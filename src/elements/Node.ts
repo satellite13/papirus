@@ -1,0 +1,888 @@
+import { Element, generateId } from './Element';
+import { Port, type PortOptions } from './Port';
+import { TextLabel, type TextLabelOptions } from './TextLabel';
+import { NodeImage, type NodeImageOptions, type NodeImagePlacement, isCornerPlacement } from './NodeImage';
+import type { StyleManager } from '@/styles/StyleManager';
+import type { Bounds, LabelPlacement, NodeStyle, Point, Size } from '@/types';
+export type { LabelPlacement } from '../types';
+import { shallowEqual } from '@/utils/style';
+import {
+  DEFAULT_SELECTION_COLOR,
+  NODE_HITBOX_PADDING,
+  RESIZE_HANDLE_OFFSET,
+  RESIZE_HANDLE_SIZE,
+} from '@/constants';
+
+export interface NodeOptions {
+  id?: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  style?: NodeStyle;
+  styleClass?: string;
+  label?: string | TextLabelOptions;
+  labelPlacement?: LabelPlacement;
+  icon?: NodeImageOptions;
+  ports?: PortOptions[];
+  showPortsAlways?: boolean;
+  anchorPoints?: AnchorPointsConfig;
+}
+
+export type ResizeHandle = 'nw' | 'ne' | 'se' | 'sw';
+export type AnchorId = `${'top' | 'right' | 'bottom' | 'left'}:${number}`;
+
+/**
+ * Validate if a string is a valid AnchorId format
+ */
+export function isValidAnchorId(id: string): id is AnchorId {
+  return /^(top|right|bottom|left):\d+$/.test(id);
+}
+
+export interface AnchorPointsConfig {
+  top?: number;
+  right?: number;
+  bottom?: number;
+  left?: number;
+}
+
+const DEFAULT_NODE_STYLE: NodeStyle = {
+  fillColor: '#ffffff',
+  strokeColor: '#333333',
+  strokeWidth: 2,
+  opacity: 1,
+};
+
+/**
+ * Abstract base class for diagram nodes
+ */
+export abstract class Node extends Element {
+  protected _ports: Port[] = [];
+  protected _label?: TextLabel;
+  protected _icon?: NodeImage;
+  protected _nodeStyle: NodeStyle;
+  protected _showPortsAlways: boolean;
+  protected _anchorPoints: Required<AnchorPointsConfig>;
+  protected _defaultSize: Size;
+  protected _labelPlacement: LabelPlacement;
+
+  protected constructor(options: NodeOptions) {
+    super({
+      id: options.id ?? generateId('node'),
+      x: options.x,
+      y: options.y,
+      width: options.width,
+      height: options.height,
+      style: options.style,
+      styleClass: options.styleClass,
+    });
+
+    this._defaultSize = { width: options.width, height: options.height };
+    this._nodeStyle = { ...DEFAULT_NODE_STYLE, ...options.style };
+    this._showPortsAlways = options.showPortsAlways ?? false;
+    this._anchorPoints = this.normalizeAnchorPoints(options.anchorPoints);
+    this._labelPlacement = options.labelPlacement ?? 'auto';
+
+    if (options.label !== undefined) {
+      if (typeof options.label === 'string') {
+        this._label = new TextLabel({ text: options.label, onChange: () => this.markDirty() });
+      } else {
+        this._label = new TextLabel({ ...options.label, onChange: () => this.markDirty() });
+      }
+    }
+
+    if (options.icon !== undefined) {
+      this._icon = new NodeImage(options.icon, () => this.markDirty());
+    }
+
+    if (options.ports !== undefined) {
+      for (const portOptions of options.ports) {
+        this.addPort(portOptions);
+      }
+    }
+  }
+
+  /**
+   * Node style
+   */
+  override get style(): NodeStyle {
+    return this._nodeStyle;
+  }
+
+  override set style(value: NodeStyle) {
+    this._nodeStyle = { ...DEFAULT_NODE_STYLE, ...value };
+    this._style = value;
+    this.markDirty();
+  }
+
+  applyStyleManager(styleManager: StyleManager): void {
+    const baseStyle = styleManager.getNodeStyle(this._state, this._styleClass);
+    const mergedStyle = { ...baseStyle, ...this._style };
+    if (!shallowEqual(this._nodeStyle, mergedStyle)) {
+      this._nodeStyle = mergedStyle;
+      this.markDirty();
+    }
+
+    if (this._label) {
+      this._label.applyStyleManager(styleManager);
+    }
+
+    for (const port of this._ports) {
+      port.applyStyleManager(styleManager);
+    }
+  }
+
+  /**
+   * Ports on this node
+   */
+  get ports(): readonly Port[] {
+    return this._ports;
+  }
+
+  /**
+   * Text label
+   */
+  get label(): TextLabel | undefined {
+    return this._label;
+  }
+
+  set label(value: TextLabel | string | undefined) {
+    if (value === undefined) {
+      this._label = undefined;
+    } else if (typeof value === 'string') {
+      this._label = new TextLabel({ text: value, onChange: () => this.markDirty() });
+    } else {
+      this._label = value;
+      this._label.setOnChange(() => this.markDirty());
+    }
+    this.markDirty();
+  }
+
+  /**
+   * Node icon/image
+   */
+  get icon(): NodeImage | undefined {
+    return this._icon;
+  }
+
+  set icon(value: NodeImage | NodeImageOptions | undefined) {
+    if (value === undefined) {
+      this._icon = undefined;
+    } else if (value instanceof NodeImage) {
+      this._icon = value;
+    } else {
+      this._icon = new NodeImage(value, () => this.markDirty());
+    }
+    this.markDirty();
+  }
+
+  /**
+   * Add a port to this node
+   */
+  addPort(options: PortOptions): Port {
+    const port = new Port(options);
+    this._ports.push(port);
+    this.markDirty();
+    return port;
+  }
+
+  /**
+   * Remove a port by ID
+   */
+  removePort(portId: string): boolean {
+    const index = this._ports.findIndex((p) => p.id === portId);
+    if (index === -1) {
+      return false;
+    }
+    this._ports.splice(index, 1);
+    this.markDirty();
+    return true;
+  }
+
+  /**
+   * Get a port by ID
+   */
+  getPort(portId: string): Port | undefined {
+    return this._ports.find((p) => p.id === portId);
+  }
+
+  /**
+   * Get absolute position of a port
+   */
+  getPortPosition(portId: string): Point | undefined {
+    const port = this.getPort(portId);
+    if (port === undefined) {
+      return undefined;
+    }
+    return port.getAbsolutePosition(this);
+  }
+
+  /**
+   * Find port at a point
+   */
+  getPortAtPoint(point: Point): Port | undefined {
+    for (const port of this._ports) {
+      if (port.hitTest(point, this)) {
+        return port;
+      }
+    }
+    return undefined;
+  }
+
+  /**
+   * Apply style to canvas context
+   */
+  protected applyStyle(ctx: CanvasRenderingContext2D): void {
+    const style = this._nodeStyle;
+
+    ctx.fillStyle = style.fillColor ?? '#ffffff';
+    ctx.strokeStyle = style.strokeColor ?? '#333333';
+    ctx.lineWidth = style.strokeWidth ?? 2;
+    ctx.globalAlpha = style.opacity ?? 1;
+    if (style.lineDash !== undefined && style.lineDash.length > 0) {
+      ctx.setLineDash(style.lineDash);
+    } else {
+      ctx.setLineDash([]);
+    }
+    if (style.lineDashOffset !== undefined) {
+      ctx.lineDashOffset = style.lineDashOffset;
+    }
+
+    // Highlight for hover state only
+    if (this._state === 'hover') {
+      ctx.strokeStyle = '#6366f1';
+    }
+  }
+
+  /**
+   * Whether to always show ports
+   */
+  get showPortsAlways(): boolean {
+    return this._showPortsAlways;
+  }
+
+  set showPortsAlways(value: boolean) {
+    if (this._showPortsAlways !== value) {
+      this._showPortsAlways = value;
+      this.markDirty();
+    }
+  }
+
+  /**
+   * Anchor points configuration (per side)
+   */
+  get anchorPoints(): Required<AnchorPointsConfig> {
+    return this._anchorPoints;
+  }
+
+  set anchorPoints(value: AnchorPointsConfig) {
+    this._anchorPoints = this.normalizeAnchorPoints(value);
+    this.markDirty();
+  }
+
+  /**
+   * Label placement inside the node
+   */
+  get labelPlacement(): LabelPlacement {
+    return this._labelPlacement;
+  }
+
+  set labelPlacement(value: LabelPlacement) {
+    if (this._labelPlacement !== value) {
+      this._labelPlacement = value;
+      this.markDirty();
+    }
+  }
+
+  /**
+   * Default size (initial width/height)
+   */
+  get defaultSize(): Size {
+    return { ...this._defaultSize };
+  }
+
+  /**
+   * Render ports
+   */
+  protected renderPorts(ctx: CanvasRenderingContext2D): void {
+    // Show ports when hovered, selected, dragging, or if showPortsAlways is set
+    const shouldShow =
+      this._showPortsAlways ||
+      this._ports.some((port) => port.hovered) ||
+      this._state === 'hover' ||
+      this._state === 'selected' ||
+      this._state === 'dragging';
+
+    if (!shouldShow) {
+      return;
+    }
+
+    for (const port of this._ports) {
+      port.render(ctx, this);
+    }
+  }
+
+  /**
+   * Render label
+   */
+  protected renderLabel(ctx: CanvasRenderingContext2D, bounds: Bounds = this.getBounds()): void {
+    if (this._label === undefined) {
+      return;
+    }
+
+    ctx.globalAlpha = 1;
+    this._label.render(ctx, bounds);
+  }
+
+  /**
+   * Render icon, label, and ports
+   */
+  protected renderContents(ctx: CanvasRenderingContext2D): void {
+    // Reset dash settings so icon/label/ports render solid
+    ctx.setLineDash([]);
+    ctx.lineDashOffset = 0;
+
+    let bounds = this.getBounds();
+    const labelSize = this._label ? this._label.measure(ctx) : undefined;
+    const iconBoxSize = this._icon ? this.getIconBoxSize() : undefined;
+
+    if (labelSize || iconBoxSize) {
+      this.ensureContentsFit(labelSize, iconBoxSize);
+      bounds = this.getBounds();
+    }
+
+    let iconBounds = bounds;
+    let labelBounds = bounds;
+
+    if (this._icon && iconBoxSize) {
+      iconBounds = this.getIconBounds(bounds, iconBoxSize, this._icon.placement);
+    }
+
+    if (
+      this._icon &&
+      this._label &&
+      iconBoxSize &&
+      labelSize &&
+      this._labelPlacement === 'auto' &&
+      this._icon.placement !== 'center'
+    ) {
+      const gap = this._icon.gap;
+      const placement = this._icon.placement;
+
+      if (isCornerPlacement(placement)) {
+        // For corner placements, icon goes in corner, label uses remaining space
+        iconBounds = this.getIconBounds(bounds, iconBoxSize, placement);
+        // Label gets full bounds (will be centered by default)
+        labelBounds = bounds;
+      } else {
+        switch (placement) {
+          case 'top':
+            iconBounds = {
+              x: bounds.x,
+              y: bounds.y,
+              width: bounds.width,
+              height: iconBoxSize.height,
+            };
+            labelBounds = {
+              x: bounds.x,
+              y: bounds.y + iconBoxSize.height + gap,
+              width: bounds.width,
+              height: Math.max(0, bounds.height - iconBoxSize.height - gap),
+            };
+            break;
+          case 'bottom':
+            iconBounds = {
+              x: bounds.x,
+              y: bounds.y + bounds.height - iconBoxSize.height,
+              width: bounds.width,
+              height: iconBoxSize.height,
+            };
+            labelBounds = {
+              x: bounds.x,
+              y: bounds.y,
+              width: bounds.width,
+              height: Math.max(0, bounds.height - iconBoxSize.height - gap),
+            };
+            break;
+          case 'left':
+            iconBounds = {
+              x: bounds.x,
+              y: bounds.y,
+              width: iconBoxSize.width,
+              height: bounds.height,
+            };
+            labelBounds = {
+              x: bounds.x + iconBoxSize.width + gap,
+              y: bounds.y,
+              width: Math.max(0, bounds.width - iconBoxSize.width - gap),
+              height: bounds.height,
+            };
+            break;
+          case 'right':
+            iconBounds = {
+              x: bounds.x + bounds.width - iconBoxSize.width,
+              y: bounds.y,
+              width: iconBoxSize.width,
+              height: bounds.height,
+            };
+            labelBounds = {
+              x: bounds.x,
+              y: bounds.y,
+              width: Math.max(0, bounds.width - iconBoxSize.width - gap),
+              height: bounds.height,
+            };
+            break;
+          default:
+            break;
+        }
+      }
+    } else if (this._label && labelSize) {
+      labelBounds = this.getLabelBounds(bounds, labelSize, this._labelPlacement);
+    }
+
+    if (this._icon) {
+      this._icon.render(ctx, iconBounds);
+    }
+
+    this.renderLabel(ctx, labelBounds);
+    this.renderPorts(ctx);
+  }
+
+  /**
+   * Minimal size required to fit current contents
+   */
+  getContentMinSize(ctx: CanvasRenderingContext2D): Size {
+    const labelSize = this._label ? this._label.measure(ctx) : undefined;
+    const iconBoxSize = this._icon ? this.getIconBoxSize() : undefined;
+    return this.calculateContentMinSize(labelSize, iconBoxSize);
+  }
+
+  /**
+   * Render resize handles when selected
+   */
+  renderResizeHandles(ctx: CanvasRenderingContext2D): void {
+    if (this._state !== 'selected') {
+      return;
+    }
+
+    const bounds = this.getBounds();
+    const offset = RESIZE_HANDLE_OFFSET;
+    const size = RESIZE_HANDLE_SIZE;
+    const half = size / 2;
+
+    ctx.save();
+
+    // Draw dashed selection rectangle
+    ctx.strokeStyle = DEFAULT_SELECTION_COLOR;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.strokeRect(
+      bounds.x - offset,
+      bounds.y - offset,
+      bounds.width + offset * 2,
+      bounds.height + offset * 2
+    );
+
+    // Draw resize handles
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = DEFAULT_SELECTION_COLOR;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([]);
+
+    for (const handle of this.getResizeHandlePositions()) {
+      ctx.beginPath();
+      ctx.rect(handle.x - half, handle.y - half, size, size);
+      ctx.fill();
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+
+  /**
+   * Hit test a resize handle
+   */
+  hitTestResizeHandle(point: Point): ResizeHandle | null {
+    if (this._state !== 'selected') {
+      return null;
+    }
+
+    const size = RESIZE_HANDLE_SIZE;
+    const half = size / 2;
+
+    for (const handle of this.getResizeHandlePositions()) {
+      if (
+        point.x >= handle.x - half &&
+        point.x <= handle.x + half &&
+        point.y >= handle.y - half &&
+        point.y <= handle.y + half
+      ) {
+        return handle.type;
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Default bounding box hit test
+   */
+  hitTest(point: Point): boolean {
+    const bounds = this.getBounds();
+    const padding = NODE_HITBOX_PADDING;
+    return (
+      point.x >= bounds.x - padding &&
+      point.x <= bounds.x + bounds.width + padding &&
+      point.y >= bounds.y - padding &&
+      point.y <= bounds.y + bounds.height + padding
+    );
+  }
+
+  /**
+   * Get a connection point on the node boundary toward a target point,
+   * snapped to nearest anchor point on the contour.
+   */
+  getConnectionPoint(target: Point): Point {
+    const anchors = this.getAnchorsOnOutline();
+    if (anchors.length === 0) {
+      return this.getOutlinePointToward(target);
+    }
+
+    let closest = anchors[0]!;
+    let minDist = (target.x - closest.point.x) ** 2 + (target.y - closest.point.y) ** 2;
+
+    for (let i = 1; i < anchors.length; i++) {
+      const anchor = anchors[i]!;
+      const dist = (target.x - anchor.point.x) ** 2 + (target.y - anchor.point.y) ** 2;
+      if (dist < minDist) {
+        minDist = dist;
+        closest = anchor;
+      }
+    }
+
+    return closest.point;
+  }
+
+  /**
+   * Get all anchors on the outline
+   */
+  getAnchors(): { id: AnchorId; point: Point }[] {
+    return this.getAnchorsOnOutline();
+  }
+
+  /**
+   * Get all anchor points on the outline
+   */
+  getAnchorPoints(): Point[] {
+    return this.getAnchorsOnOutline().map((anchor) => anchor.point);
+  }
+
+  /**
+   * Get nearest anchor to a target point
+   */
+  getNearestAnchor(target: Point): { id: AnchorId; point: Point } | null {
+    const anchors = this.getAnchorsOnOutline();
+    if (anchors.length === 0) {
+      return null;
+    }
+
+    let closest = anchors[0]!;
+    let minDist = (target.x - closest.point.x) ** 2 + (target.y - closest.point.y) ** 2;
+
+    for (let i = 1; i < anchors.length; i++) {
+      const anchor = anchors[i]!;
+      const dist = (target.x - anchor.point.x) ** 2 + (target.y - anchor.point.y) ** 2;
+      if (dist < minDist) {
+        minDist = dist;
+        closest = anchor;
+      }
+    }
+
+    return closest;
+  }
+
+  /**
+   * Get anchor point by id
+   */
+  getAnchorPointById(anchorId: string): Point | null {
+    if (!isValidAnchorId(anchorId)) {
+      return null;
+    }
+    const anchors = this.getAnchorsOnOutline();
+    const match = anchors.find((anchor) => anchor.id === anchorId);
+    return match?.point ?? null;
+  }
+
+  /**
+   * Get shape-specific bounds (can be overridden for non-rectangular shapes)
+   */
+  override getBounds(): Bounds {
+    return {
+      x: this._x,
+      y: this._y,
+      width: this._width,
+      height: this._height,
+    };
+  }
+
+  /**
+   * Get the type name of this node
+   */
+  abstract get typeName(): string;
+
+  /**
+   * Get intersection point on the shape outline toward the target.
+   * Override for non-rectangular shapes.
+   */
+  protected getOutlinePointToward(target: Point): Point {
+    const bounds = this.getBounds();
+    const center = this.getCenter();
+    const dx = target.x - center.x;
+    const dy = target.y - center.y;
+
+    if (dx === 0 && dy === 0) {
+      return center;
+    }
+
+    const halfW = bounds.width / 2;
+    const halfH = bounds.height / 2;
+
+    const scaleX = halfW / Math.abs(dx);
+    const scaleY = halfH / Math.abs(dy);
+    const scale = Math.min(scaleX, scaleY);
+
+    return {
+      x: center.x + dx * scale,
+      y: center.y + dy * scale,
+    };
+  }
+
+  private getResizeHandlePositions(offset = RESIZE_HANDLE_OFFSET): { type: ResizeHandle; x: number; y: number }[] {
+    const { x, y, width, height } = this.getBounds();
+
+    return [
+      { type: 'nw', x: x - offset, y: y - offset },
+      { type: 'ne', x: x + width + offset, y: y - offset },
+      { type: 'se', x: x + width + offset, y: y + height + offset },
+      { type: 'sw', x: x - offset, y: y + height + offset },
+    ];
+  }
+
+  private ensureContentsFit(labelSize?: Size, iconBoxSize?: Size): void {
+    const bounds = this.getBounds();
+    const minSize = this.calculateContentMinSize(labelSize, iconBoxSize);
+
+    if (minSize.width > bounds.width) {
+      this.width = minSize.width;
+    }
+    if (minSize.height > bounds.height) {
+      this.height = minSize.height;
+    }
+  }
+
+  private calculateContentMinSize(labelSize?: Size, iconBoxSize?: Size): Size {
+    let minWidth = 0;
+    let minHeight = 0;
+
+    if (labelSize) {
+      minWidth = Math.max(minWidth, labelSize.width);
+      minHeight = Math.max(minHeight, labelSize.height);
+    }
+
+    if (iconBoxSize) {
+      minWidth = Math.max(minWidth, iconBoxSize.width);
+      minHeight = Math.max(minHeight, iconBoxSize.height);
+    }
+
+    if (labelSize && iconBoxSize && this._icon) {
+      const gap = this._icon.gap;
+      const labelPlacement = this._labelPlacement === 'auto' ? 'center' : this._labelPlacement;
+      const iconPlacement = this._icon.placement;
+
+      if (this._labelPlacement === 'auto' && iconPlacement !== 'center') {
+        if (isCornerPlacement(iconPlacement)) {
+          // For corner placements, just ensure both fit (no stacking)
+          minWidth = Math.max(minWidth, iconBoxSize.width, labelSize.width);
+          minHeight = Math.max(minHeight, iconBoxSize.height, labelSize.height);
+        } else if (iconPlacement === 'top' || iconPlacement === 'bottom') {
+          minHeight = Math.max(minHeight, iconBoxSize.height + gap + labelSize.height);
+          minWidth = Math.max(minWidth, iconBoxSize.width, labelSize.width);
+        } else if (iconPlacement === 'left' || iconPlacement === 'right') {
+          minWidth = Math.max(minWidth, iconBoxSize.width + gap + labelSize.width);
+          minHeight = Math.max(minHeight, iconBoxSize.height, labelSize.height);
+        }
+      } else {
+        const labelHorizontal = labelPlacement === 'left' || labelPlacement === 'right';
+        const labelVertical = labelPlacement === 'top' || labelPlacement === 'bottom';
+        const iconHorizontal = iconPlacement === 'left' || iconPlacement === 'right';
+        const iconVertical = iconPlacement === 'top' || iconPlacement === 'bottom';
+
+        if (labelHorizontal && iconHorizontal && labelPlacement !== iconPlacement) {
+          minWidth = Math.max(minWidth, iconBoxSize.width + gap + labelSize.width);
+        }
+        if (labelVertical && iconVertical && labelPlacement !== iconPlacement) {
+          minHeight = Math.max(minHeight, iconBoxSize.height + gap + labelSize.height);
+        }
+      }
+    }
+
+    return { width: minWidth, height: minHeight };
+  }
+
+  private getLabelBounds(bounds: Bounds, labelSize: Size, placement: LabelPlacement): Bounds {
+    const normalizedPlacement = placement === 'auto' ? 'center' : placement;
+    const width = Math.min(labelSize.width, bounds.width);
+    const height = Math.min(labelSize.height, bounds.height);
+
+    let x = bounds.x + (bounds.width - width) / 2;
+    let y = bounds.y + (bounds.height - height) / 2;
+
+    switch (normalizedPlacement) {
+      case 'top':
+        y = bounds.y;
+        break;
+      case 'bottom':
+        y = bounds.y + bounds.height - height;
+        break;
+      case 'left':
+        x = bounds.x;
+        break;
+      case 'right':
+        x = bounds.x + bounds.width - width;
+        break;
+      default:
+        break;
+    }
+
+    return { x, y, width, height };
+  }
+
+  private getIconBoxSize(): Size | undefined {
+    if (!this._icon) {
+      return undefined;
+    }
+
+    const { width, height } = this._icon.getSize();
+    if (width <= 0 || height <= 0) {
+      return undefined;
+    }
+
+    const padding = this._icon.options.padding ?? 8;
+    const margin = Math.max(0, this._icon.options.margin ?? 0);
+    return {
+      width: width + padding * 2 + margin * 2,
+      height: height + padding * 2 + margin * 2,
+    };
+  }
+
+  private getIconBounds(bounds: Bounds, iconBoxSize: Size, placement: NodeImagePlacement): Bounds {
+    switch (placement) {
+      case 'top':
+        return {
+          x: bounds.x,
+          y: bounds.y,
+          width: bounds.width,
+          height: iconBoxSize.height,
+        };
+      case 'bottom':
+        return {
+          x: bounds.x,
+          y: bounds.y + bounds.height - iconBoxSize.height,
+          width: bounds.width,
+          height: iconBoxSize.height,
+        };
+      case 'left':
+        return {
+          x: bounds.x,
+          y: bounds.y,
+          width: iconBoxSize.width,
+          height: bounds.height,
+        };
+      case 'right':
+        return {
+          x: bounds.x + bounds.width - iconBoxSize.width,
+          y: bounds.y,
+          width: iconBoxSize.width,
+          height: bounds.height,
+        };
+      case 'top-left':
+        return {
+          x: bounds.x,
+          y: bounds.y,
+          width: iconBoxSize.width,
+          height: iconBoxSize.height,
+        };
+      case 'top-right':
+        return {
+          x: bounds.x + bounds.width - iconBoxSize.width,
+          y: bounds.y,
+          width: iconBoxSize.width,
+          height: iconBoxSize.height,
+        };
+      case 'bottom-left':
+        return {
+          x: bounds.x,
+          y: bounds.y + bounds.height - iconBoxSize.height,
+          width: iconBoxSize.width,
+          height: iconBoxSize.height,
+        };
+      case 'bottom-right':
+        return {
+          x: bounds.x + bounds.width - iconBoxSize.width,
+          y: bounds.y + bounds.height - iconBoxSize.height,
+          width: iconBoxSize.width,
+          height: iconBoxSize.height,
+        };
+      default:
+        return bounds;
+    }
+  }
+
+  private normalizeAnchorPoints(config?: AnchorPointsConfig): Required<AnchorPointsConfig> {
+    const normalize = (value: number | undefined): number => {
+      if (value === undefined) return 1;
+      if (!Number.isFinite(value)) return 1;
+      return Math.max(0, Math.floor(value));
+    };
+
+    return {
+      top: normalize(config?.top),
+      right: normalize(config?.right),
+      bottom: normalize(config?.bottom),
+      left: normalize(config?.left),
+    };
+  }
+
+  private getAnchorsOnOutline(): { id: AnchorId; point: Point }[] {
+    const { top, right, bottom, left } = this._anchorPoints;
+    const bounds = this.getBounds();
+    const anchors: { id: AnchorId; point: Point }[] = [];
+
+    const addPoints = (
+      side: 'top' | 'right' | 'bottom' | 'left',
+      count: number,
+      cb: (t: number) => Point
+    ): void => {
+      if (count <= 0) return;
+      for (let i = 0; i < count; i++) {
+        const t = (i + 1) / (count + 1);
+        const id: AnchorId = `${side}:${i}`;
+        anchors.push({ id, point: cb(t) });
+      }
+    };
+
+    addPoints('top', top, (t) => ({ x: bounds.x + bounds.width * t, y: bounds.y }));
+    addPoints('bottom', bottom, (t) => ({ x: bounds.x + bounds.width * t, y: bounds.y + bounds.height }));
+    addPoints('left', left, (t) => ({ x: bounds.x, y: bounds.y + bounds.height * t }));
+    addPoints('right', right, (t) => ({ x: bounds.x + bounds.width, y: bounds.y + bounds.height * t }));
+
+    if (anchors.length === 0) {
+      return [];
+    }
+
+    return anchors.map((anchor) => ({
+      id: anchor.id,
+      point: this.getOutlinePointToward(anchor.point),
+    }));
+  }
+}

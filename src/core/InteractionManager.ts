@@ -1,0 +1,812 @@
+import { InputHandler } from '@/events/InputHandler';
+import type { InputEvent, WheelInputEvent, PanInputEvent, PinchInputEvent } from '@/events/InputHandler';
+import type { DiagramRenderer } from './DiagramRenderer';
+import { SelectionManager } from './SelectionManager';
+import { DragManager } from './DragManager';
+import { ResizeManager } from './ResizeManager';
+import { NavigationManager } from './NavigationManager';
+import { ConnectionManager } from './ConnectionManager';
+import {
+  ChangeEdgePropertiesCommand,
+  ChangeGroupPropertiesCommand,
+  ChangeNodePropertiesCommand,
+  HistoryManager,
+  MoveNodesCommand,
+  RemoveNodeFromGroupsCommand,
+  createEdgeSnapshot,
+  createGroupSnapshot,
+  createNodeSnapshot,
+} from './HistoryManager';
+import type { Bounds, EdgeEndpoint, Point, SerializedEdge, SerializedNode } from '@/types';
+import { Edge } from '@/elements/Edge';
+import type { Group } from '@/elements/Group';
+import type { Node } from '@/elements/Node';
+import { CompositeCommand } from './history/commands';
+
+export interface InteractionKeymap {
+  deleteKeys: string[];
+  copyKey: string;
+  pasteKey: string;
+  undoKey: string;
+  redoKey: string;
+}
+
+export interface InteractionManagerOptions {
+  renderer: DiagramRenderer;
+  createEdge?: (from: EdgeEndpoint, to: EdgeEndpoint) => Edge;
+  nodeFactory?: (data: SerializedNode) => Node;
+  edgeFactory?: (data: SerializedEdge) => Edge;
+  snapToGrid?: boolean;
+  gridSize?: number;
+  keymap?: Partial<InteractionKeymap>;
+}
+
+const DEFAULT_KEYMAP: InteractionKeymap = {
+  deleteKeys: ['Delete', 'Backspace'],
+  copyKey: 'c',
+  pasteKey: 'v',
+  undoKey: 'z',
+  redoKey: 'y',
+};
+
+export class InteractionManager {
+  private readonly renderer: DiagramRenderer;
+  private inputHandler: InputHandler;
+  private readonly selectionManager: SelectionManager;
+  private readonly dragManager: DragManager;
+  private readonly resizeManager: ResizeManager;
+  private readonly navigationManager: NavigationManager;
+  private readonly connectionManager: ConnectionManager;
+  private readonly historyManager: HistoryManager;
+  private keymap: InteractionKeymap;
+  private overlayCleanup: (() => void) | null = null;
+
+  private dragStartPositions = new Map<string, { x: number; y: number }>();
+  private reconnectOrigins = new Map<
+    string,
+    { endpoint: 'start' | 'end'; original: EdgeEndpoint }
+  >();
+
+  private clipboard: {
+    nodes: SerializedNode[];
+    edges: SerializedEdge[];
+  } | null = null;
+
+  private pendingPropertyChanges = new Map<
+    string,
+    {
+      kind: 'node' | 'edge' | 'group';
+      id: string;
+      before:
+        | ReturnType<typeof createNodeSnapshot>
+        | ReturnType<typeof createEdgeSnapshot>
+        | ReturnType<typeof createGroupSnapshot>;
+      after:
+        | ReturnType<typeof createNodeSnapshot>
+        | ReturnType<typeof createEdgeSnapshot>
+        | ReturnType<typeof createGroupSnapshot>;
+      timerId: number;
+    }
+  >();
+  private propertyChangeDebounceMs = 350;
+
+  constructor(options: InteractionManagerOptions) {
+    this.renderer = options.renderer;
+    this.inputHandler = new InputHandler({
+      canvas: this.renderer.getCanvas(),
+      screenToWorld: (x, y): { x: number; y: number } => this.renderer.screenToWorld(x, y),
+    });
+
+    this.selectionManager = new SelectionManager(this.renderer);
+    this.dragManager = new DragManager({
+      renderer: this.renderer,
+      selectionManager: this.selectionManager,
+      snapToGrid: options.snapToGrid ?? this.renderer.snapToGrid,
+      gridSize: options.gridSize ?? 20,
+    });
+    this.resizeManager = new ResizeManager({
+      renderer: this.renderer,
+      selectionManager: this.selectionManager,
+      snapToGrid: options.snapToGrid ?? this.renderer.snapToGrid,
+      gridSize: options.gridSize ?? 20,
+    });
+    this.navigationManager = new NavigationManager({ renderer: this.renderer });
+    this.historyManager = new HistoryManager();
+
+    this.keymap = { ...DEFAULT_KEYMAP, ...options.keymap };
+
+    this.connectionManager = new ConnectionManager({
+      renderer: this.renderer,
+      createEdge:
+        options.createEdge ??
+        ((from, to): Edge => new Edge({ from, to, type: 'bezier', arrowType: 'single' })),
+      addEdge: (edge): void => {
+        this.historyManager.execute({
+          execute: (): void => this.renderer.addEdge(edge),
+          undo: (): void => {
+            this.renderer.removeEdge(edge.id);
+          },
+        });
+      },
+    });
+
+    this.setupEvents(options);
+  }
+
+  get selection(): SelectionManager {
+    return this.selectionManager;
+  }
+
+  get drag(): DragManager {
+    return this.dragManager;
+  }
+
+  get resize(): ResizeManager {
+    return this.resizeManager;
+  }
+
+  get navigation(): NavigationManager {
+    return this.navigationManager;
+  }
+
+  get connection(): ConnectionManager {
+    return this.connectionManager;
+  }
+
+  get history(): HistoryManager {
+    return this.historyManager;
+  }
+
+  changeNodeProperties(nodeId: string, apply: (node: Node) => void): void {
+    const node = this.renderer.getNode(nodeId);
+    if (!node) {
+      return;
+    }
+    const before = createNodeSnapshot(node);
+    apply(node);
+    const after = createNodeSnapshot(node);
+    if (JSON.stringify(before) === JSON.stringify(after)) {
+      return;
+    }
+    this.queuePropertyChange('node', nodeId, before, after);
+  }
+
+  changeEdgeProperties(edgeId: string, apply: (edge: Edge) => void): void {
+    const edge = this.renderer.getEdge(edgeId);
+    if (!edge) {
+      return;
+    }
+    const before = createEdgeSnapshot(edge);
+    apply(edge);
+    const after = createEdgeSnapshot(edge);
+    if (JSON.stringify(before) === JSON.stringify(after)) {
+      return;
+    }
+    this.queuePropertyChange('edge', edgeId, before, after);
+  }
+
+  changeGroupProperties(groupId: string, apply: (group: Group) => void): void {
+    const group = this.renderer.getGroup(groupId);
+    if (!group) {
+      return;
+    }
+    const before = createGroupSnapshot(group);
+    apply(group);
+    const after = createGroupSnapshot(group);
+    if (JSON.stringify(before) === JSON.stringify(after)) {
+      return;
+    }
+    this.queuePropertyChange('group', groupId, before, after);
+  }
+
+  removeNodeFromGroups(nodeId: string, groupIds?: string[]): void {
+    const node = this.renderer.getNode(nodeId);
+    if (!node) {
+      return;
+    }
+    const groups =
+      groupIds ??
+      Array.from(this.renderer.groups.values())
+        .filter((group) => group.hasChild(nodeId))
+        .map((group) => group.id);
+    if (groups.length === 0) {
+      return;
+    }
+    this.historyManager.execute(
+      new RemoveNodeFromGroupsCommand(
+        (id) => this.renderer.getGroup(id),
+        (id) => this.renderer.getNode(id),
+        nodeId,
+        groups
+      )
+    );
+  }
+
+  deleteByIds(ids: string[]): void {
+    if (ids.length === 0) {
+      return;
+    }
+
+    const command = this.buildDeleteCommand(ids);
+    this.historyManager.execute(command);
+    this.selectionManager.clearSelection();
+    this.renderer.markDirty();
+  }
+
+  zoomToSelection(padding = 50): void {
+    const bounds = this.getSelectionBounds();
+    if (bounds) {
+      this.navigationManager.zoomToSelection(bounds, padding);
+    }
+  }
+
+  destroy(): void {
+    this.inputHandler.destroy();
+    this.overlayCleanup?.();
+    this.overlayCleanup = null;
+  }
+
+  private setupEvents(options: InteractionManagerOptions): void {
+    this.overlayCleanup = this.renderer.addOverlayRenderer((ctx) => {
+      this.selectionManager.renderSelectionRect(ctx);
+      this.connectionManager.renderPreview(ctx);
+      this.connectionManager.renderHoverAnchors(ctx);
+      for (const id of this.selectionManager.selectedIds) {
+        const node = this.renderer.getNode(id);
+        if (node) {
+          node.renderResizeHandles(ctx);
+        }
+      }
+    });
+
+    this.inputHandler.on('mousedown', (event) => this.handleMouseDown(event));
+    this.inputHandler.on('mousemove', (event) => this.handleMouseMove(event));
+    this.inputHandler.on('mouseup', (event) => this.handleMouseUp(event));
+    this.inputHandler.on('click', (event) => this.handleClick(event));
+    this.inputHandler.on('wheel', (event) => this.handleWheel(event));
+    this.inputHandler.on('pan', (event) => this.handlePan(event));
+    this.inputHandler.on('pinch', (event) => this.handlePinch(event));
+    this.inputHandler.on('keydown', (event) => this.handleKeyDown(event, options));
+    this.inputHandler.on('keyup', (event) => this.handleKeyUp(event));
+
+    this.dragManager.on('dragstart', (nodeIds) => {
+      this.connectionManager.disableHover();
+      this.dragStartPositions.clear();
+      for (const id of nodeIds) {
+        const node = this.renderer.getNode(id);
+        if (node) {
+          this.dragStartPositions.set(id, { x: node.x, y: node.y });
+        }
+      }
+    });
+
+    this.dragManager.on('dragend', (nodeIds) => {
+      this.connectionManager.enableHover();
+
+      const nodePositions = new Map<
+        string,
+        { before: { x: number; y: number }; after: { x: number; y: number } }
+      >();
+      for (const id of nodeIds) {
+        const node = this.renderer.getNode(id);
+        const before = this.dragStartPositions.get(id);
+        if (!node || !before) continue;
+        const after = { x: node.x, y: node.y };
+        if (before.x !== after.x || before.y !== after.y) {
+          nodePositions.set(id, { before, after });
+        }
+      }
+
+      if (nodePositions.size > 0) {
+        this.historyManager.execute(
+          new MoveNodesCommand((id) => this.renderer.getNode(id), nodePositions)
+        );
+      }
+    });
+
+    this.connectionManager.on('edgeReconnectStart', (edge, endpoint, original) => {
+      this.reconnectOrigins.set(edge.id, { endpoint, original: { ...original } });
+    });
+
+    this.connectionManager.on('edgeReconnect', (edge, endpoint) => {
+      const origin = this.reconnectOrigins.get(edge.id);
+      if (!origin || origin.endpoint !== endpoint) {
+        return;
+      }
+
+      const before = origin.original;
+      const after = endpoint === 'start' ? edge.from : edge.to;
+      if (this.endpointsEqual(before, after)) {
+        this.reconnectOrigins.delete(edge.id);
+        return;
+      }
+
+      this.historyManager.execute({
+        execute: () => {
+          if (endpoint === 'start') {
+            edge.from = { ...after };
+          } else {
+            edge.to = { ...after };
+          }
+          this.renderer.markDirty();
+        },
+        undo: () => {
+          if (endpoint === 'start') {
+            edge.from = { ...before };
+          } else {
+            edge.to = { ...before };
+          }
+          this.renderer.markDirty();
+        },
+      });
+      this.reconnectOrigins.delete(edge.id);
+    });
+
+    this.historyManager.on('change', () => {
+      this.renderer.markDirty();
+    });
+  }
+
+  private handleMouseDown(event: InputEvent): void {
+    if (this.resizeManager.handleMouseDown(event)) {
+      return;
+    }
+    if (this.connectionManager.tryStartReconnection(event)) {
+      return;
+    }
+    if (this.connectionManager.tryStartConnectionAtPoint(event)) {
+      return;
+    }
+
+    const point = { x: event.worldX, y: event.worldY };
+    const hitElement = this.renderer.getElementAtPoint(point);
+
+    if (hitElement === undefined && event.button === 0) {
+      if (event.ctrlKey || event.metaKey) {
+        this.selectionManager.startSelectionRect(point);
+        return;
+      }
+      this.selectionManager.clearSelection();
+      this.navigationManager.startPan(event);
+      return;
+    }
+
+    if (this.navigationManager.handleMouseDown(event)) {
+      return;
+    }
+
+    // Connection creation now starts from anchor points without modifiers
+
+    if (this.dragManager.handleMouseDown(event)) {
+      return;
+    }
+  }
+
+  private handleMouseMove(event: InputEvent): void {
+    if (this.resizeManager.handleMouseMove(event)) {
+      return;
+    }
+
+    if (this.connectionManager.handleMouseMove(event)) {
+      return;
+    }
+
+    if (this.dragManager.handleMouseMove(event)) {
+      return;
+    }
+
+    if (this.selectionManager.selectionRectangle !== null) {
+      this.selectionManager.updateSelectionRect({ x: event.worldX, y: event.worldY });
+      return;
+    }
+
+    this.navigationManager.handleMouseMove(event);
+  }
+
+  private handleMouseUp(event: InputEvent): void {
+    if (this.resizeManager.handleMouseUp()) {
+      return;
+    }
+
+    if (this.connectionManager.handleMouseUp(event)) {
+      return;
+    }
+
+    if (this.dragManager.handleMouseUp(event)) {
+      return;
+    }
+
+    if (this.selectionManager.selectionRectangle !== null) {
+      this.selectionManager.endSelectionRect();
+      return;
+    }
+
+    this.navigationManager.handleMouseUp(event);
+  }
+
+  private handleClick(event: InputEvent): void {
+    if (
+      this.dragManager.handledMouseDown ||
+      this.resizeManager.handledMouseDown ||
+      this.connectionManager.connecting
+    ) {
+      return;
+    }
+
+    this.selectionManager.handleClick(event);
+  }
+
+  private handleWheel(event: WheelInputEvent): void {
+    this.navigationManager.handleWheel(event);
+  }
+
+  private handlePan(event: PanInputEvent): void {
+    this.navigationManager.handlePanGesture(event);
+  }
+
+  private handlePinch(event: PinchInputEvent): void {
+    this.navigationManager.handlePinch(event);
+  }
+
+  private handleKeyDown(event: KeyboardEvent, options: InteractionManagerOptions): void {
+    const isCtrlOrMeta = event.ctrlKey || event.metaKey;
+    const key = event.key.toLowerCase();
+
+    if (isCtrlOrMeta && (key === 'z' || key === 'y')) {
+      this.flushPendingPropertyChanges();
+    }
+
+    if (this.historyManager.handleKeyDown(event)) {
+      return;
+    }
+
+    this.navigationManager.handleKeyDown(event);
+
+    if (this.keymap.deleteKeys.includes(event.key)) {
+      event.preventDefault();
+      this.deleteSelection();
+      return;
+    }
+
+    if (isCtrlOrMeta && key === this.keymap.copyKey) {
+      event.preventDefault();
+      this.copySelection();
+      return;
+    }
+
+    if (isCtrlOrMeta && key === this.keymap.pasteKey) {
+      event.preventDefault();
+      this.pasteSelection(options);
+      return;
+    }
+  }
+
+  private handleKeyUp(event: KeyboardEvent): void {
+    this.navigationManager.handleKeyUp(event);
+  }
+
+  private queuePropertyChange(
+    kind: 'node' | 'edge' | 'group',
+    id: string,
+    before:
+      | ReturnType<typeof createNodeSnapshot>
+      | ReturnType<typeof createEdgeSnapshot>
+      | ReturnType<typeof createGroupSnapshot>,
+    after:
+      | ReturnType<typeof createNodeSnapshot>
+      | ReturnType<typeof createEdgeSnapshot>
+      | ReturnType<typeof createGroupSnapshot>
+  ): void {
+    const key = `${kind}:${id}`;
+    const existing = this.pendingPropertyChanges.get(key);
+    if (existing) {
+      existing.after = after;
+      window.clearTimeout(existing.timerId);
+      existing.timerId = window.setTimeout(
+        () => this.flushPendingPropertyChange(key),
+        this.propertyChangeDebounceMs
+      );
+      return;
+    }
+
+    const timerId = window.setTimeout(
+      () => this.flushPendingPropertyChange(key),
+      this.propertyChangeDebounceMs
+    );
+    this.pendingPropertyChanges.set(key, { kind, id, before, after, timerId });
+  }
+
+  private flushPendingPropertyChanges(): void {
+    const keys = Array.from(this.pendingPropertyChanges.keys());
+    for (const key of keys) {
+      this.flushPendingPropertyChange(key);
+    }
+  }
+
+  private flushPendingPropertyChange(key: string): void {
+    const pending = this.pendingPropertyChanges.get(key);
+    if (!pending) {
+      return;
+    }
+    window.clearTimeout(pending.timerId);
+    this.pendingPropertyChanges.delete(key);
+    if (JSON.stringify(pending.before) === JSON.stringify(pending.after)) {
+      return;
+    }
+
+    switch (pending.kind) {
+      case 'node':
+        this.historyManager.execute(
+          new ChangeNodePropertiesCommand(
+            (id) => this.renderer.getNode(id),
+            pending.id,
+            pending.before as ReturnType<typeof createNodeSnapshot>,
+            pending.after as ReturnType<typeof createNodeSnapshot>
+          )
+        );
+        break;
+      case 'edge':
+        this.historyManager.execute(
+          new ChangeEdgePropertiesCommand(
+            (id) => this.renderer.getEdge(id),
+            pending.id,
+            pending.before as ReturnType<typeof createEdgeSnapshot>,
+            pending.after as ReturnType<typeof createEdgeSnapshot>
+          )
+        );
+        break;
+      case 'group':
+        this.historyManager.execute(
+          new ChangeGroupPropertiesCommand(
+            (id) => this.renderer.getGroup(id),
+            pending.id,
+            pending.before as ReturnType<typeof createGroupSnapshot>,
+            pending.after as ReturnType<typeof createGroupSnapshot>
+          )
+        );
+        break;
+    }
+  }
+
+  private deleteSelection(): void {
+    const selectedIds = Array.from(this.selectionManager.selectedIds);
+    this.deleteByIds(selectedIds);
+  }
+
+  private buildDeleteCommand(selectedIds: string[]): CompositeCommand {
+    const nodes: Node[] = [];
+    const edges: Edge[] = [];
+    const edgeIds = new Set<string>();
+    const nodeIds = new Set<string>();
+    const nodeGroupIds = new Map<string, string[]>();
+
+    for (const id of selectedIds) {
+      const node = this.renderer.getNode(id);
+      if (node) {
+        nodes.push(node);
+        nodeIds.add(id);
+        continue;
+      }
+
+      const edge = this.renderer.getEdge(id);
+      if (edge && !edgeIds.has(edge.id)) {
+        edgeIds.add(edge.id);
+        edges.push(edge);
+      }
+    }
+
+    if (nodeIds.size > 0) {
+      for (const group of this.renderer.groups.values()) {
+        for (const child of group.children) {
+          if ('typeName' in child && nodeIds.has(child.id)) {
+            const list = nodeGroupIds.get(child.id) ?? [];
+            list.push(group.id);
+            nodeGroupIds.set(child.id, list);
+          }
+        }
+      }
+    }
+
+    for (const edge of this.renderer.edges.values()) {
+      if (nodeIds.has(edge.from.nodeId) || nodeIds.has(edge.to.nodeId)) {
+        if (!edgeIds.has(edge.id)) {
+          edgeIds.add(edge.id);
+          edges.push(edge);
+        }
+      }
+    }
+
+    return new CompositeCommand([
+      {
+        execute: (): void => {
+          for (const edge of edges) {
+            this.renderer.removeEdge(edge.id);
+          }
+          for (const node of nodes) {
+            this.renderer.removeNode(node.id);
+          }
+        },
+        undo: (): void => {
+          for (const node of nodes) {
+            this.renderer.addNode(node);
+          }
+          for (const node of nodes) {
+            const groupIds = nodeGroupIds.get(node.id);
+            if (!groupIds) {
+              continue;
+            }
+            for (const groupId of groupIds) {
+              const group = this.renderer.getGroup(groupId);
+              if (group) {
+                group.addChild(node);
+              }
+            }
+          }
+          for (const edge of edges) {
+            this.renderer.addEdge(edge);
+          }
+        },
+      },
+    ]);
+  }
+
+  private copySelection(): void {
+    const selectedIds = new Set(this.selectionManager.selectedIds);
+    if (selectedIds.size === 0) {
+      return;
+    }
+
+    const nodes: SerializedNode[] = [];
+    const edges: SerializedEdge[] = [];
+    const nodeIds = new Set<string>();
+
+    for (const id of selectedIds) {
+      const node = this.renderer.getNode(id);
+      if (node) {
+        nodes.push({
+          id: node.id,
+          type: node.typeName,
+          x: node.x,
+          y: node.y,
+          width: node.width,
+          height: node.height,
+          style: node.style,
+          styleClass: node.styleClass,
+          label: node.label?.text,
+          labelStyleClass: node.label?.styleClass,
+          ports: node.ports.map((port) => ({
+            id: port.id,
+            type: port.type,
+            position: port.position,
+            styleClass: port.styleClass,
+          })),
+          data: Object.keys(node.data).length > 0 ? node.data : undefined,
+        });
+        nodeIds.add(node.id);
+      }
+    }
+
+    for (const edge of this.renderer.edges.values()) {
+      if (nodeIds.has(edge.from.nodeId) && nodeIds.has(edge.to.nodeId)) {
+        edges.push({
+          id: edge.id,
+          from: edge.from,
+          to: edge.to,
+          type: edge.type,
+          controlPoints: edge.controlPoints,
+          arrowType: edge.arrowType,
+          style: edge.style,
+          styleClass: edge.styleClass,
+          label: edge.label?.text,
+          labelStyleClass: edge.label?.styleClass,
+          labelOffset: edge.labelOffset !== 0 ? edge.labelOffset : undefined,
+          labelBackground: edge.labelBackground,
+          data: Object.keys(edge.data).length > 0 ? edge.data : undefined,
+        });
+      }
+    }
+
+    this.clipboard = { nodes, edges };
+  }
+
+  private pasteSelection(options: InteractionManagerOptions): void {
+    if (!this.clipboard || !options.nodeFactory || !options.edgeFactory) {
+      return;
+    }
+
+    const offset: Point = { x: 20, y: 20 };
+    const idMap = new Map<string, string>();
+    const newNodes: Node[] = [];
+    const newEdges: Edge[] = [];
+
+    for (const nodeData of this.clipboard.nodes) {
+      const newId = `${nodeData.id}_copy_${Date.now()}`;
+      idMap.set(nodeData.id, newId);
+      const copyData: SerializedNode = {
+        ...nodeData,
+        id: newId,
+        x: nodeData.x + offset.x,
+        y: nodeData.y + offset.y,
+      };
+      newNodes.push(options.nodeFactory(copyData));
+    }
+
+    for (const edgeData of this.clipboard.edges) {
+      const fromNodeId = idMap.get(edgeData.from.nodeId);
+      const toNodeId = idMap.get(edgeData.to.nodeId);
+      if (!fromNodeId || !toNodeId) {
+        continue;
+      }
+      const newId = `${edgeData.id}_copy_${Date.now()}`;
+      const copyEdge: SerializedEdge = {
+        ...edgeData,
+        id: newId,
+        from: { ...edgeData.from, nodeId: fromNodeId },
+        to: { ...edgeData.to, nodeId: toNodeId },
+      };
+      newEdges.push(options.edgeFactory(copyEdge));
+    }
+
+    if (newNodes.length === 0 && newEdges.length === 0) {
+      return;
+    }
+
+    this.historyManager.execute({
+      execute: () => {
+        for (const node of newNodes) {
+          this.renderer.addNode(node);
+        }
+        for (const edge of newEdges) {
+          this.renderer.addEdge(edge);
+        }
+      },
+      undo: () => {
+        for (const edge of newEdges) {
+          this.renderer.removeEdge(edge.id);
+        }
+        for (const node of newNodes) {
+          this.renderer.removeNode(node.id);
+        }
+      },
+    });
+  }
+
+  private endpointsEqual(a: EdgeEndpoint, b: EdgeEndpoint): boolean {
+    return a.nodeId === b.nodeId && (a.portId ?? null) === (b.portId ?? null);
+  }
+
+  private getSelectionBounds(): Bounds | null {
+    const selected = Array.from(this.selectionManager.selectedIds);
+    if (selected.length === 0) {
+      return null;
+    }
+
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    let hasBounds = false;
+
+    for (const id of selected) {
+      const node = this.renderer.getNode(id);
+      if (!node) continue;
+      const bounds = node.getBounds();
+      minX = Math.min(minX, bounds.x);
+      minY = Math.min(minY, bounds.y);
+      maxX = Math.max(maxX, bounds.x + bounds.width);
+      maxY = Math.max(maxY, bounds.y + bounds.height);
+      hasBounds = true;
+    }
+
+    if (!hasBounds) {
+      return null;
+    }
+
+    return {
+      x: minX,
+      y: minY,
+      width: maxX - minX,
+      height: maxY - minY,
+    };
+  }
+}
