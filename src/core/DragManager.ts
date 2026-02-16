@@ -87,8 +87,36 @@ export class DragManager extends EventEmitter<DragEvents> {
     // Check if it's a node
     const node = this.renderer.getNode(element.id);
     const group = node === undefined ? this.renderer.getGroup(element.id) : undefined;
-    if (node === undefined && group === undefined) {
+    const edge = node === undefined && group === undefined ? this.renderer.getEdge(element.id) : undefined;
+    if (node === undefined && group === undefined && edge === undefined) {
       return false;
+    }
+
+    // Edge dragging: allow dragging selected nodes through edge hit area.
+    // Useful for relation anchors that are hidden and hard to click directly.
+    if (edge !== undefined) {
+      if (edge.state !== 'selected') {
+        return false;
+      }
+      const hasSelectedNodes = Array.from(this.selectionManager.selectedIds).some(
+        (id) => this.renderer.getNode(id) !== undefined
+      );
+      if (!hasSelectedNodes) {
+        return false;
+      }
+      this._handledMouseDown = true;
+      this.dragStartPoint = point;
+      this.lastDragPoint = point;
+      this.draggedGroupSelection = false;
+      this.draggedNodes = [];
+      this.initialPositions.clear();
+      for (const id of this.selectionManager.selectedIds) {
+        const selectedNode = this.renderer.getNode(id);
+        if (selectedNode !== undefined) {
+          this.addDraggedNode(selectedNode);
+        }
+      }
+      return this.draggedNodes.length > 0;
     }
 
     const targetId = node?.id ?? group!.id;

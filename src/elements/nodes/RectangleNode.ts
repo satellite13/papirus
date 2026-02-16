@@ -36,6 +36,10 @@ export class RectangleNode extends Node {
   render(ctx: CanvasRenderingContext2D): void {
     const { x, y, width, height } = this.getBounds();
     const radius = Math.min(this._cornerRadius, width / 2, height / 2);
+    const style = this.style;
+    const baseOpacity = style.opacity ?? 1;
+    const fillOpacity = style.fillOpacity ?? 1;
+    const strokeOpacity = style.strokeOpacity ?? 1;
 
     this.applyStyle(ctx);
 
@@ -58,7 +62,9 @@ export class RectangleNode extends Node {
     }
 
     ctx.closePath();
+    ctx.globalAlpha = baseOpacity * fillOpacity;
     ctx.fill();
+    ctx.globalAlpha = baseOpacity * strokeOpacity;
     ctx.stroke();
 
     ctx.globalAlpha = 1;

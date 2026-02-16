@@ -460,7 +460,9 @@ export class Edge extends Element {
 
     ctx.strokeStyle = style.strokeColor ?? '#666666';
     ctx.lineWidth = style.strokeWidth ?? 2;
-    ctx.globalAlpha = style.opacity ?? 1;
+    const baseOpacity = style.opacity ?? 1;
+    const strokeOpacity = style.strokeOpacity ?? 1;
+    ctx.globalAlpha = baseOpacity * strokeOpacity;
 
     this.applyLineDash(ctx, style);
 
@@ -828,7 +830,7 @@ export class Edge extends Element {
       y: midpoint.y + this._labelOffset,
     };
 
-    ctx.globalAlpha = 1;
+    const labelOpacity = this._label.style.opacity ?? 1;
 
     // Draw background for label
     this._label.measure(ctx);
@@ -837,6 +839,7 @@ export class Edge extends Element {
 
     const bgPadding = this._labelBackground?.padding ?? EDGE_LABEL_BACKGROUND_PADDING;
     const bgColor = this._labelBackground?.color ?? '#ffffff';
+    const bgOpacity = this._labelBackground?.opacity ?? 1;
     const bgRadius = this._labelBackground?.borderRadius ?? EDGE_LABEL_BACKGROUND_RADIUS;
 
     const bgX = labelPosition.x - labelWidth / 2 - bgPadding;
@@ -845,6 +848,7 @@ export class Edge extends Element {
     const bgHeight = labelHeight + bgPadding * 2;
 
     ctx.fillStyle = bgColor;
+    ctx.globalAlpha = bgOpacity;
 
     if (bgRadius > 0) {
       this.drawRoundedRect(ctx, bgX, bgY, bgWidth, bgHeight, bgRadius);
@@ -853,7 +857,9 @@ export class Edge extends Element {
       ctx.fillRect(bgX, bgY, bgWidth, bgHeight);
     }
 
+    ctx.globalAlpha = labelOpacity;
     this._label.renderAt(ctx, labelPosition);
+    ctx.globalAlpha = 1;
   }
 
   private drawRoundedRect(

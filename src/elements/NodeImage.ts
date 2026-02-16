@@ -30,10 +30,61 @@ export interface NodeImageOptions {
   margin?: number;
   gap?: number;
   opacity?: number;
+  strokeColor?: string;
+  fillColor?: string;
   align?: 'left' | 'center' | 'right';
   verticalAlign?: 'top' | 'center' | 'bottom';
   offsetX?: number;
   offsetY?: number;
+}
+
+const svgTextCache = new Map<string, Promise<string>>();
+
+function styleSetColor(style: string, key: 'stroke' | 'fill', color: string): string {
+  const hasKey = new RegExp(`${key}\\s*:`).test(style);
+  if (hasKey) {
+    return style.replace(new RegExp(`${key}\\s*:[^;]+`), `${key}:${color}`);
+  }
+  const suffix = style.trim().endsWith(';') || style.trim() === '' ? '' : ';';
+  return `${style}${suffix}${key}:${color};`;
+}
+
+function tintSvg(svgText: string, strokeColor?: string, fillColor?: string): string {
+  if (!strokeColor && !fillColor) return svgText;
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(svgText, 'image/svg+xml');
+  const root = doc.documentElement;
+  if (!root || root.nodeName.toLowerCase() === 'parsererror') {
+    return svgText;
+  }
+
+  const all = [root, ...Array.from(root.querySelectorAll('*'))] as Element[];
+  for (const el of all) {
+    const stroke = el.getAttribute('stroke');
+    if (strokeColor && stroke !== null && stroke.toLowerCase() !== 'none') {
+      el.setAttribute('stroke', strokeColor);
+    }
+    const fill = el.getAttribute('fill');
+    if (fillColor && fill !== null && fill.toLowerCase() !== 'none') {
+      el.setAttribute('fill', fillColor);
+    }
+    const style = el.getAttribute('style');
+    if (style) {
+      let next = style;
+      if (strokeColor && /stroke\s*:\s*(?!none)/.test(style)) {
+        next = styleSetColor(next, 'stroke', strokeColor);
+      }
+      if (fillColor && /fill\s*:\s*(?!none)/.test(style)) {
+        next = styleSetColor(next, 'fill', fillColor);
+      }
+      if (next !== style) {
+        el.setAttribute('style', next);
+      }
+    }
+  }
+
+  return new XMLSerializer().serializeToString(root);
 }
 
 function isSvgMarkup(value: string): boolean {
@@ -60,6 +111,7 @@ export class NodeImage {
   private _naturalWidth = 0;
   private _naturalHeight = 0;
   private _onChange?: () => void;
+  private _sourceVersion = 0;
 
   constructor(options: NodeImageOptions, onChange?: () => void) {
     this._options = { ...options };
@@ -178,11 +230,39 @@ export class NodeImage {
     return img;
   }
 
-  private applySource(source: string | HTMLImageElement): void {
+  private async applySource(source: string | HTMLImageElement): Promise<void> {
     if (source instanceof HTMLImageElement) {
       return;
     }
-    this._image.src = isSvgMarkup(source) ? svgToDataUrl(source) : source;
+    const version = ++this._sourceVersion;
+
+    // Inline SVG markup source
+    if (isSvgMarkup(source)) {
+      const tinted = tintSvg(source, this._options.strokeColor, this._options.fillColor);
+      if (version !== this._sourceVersion) return;
+      this._image.src = svgToDataUrl(tinted);
+      return;
+    }
+
+    // URL source with optional SVG tinting
+    const shouldTint = !!this._options.strokeColor || !!this._options.fillColor;
+    if (shouldTint && source.toLowerCase().endsWith('.svg')) {
+      let svgPromise = svgTextCache.get(source);
+      if (!svgPromise) {
+        svgPromise = fetch(source).then((r) => (r.ok ? r.text() : ''));
+        svgTextCache.set(source, svgPromise);
+      }
+      const svgText = await svgPromise;
+      if (version !== this._sourceVersion) return;
+      if (svgText) {
+        const tinted = tintSvg(svgText, this._options.strokeColor, this._options.fillColor);
+        this._image.src = svgToDataUrl(tinted);
+        return;
+      }
+    }
+
+    if (version !== this._sourceVersion) return;
+    this._image.src = source;
   }
 
   private attachHandlers(): void {

@@ -62,13 +62,19 @@ export class CircleNode extends Node {
     const center = this.getCenter();
     const rx = this._width / 2;
     const ry = this._height / 2;
+    const style = this.style;
+    const baseOpacity = style.opacity ?? 1;
+    const fillOpacity = style.fillOpacity ?? 1;
+    const strokeOpacity = style.strokeOpacity ?? 1;
 
     this.applyStyle(ctx);
 
     ctx.beginPath();
     ctx.ellipse(center.x, center.y, rx, ry, 0, 0, Math.PI * 2);
     ctx.closePath();
+    ctx.globalAlpha = baseOpacity * fillOpacity;
     ctx.fill();
+    ctx.globalAlpha = baseOpacity * strokeOpacity;
     ctx.stroke();
 
     ctx.globalAlpha = 1;

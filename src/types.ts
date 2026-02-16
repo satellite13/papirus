@@ -88,6 +88,8 @@ export interface ElementStyle {
  * Style properties for nodes
  */
 export interface NodeStyle extends ElementStyle {
+  fillOpacity?: number;
+  strokeOpacity?: number;
   cornerRadius?: number;
   lineDash?: number[];
   lineDashOffset?: number;
@@ -102,6 +104,7 @@ export type LabelPlacement = 'auto' | 'center' | 'top' | 'bottom' | 'left' | 'ri
  * Style properties for edges
  */
 export interface EdgeStyle extends ElementStyle {
+  strokeOpacity?: number;
   lineDash?: number[];
   lineDashOffset?: number;
   lineCap?: CanvasLineCap;
@@ -115,6 +118,7 @@ export interface EdgeStyle extends ElementStyle {
  */
 export interface EdgeLabelBackground {
   color?: string;
+  opacity?: number;
   padding?: number;
   borderRadius?: number;
 }
@@ -128,6 +132,7 @@ export interface TextStyle {
   fontFamily?: string;
   fontWeight?: string;
   color?: string;
+  opacity?: number;
   align?: CanvasTextAlign;
   baseline?: CanvasTextBaseline;
 }
@@ -196,6 +201,8 @@ export interface SerializedNodeIcon {
   margin?: number;
   gap?: number;
   opacity?: number;
+  strokeColor?: string;
+  fillColor?: string;
   align?: 'left' | 'center' | 'right';
   verticalAlign?: 'top' | 'center' | 'bottom';
   offsetX?: number;

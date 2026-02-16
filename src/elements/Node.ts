@@ -330,8 +330,10 @@ export abstract class Node extends Element {
       return;
     }
 
-    ctx.globalAlpha = 1;
+    const labelOpacity = this._label.style.opacity ?? 1;
+    ctx.globalAlpha = labelOpacity;
     this._label.render(ctx, bounds);
+    ctx.globalAlpha = 1;
   }
 
   /**

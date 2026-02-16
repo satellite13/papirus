@@ -18,6 +18,7 @@ const DEFAULT_STYLE: Required<TextStyle> = {
   fontFamily: 'sans-serif',
   fontWeight: 'normal',
   color: '#000000',
+  opacity: 1,
   align: 'center',
   baseline: 'middle',
 };
