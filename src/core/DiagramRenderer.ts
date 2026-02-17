@@ -817,12 +817,20 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
       return;
     }
 
-    const contentBounds = this.getContentBounds();
-    if (!contentBounds) {
+    const rawContentBounds = this.getContentBounds();
+    if (!rawContentBounds) {
       return;
     }
 
     const viewportBounds = this.getViewportBounds();
+
+    // Union of content and viewport to get the full scrollable area
+    const unionMinX = Math.min(rawContentBounds.x, viewportBounds.x);
+    const unionMinY = Math.min(rawContentBounds.y, viewportBounds.y);
+    const unionMaxX = Math.max(rawContentBounds.x + rawContentBounds.width, viewportBounds.x + viewportBounds.width);
+    const unionMaxY = Math.max(rawContentBounds.y + rawContentBounds.height, viewportBounds.y + viewportBounds.height);
+    const contentBounds = { x: unionMinX, y: unionMinY, width: unionMaxX - unionMinX, height: unionMaxY - unionMinY };
+
     const contentWidth = Math.max(contentBounds.width, 1);
     const contentHeight = Math.max(contentBounds.height, 1);
     const showHorizontal = contentWidth > viewportBounds.width + 0.01;

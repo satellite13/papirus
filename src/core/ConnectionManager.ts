@@ -18,6 +18,8 @@ export interface ConnectionEvents {
   edgeReconnect: [edge: Edge, endpoint: 'start' | 'end'];
 }
 
+export type ConnectionValidator = (sourceNodeId: string, targetNodeId: string) => boolean;
+
 export interface ConnectionManagerOptions {
   renderer: DiagramRenderer;
   createEdge: (from: EdgeEndpoint, to: EdgeEndpoint) => Edge;
@@ -31,6 +33,7 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
   private renderer: DiagramRenderer;
   private readonly createEdge: (from: EdgeEndpoint, to: EdgeEndpoint) => Edge;
   private readonly addEdge: (edge: Edge) => void;
+  private _connectionValidator: ConnectionValidator | null = null;
 
   private isConnecting = false;
   private sourceNode: Node | null = null;
@@ -54,6 +57,14 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     this.renderer = options.renderer;
     this.createEdge = options.createEdge;
     this.addEdge = options.addEdge ?? ((edge): void => this.renderer.addEdge(edge));
+  }
+
+  /**
+   * Set a validator that determines whether a connection between two nodes is allowed.
+   * When set, disallowed targets show forbidden styling and connections are blocked.
+   */
+  set connectionValidator(validator: ConnectionValidator | null) {
+    this._connectionValidator = validator;
   }
 
   /**
@@ -278,11 +289,20 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     this.previewTargetAnchorId = null;
     const targetNode = this.getNodeAtPoint(cursorPoint, false);
     if (targetNode && this.isCompatibleTarget(targetNode)) {
-      const nearestAnchor = targetNode.getNearestAnchor(cursorPoint);
-      if (nearestAnchor) {
-        snappedPoint = nearestAnchor.point;
-        this.previewTargetAnchorId = nearestAnchor.id;
+      const forbidden = this._connectionValidator && this.sourceNode &&
+        !this._connectionValidator(this.sourceNode.id, targetNode.id);
+      if (forbidden) {
+        this.setCursor('not-allowed');
+      } else {
+        this.setCursor('crosshair');
+        const nearestAnchor = targetNode.getNearestAnchor(cursorPoint);
+        if (nearestAnchor) {
+          snappedPoint = nearestAnchor.point;
+          this.previewTargetAnchorId = nearestAnchor.id;
+        }
       }
+    } else {
+      this.setCursor('crosshair');
     }
 
     this.previewEndpoint = snappedPoint;
@@ -371,20 +391,25 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     // Check if we're over a valid target node
     const targetNode = this.getNodeAtPoint(point, false);
     if (targetNode) {
-      // Create the edge
-      const targetAnchor = targetNode.getNearestAnchor(point);
-      const from: EdgeEndpoint = {
-        nodeId: this.sourceNode!.id,
-        portId: this.sourceAnchorId ? `${ANCHOR_PORT_PREFIX}${this.sourceAnchorId}` : undefined,
-      };
-      const to: EdgeEndpoint = {
-        nodeId: targetNode.id,
-        portId: targetAnchor ? `${ANCHOR_PORT_PREFIX}${targetAnchor.id}` : undefined,
-      };
+      // Check validator if set
+      const allowed = !this._connectionValidator ||
+        this._connectionValidator(this.sourceNode!.id, targetNode.id);
+      if (allowed) {
+        // Create the edge
+        const targetAnchor = targetNode.getNearestAnchor(point);
+        const from: EdgeEndpoint = {
+          nodeId: this.sourceNode!.id,
+          portId: this.sourceAnchorId ? `${ANCHOR_PORT_PREFIX}${this.sourceAnchorId}` : undefined,
+        };
+        const to: EdgeEndpoint = {
+          nodeId: targetNode.id,
+          portId: targetAnchor ? `${ANCHOR_PORT_PREFIX}${targetAnchor.id}` : undefined,
+        };
 
-      createdEdge = this.createEdge(from, to);
-      this.addEdge(createdEdge);
-      this.emit('connect', createdEdge);
+        createdEdge = this.createEdge(from, to);
+        this.addEdge(createdEdge);
+        this.emit('connect', createdEdge);
+      }
     }
 
     this.emit('connectionEnd', createdEdge);
@@ -516,12 +541,20 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     return node.id !== this.sourceNode?.id;
   }
 
+  private setCursor(cursor: string): void {
+    const canvas = this.renderer.getCanvas();
+    if (canvas.style.cursor !== cursor) {
+      canvas.style.cursor = cursor;
+    }
+  }
+
   private reset(): void {
     this.isConnecting = false;
     this.sourceNode = null;
     this.sourcePoint = null;
     this.previewEndpoint = null;
     this.sourceAnchorId = null;
+    this.setCursor('');
   }
 
   private resetReconnection(): void {
@@ -533,6 +566,7 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     this.reconnectingEndpoint = null;
     this.originalEdgeEndpoint = null;
     this.reconnectPoint = null;
+    this.setCursor('');
   }
 
   /**
@@ -597,6 +631,10 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
       return;
     }
 
+    // Check if connection to this target is allowed
+    const forbidden = this._connectionValidator && this.sourceNode &&
+      !this._connectionValidator(this.sourceNode.id, node.id);
+
     const anchors = node.getAnchors();
     const nearest = node.getNearestAnchor(point);
     if (anchors.length === 0) {
@@ -606,23 +644,41 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     ctx.save();
     ctx.setLineDash([]);
 
+    const fillColor = forbidden ? '#ef4444' : '#3b82f6';
+
     for (const anchor of anchors) {
       const isNearest = nearest && anchor.id === nearest.id;
       const radius = isNearest ? ANCHOR_POINT_HOVER_RADIUS : ANCHOR_POINT_RADIUS;
 
       // Draw anchor circle
-      ctx.fillStyle = '#3b82f6';
+      ctx.fillStyle = fillColor;
       ctx.beginPath();
       ctx.arc(anchor.point.x, anchor.point.y, radius, 0, Math.PI * 2);
       ctx.fill();
 
-      // Draw white plus on nearest
+      // Draw white plus/cross on nearest
       if (isNearest) {
-        this.drawPlus(radius, ctx, anchor);
+        if (forbidden) {
+          this.drawCross(radius, ctx, anchor);
+        } else {
+          this.drawPlus(radius, ctx, anchor);
+        }
       }
     }
 
     ctx.restore();
+  }
+
+  private drawCross(radius: number, ctx: CanvasRenderingContext2D, anchor: { id: AnchorId; point: Point }): void {
+    const size = radius * 0.4;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(anchor.point.x - size, anchor.point.y - size);
+    ctx.lineTo(anchor.point.x + size, anchor.point.y + size);
+    ctx.moveTo(anchor.point.x + size, anchor.point.y - size);
+    ctx.lineTo(anchor.point.x - size, anchor.point.y + size);
+    ctx.stroke();
   }
 
   private getNodeAtPoint(point: Point, reconnecting: boolean): Node | null {

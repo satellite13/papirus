@@ -15,7 +15,7 @@ export { NavigationManager } from './core/NavigationManager';
 export type { NavigationEvents, NavigationManagerOptions } from './core/NavigationManager';
 
 export { ConnectionManager } from './core/ConnectionManager';
-export type { ConnectionEvents, ConnectionManagerOptions } from './core/ConnectionManager';
+export type { ConnectionEvents, ConnectionManagerOptions, ConnectionValidator } from './core/ConnectionManager';
 
 export { InteractionManager } from './core/InteractionManager';
 export type { InteractionManagerOptions, InteractionKeymap } from './core/InteractionManager';

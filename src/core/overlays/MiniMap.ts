@@ -2,6 +2,8 @@ import type { DiagramPlugin, DiagramRenderer } from '../DiagramRenderer';
 import type { Bounds } from '@/types';
 import { getContentBounds } from '@/utils/contentBounds';
 
+export type MiniMapAnchor = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
+
 export interface MiniMapOptions {
   enabled?: boolean;
   width?: number;
@@ -10,6 +12,7 @@ export interface MiniMapOptions {
   backgroundColor?: string;
   borderColor?: string;
   viewportColor?: string;
+  anchor?: MiniMapAnchor;
 }
 
 export class MiniMap implements DiagramPlugin {
@@ -25,6 +28,7 @@ export class MiniMap implements DiagramPlugin {
       backgroundColor: options.backgroundColor ?? 'rgba(24, 24, 27, 0.5)',
       borderColor: options.borderColor ?? '#52525b',
       viewportColor: options.viewportColor ?? '#22c55e',
+      anchor: options.anchor ?? 'bottom-right',
     };
   }
 
@@ -38,9 +42,13 @@ export class MiniMap implements DiagramPlugin {
       });
       if (!bounds) return;
 
-      const { width, height, padding } = this.options;
-      const x = renderer.width - width - padding;
-      const y = renderer.height - height - padding;
+      const { width, height, padding, anchor } = this.options;
+      const x = anchor === 'bottom-left' || anchor === 'top-left'
+        ? padding
+        : renderer.width - width - padding;
+      const y = anchor === 'top-left' || anchor === 'top-right'
+        ? padding
+        : renderer.height - height - padding;
 
       ctx.save();
       ctx.setTransform(renderer.pixelRatio, 0, 0, renderer.pixelRatio, 0, 0);
