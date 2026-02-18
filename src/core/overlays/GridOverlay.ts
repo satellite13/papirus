@@ -7,13 +7,21 @@ export interface GridOverlayOptions extends BaseOverlayOptions {
 }
 
 export class GridOverlay extends BaseOverlay {
-  private readonly gridSize: number;
-  private readonly color: string;
+  private gridSize: number;
+  private color: string;
 
   constructor(options: GridOverlayOptions = {}) {
     super(options.enabled ?? true);
     this.gridSize = options.gridSize ?? 20;
     this.color = options.color ?? '#e0e0e0';
+  }
+
+  setColor(color: string): void {
+    this.color = color;
+  }
+
+  setGridSize(size: number): void {
+    this.gridSize = size;
   }
 
   install(renderer: DiagramRenderer): void {

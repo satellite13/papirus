@@ -3,1885 +3,240 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Papirus - Basic Example</title>
+  <title>Papirus - Interactive Diagram Library</title>
+  <link rel="stylesheet" href="shared/styles.css">
   <style>
-      :root {
-          color-scheme: light;
-          --bg: #f6f7fb;
-          --card: #ffffff;
-          --border: #e2e8f0;
-          --text: #0f172a;
-          --muted: #64748b;
-          --primary: #2563eb;
-          --primary-weak: #e0e7ff;
-          --shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
-          --radius: 12px;
-      }
-      * {
-          margin: 0;
-          padding: 0;
-          box-sizing: border-box;
-      }
-      body {
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-          background: var(--bg);
-          color: var(--text);
-          min-height: 100vh;
-      }
-      .page {
-          max-width: 1200px;
-          margin: 32px auto 40px;
-          padding: 0 24px;
-          display: grid;
-          gap: 16px;
-      }
-      .header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 16px;
-          padding: 18px 22px;
-          background: var(--card);
-          border: 1px solid var(--border);
-          border-radius: var(--radius);
-          box-shadow: var(--shadow);
-      }
-      .title {
-          display: grid;
-          gap: 6px;
-      }
-      h1 {
-          font-size: 20px;
-          letter-spacing: -0.02em;
-      }
-      .subtitle {
-          color: var(--muted);
-          font-size: 14px;
-      }
-      .toolbar {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 8px;
-      }
-      button {
-          padding: 8px 14px;
-          border: 1px solid var(--border);
-          background: var(--card);
-          border-radius: 10px;
-          cursor: pointer;
-          font-size: 13px;
-          color: var(--text);
-          transition: transform 0.08s ease, border-color 0.15s ease, box-shadow 0.15s ease;
-      }
-      button:hover {
-          border-color: #cbd5f5;
-          box-shadow: 0 6px 14px rgba(37, 99, 235, 0.12);
-      }
-      button:active {
-          transform: translateY(1px);
-      }
-      .button-primary {
-          background: var(--primary);
-          border-color: var(--primary);
-          color: #fff;
-      }
-      .button-primary:hover {
-          box-shadow: 0 6px 16px rgba(37, 99, 235, 0.25);
-      }
-      .button-muted {
-          color: var(--muted);
-      }
-      .content {
-          display: grid;
-          grid-template-columns: minmax(0, 1fr) 280px;
-          gap: 16px;
-          align-items: start;
-      }
-      @media (max-width: 980px) {
-          .content {
-              grid-template-columns: 1fr;
-          }
-      }
-      .canvas-card {
-          background: var(--card);
-          border: 1px solid var(--border);
-          border-radius: var(--radius);
-          box-shadow: var(--shadow);
-          padding: 16px;
-          min-width: 0;
-      }
-      #canvas {
-          width: 100%;
-          max-width: 100%;
-          height: auto;
-          display: block;
-          border: 1px solid var(--border);
-          border-radius: 10px;
-          background: #fff;
-          cursor: default;
-      }
-      .sidebar {
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
-      }
-      .panel {
-          padding: 16px;
-          background: var(--card);
-          border: 1px solid var(--border);
-          border-radius: var(--radius);
-          font-size: 13px;
-          box-shadow: var(--shadow);
-      }
-      .panel-title {
-          font-weight: 600;
-          margin-bottom: 12px;
-          color: var(--text);
-      }
-      .panel-row {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          margin-bottom: 10px;
-      }
-      .panel-row:last-child {
-          margin-bottom: 0;
-      }
-      .panel-row label {
-          flex: 0 0 80px;
-          color: var(--muted);
-          font-size: 12px;
-      }
-      .panel-row input[type="text"],
-      .panel-row input[type="number"],
-      .panel-row select {
-          flex: 1;
-          min-width: 0;
-          padding: 6px 10px;
-          border: 1px solid var(--border);
-          border-radius: 6px;
-          font-size: 12px;
-          background: var(--card);
-          color: var(--text);
-      }
-      .panel-row input[type="color"] {
-          width: 32px;
-          height: 28px;
-          padding: 2px;
-          border: 1px solid var(--border);
-          border-radius: 6px;
-          cursor: pointer;
-          flex-shrink: 0;
-      }
-      .panel-row input:focus,
-      .panel-row select:focus {
-          outline: none;
-          border-color: var(--primary);
-      }
-      .color-input-group {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          flex: 1;
-          min-width: 0;
-          overflow: hidden;
-      }
-      .color-input-group input[type="text"] {
-          flex: 1;
-          min-width: 0;
-      }
-      .color-input-group input[type="number"] {
-          width: 50px;
-          flex-shrink: 0;
-      }
-      .panel-section {
-          border-top: 1px solid var(--border);
-          margin-top: 12px;
-          padding-top: 12px;
-      }
-      .panel-section-title {
-          font-size: 11px;
-          color: var(--muted);
-          text-transform: uppercase;
-          letter-spacing: 1px;
-          margin-bottom: 10px;
-      }
-      .info {
-          color: var(--muted);
-      }
-      .info kbd {
-          background: #f1f5f9;
-          padding: 2px 6px;
-          border-radius: 6px;
-          font-family: monospace;
-          color: #1f2937;
-      }
-      .info ul {
-          margin-top: 8px;
-          margin-left: 18px;
-          display: grid;
-          gap: 4px;
-      }
-      .hidden {
-          display: none !important;
-      }
+    .hero {
+      text-align: center;
+      padding: 60px 20px;
+    }
+    
+    .hero-title {
+      font-size: 48px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      margin-bottom: 16px;
+      background: linear-gradient(135deg, var(--primary) 0%, #8b5cf6 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    .hero-subtitle {
+      font-size: 20px;
+      color: var(--muted);
+      max-width: 600px;
+      margin: 0 auto 32px;
+    }
+    
+    .hero-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    
+    .btn-lg {
+      padding: 12px 24px;
+      font-size: 15px;
+    }
+    
+    .section-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 16px;
+    }
+    
+    .stats {
+      display: flex;
+      gap: 32px;
+      justify-content: center;
+      padding: 32px;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .stat {
+      text-align: center;
+    }
+    
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    
+    .stat-label {
+      font-size: 14px;
+      color: var(--muted);
+    }
   </style>
 </head>
 <body>
-<div class="page">
-  <div class="header">
-    <div class="title">
-      <h1>Papirus</h1>
-      <div class="subtitle">Interactive diagram playground</div>
+  <div class="page">
+    <!-- Header -->
+    <header class="header">
+      <a href="index.html" class="logo">
+        <div class="logo-icon">P</div>
+        <div class="title-group">
+          <div class="title">Papirus</div>
+          <div class="subtitle">Interactive Diagram Library</div>
+        </div>
+      </a>
+      <div class="header-actions">
+        <a href="https://github.com/YOUR_USERNAME/papirus" class="github-link" target="_blank" rel="noopener">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+          </svg>
+          GitHub
+        </a>
+        <button class="theme-toggle" id="themeToggle" title="Toggle theme">🌙</button>
+      </div>
+    </header>
+
+    <!-- Hero -->
+    <section class="hero">
+      <h1 class="hero-title">Papirus</h1>
+      <p class="hero-subtitle">
+        TypeScript library for building interactive 2D diagrams and flowcharts on HTML Canvas. 
+        Zero dependencies, framework-agnostic, fully typed.
+      </p>
+      <div class="hero-actions">
+        <a href="basic/index.html" class="btn btn-primary btn-lg">Try Demo →</a>
+        <a href="https://gitverse.ru/ngroznykh/papirus#readme" class="btn btn-lg" target="_blank" rel="noopener">Documentation</a>
+      </div>
+    </section>
+
+    <!-- Stats -->
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-value">0</div>
+        <div class="stat-label">Dependencies</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">TS</div>
+        <div class="stat-label">Fully Typed</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">MIT</div>
+        <div class="stat-label">License</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">~15kb</div>
+        <div class="stat-label">Minified</div>
+      </div>
     </div>
-    <div class="toolbar">
-      <button class="button-primary" id="addRect">Add Rectangle</button>
-      <button class="button-primary" id="addCircle">Add Circle</button>
-      <button class="button-primary" id="addDiamond">Add Diamond</button>
-      <button id="fitView">Fit to View</button>
-      <button id="zoomSelection">Zoom to Selection</button>
-      <button class="button-muted" id="resetView">Reset View</button>
-      <button id="toggleGrid">Hide Grid</button>
-      <button id="toggleMiniMap">Hide Minimap</button>
-      <button id="toggleSnap">Enable Snap</button>
-      <button class="button-muted" id="exportPng">Export PNG</button>
-      <button class="button-muted" id="exportSvg">Export SVG</button>
-      <button class="button-muted" id="exportJson">Export JSON</button>
-    </div>
+
+    <!-- Examples -->
+    <section>
+      <h2 class="section-title">Interactive Examples</h2>
+      <div class="features">
+        <a href="basic/index.html" class="feature-card">
+          <div class="feature-icon">🎨</div>
+          <h3 class="feature-title">Basic Flowchart</h3>
+          <p class="feature-desc">
+            Core features: nodes, edges, groups, selection, drag & drop, zoom, pan. 
+            Style panels for real-time editing.
+          </p>
+        </a>
+
+        <a href="ports/index.html" class="feature-card">
+          <div class="feature-icon">🔌</div>
+          <h3 class="feature-title">Ports & Connections</h3>
+          <p class="feature-desc">
+            Connection points on nodes, different path types (straight, polyline, bezier), 
+            arrow markers, and connection validation.
+          </p>
+        </a>
+
+        <a href="animations/index.html" class="feature-card">
+          <div class="feature-icon">✨</div>
+          <h3 class="feature-title">Animations & Themes</h3>
+          <p class="feature-desc">
+            Edge flow animations, theme switching (light/dark), custom styles, 
+            and dynamic visual effects.
+          </p>
+        </a>
+
+        <a href="custom-shapes/index.html" class="feature-card">
+          <div class="feature-icon">🔷</div>
+          <h3 class="feature-title">Custom Shapes</h3>
+          <p class="feature-desc">
+            Create custom node shapes with Path2D, custom anchors, 
+            icons, and advanced styling options.
+          </p>
+        </a>
+      </div>
+    </section>
+
+    <!-- Features List -->
+    <section>
+      <h2 class="section-title">Features</h2>
+      <div class="card">
+        <div class="card-body">
+          <div class="features" style="grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));">
+            <div class="info-panel">
+              <h4>Core</h4>
+              <ul>
+                <li>Multiple node shapes</li>
+                <li>Edge routing (3 types)</li>
+                <li>Groups & nesting</li>
+                <li>Ports & connections</li>
+              </ul>
+            </div>
+            <div class="info-panel">
+              <h4>Interactions</h4>
+              <ul>
+                <li>Drag & select</li>
+                <li>Zoom & pan</li>
+                <li>Undo / redo</li>
+                <li>Copy / paste</li>
+              </ul>
+            </div>
+            <div class="info-panel">
+              <h4>Styling</h4>
+              <ul>
+                <li>Theme system</li>
+                <li>Style classes</li>
+                <li>Icons & labels</li>
+                <li>Custom fonts</li>
+              </ul>
+            </div>
+            <div class="info-panel">
+              <h4>Export</h4>
+              <ul>
+                <li>PNG export</li>
+                <li>SVG export</li>
+                <li>JSON serialization</li>
+                <li>Save / load</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
   </div>
 
-  <div class="content">
-    <div class="canvas-card">
-      <canvas id="canvas" width="900" height="600"></canvas>
-    </div>
-
-    <div class="sidebar">
-      <!-- Node Style Panel -->
-      <div class="panel hidden" id="nodeStylePanel">
-        <div class="panel-title">Node Style</div>
-        <div class="panel-row">
-          <label for="nodeLabel">Label</label>
-          <textarea id="nodeLabel" placeholder="Label text"></textarea>
-        </div>
-        <div class="panel-row">
-          <label for="nodeLabelColor">Label Color</label>
-          <div class="color-input-group">
-            <input type="color" id="nodeLabelColor" value="#333333">
-            <input type="text" id="nodeLabelColorText" placeholder="#333333" title="Color text">
-          </div>
-        </div>
-        <div class="panel-row">
-          <label for="nodeLabelSize">Label Size</label>
-          <input type="number" id="nodeLabelSize" min="8" max="32" step="1" value="12">
-        </div>
-        <div class="panel-row">
-          <label for="nodeLabelPadding">Label Padding</label>
-          <input type="number" id="nodeLabelPadding" min="0" max="50" step="1" value="8">
-        </div>
-        <div class="panel-row">
-          <label for="nodeLabelMargin">Label Margin</label>
-          <input type="number" id="nodeLabelMargin" min="0" max="50" step="1" value="0">
-        </div>
-        <div class="panel-row">
-          <label for="nodeLabelPlacement">Label Placement</label>
-          <select id="nodeLabelPlacement">
-            <option value="auto">Auto</option>
-            <option value="center">Center</option>
-            <option value="top">Top</option>
-            <option value="bottom">Bottom</option>
-            <option value="left">Left</option>
-            <option value="right">Right</option>
-          </select>
-        </div>
-        <div class="panel-row">
-          <label for="nodeIconPlacement">Icon Placement</label>
-          <select id="nodeIconPlacement">
-            <option value="center">Center</option>
-            <option value="top">Top</option>
-            <option value="bottom">Bottom</option>
-            <option value="left">Left</option>
-            <option value="right">Right</option>
-            <option value="top-left">Top Left</option>
-            <option value="top-right">Top Right</option>
-            <option value="bottom-left">Bottom Left</option>
-            <option value="bottom-right">Bottom Right</option>
-          </select>
-        </div>
-        <div class="panel-row">
-          <label for="nodeIconPadding">Icon Padding</label>
-          <input type="number" id="nodeIconPadding" min="0" max="50" step="1" value="8">
-        </div>
-        <div class="panel-row">
-          <label for="nodeIconMargin">Icon Margin</label>
-          <input type="number" id="nodeIconMargin" min="0" max="50" step="1" value="0">
-        </div>
-        <div class="panel-row">
-          <label for="nodeFillColor">Fill</label>
-          <div class="color-input-group">
-            <input type="color" id="nodeFillColor" value="#ffffff">
-            <input type="text" id="nodeFillColorText" placeholder="#ffffff" title="Color text">
-          </div>
-        </div>
-        <div class="panel-row">
-          <label for="nodeStrokeColor">Stroke</label>
-          <div class="color-input-group">
-            <input type="color" id="nodeStrokeColor" value="#333333">
-            <input type="text" id="nodeStrokeColorText" placeholder="#333333" title="Color text">
-          </div>
-        </div>
-        <div class="panel-row">
-          <label for="nodeStrokeWidth">Stroke Width</label>
-          <input type="number" id="nodeStrokeWidth" min="0" max="20" step="1" value="2">
-        </div>
-        <div class="panel-row">
-          <label for="nodeLineStyle">Stroke Style</label>
-          <select id="nodeLineStyle">
-            <option value="solid">Solid</option>
-            <option value="dashed">Dashed</option>
-          </select>
-        </div>
-        <div class="panel-row hidden" id="nodeLineDashRow">
-          <label for="nodeLineDash">Pattern</label>
-          <input type="text" id="nodeLineDash" placeholder="e.g. 8,4" value="8,4">
-        </div>
-        <div class="panel-row">
-          <label for="nodeCornerRadius">Corner Radius</label>
-          <input type="number" id="nodeCornerRadius" min="0" max="50" step="1" value="4">
-        </div>
-        <div class="panel-row">
-          <label for="nodeOpacity">Opacity</label>
-          <input type="number" id="nodeOpacity" min="0" max="1" step="0.1" value="1">
-        </div>
-      </div>
-
-      <!-- Edge Style Panel -->
-      <div class="panel hidden" id="edgeStylePanel">
-        <div class="panel-title">Edge Style</div>
-
-        <!-- Label Section -->
-        <div class="panel-row">
-          <label for="edgeLabel">Label</label>
-          <textarea id="edgeLabel" placeholder="Label text"></textarea>
-        </div>
-        <div class="panel-row">
-          <label for="edgeLabelColor">Label Color</label>
-          <div class="color-input-group">
-            <input type="color" id="edgeLabelColor" value="#333333">
-            <input type="text" id="edgeLabelColorText" placeholder="#333333" title="Color text">
-            <input type="number" id="edgeLabelOpacity" min="0" max="1" step="0.1" value="1" title="Opacity">
-          </div>
-        </div>
-        <div class="panel-row">
-          <label for="edgeLabelSize">Label Size</label>
-          <input type="number" id="edgeLabelSize" min="8" max="32" step="1" value="12">
-        </div>
-        <div class="panel-row">
-          <label for="edgeLabelBg">Label BG</label>
-          <div class="color-input-group">
-            <input type="color" id="edgeLabelBg" value="#ffffff">
-            <input type="text" id="edgeLabelBgText" placeholder="#ffffff" title="Color text">
-            <input type="number" id="edgeLabelBgOpacity" min="0" max="1" step="0.1" value="1" title="Opacity">
-          </div>
-        </div>
-
-        <!-- Line Section -->
-        <div class="panel-section">
-          <div class="panel-section-title">Line</div>
-          <div class="panel-row">
-            <label for="edgeType">Type</label>
-            <select id="edgeType">
-              <option value="straight">Straight</option>
-              <option value="polyline">Polyline</option>
-              <option value="bezier">Bezier</option>
-            </select>
-          </div>
-          <div class="panel-row">
-            <label for="edgeStrokeColor">Stroke</label>
-            <div class="color-input-group">
-              <input type="color" id="edgeStrokeColor" value="#666666">
-              <input type="text" id="edgeStrokeColorText" placeholder="#666666" title="Color text">
-              <input type="number" id="edgeStrokeOpacity" min="0" max="1" step="0.1" value="1" title="Opacity">
-            </div>
-          </div>
-          <div class="panel-row">
-            <label for="edgeStrokeWidth">Width</label>
-            <input type="number" id="edgeStrokeWidth" min="1" max="10" step="1" value="2">
-          </div>
-          <div class="panel-row">
-            <label for="edgeLineStyle">Style</label>
-            <select id="edgeLineStyle">
-              <option value="solid">Solid</option>
-              <option value="dashed">Dashed</option>
-            </select>
-          </div>
-          <div class="panel-row hidden" id="edgeLineDashRow">
-            <label for="edgeLineDash">Pattern</label>
-            <input type="text" id="edgeLineDash" placeholder="e.g. 8,4" value="8,4">
-          </div>
-          <div class="panel-row hidden" id="edgeDashAnimateRow">
-            <label for="edgeDashAnimate">Dash Animate</label>
-            <input type="checkbox" id="edgeDashAnimate">
-          </div>
-        </div>
-
-        <!-- Start Marker Section -->
-        <div class="panel-section">
-          <div class="panel-section-title">Start Marker</div>
-          <div class="panel-row">
-            <label for="edgeStartMarker">Type</label>
-            <select id="edgeStartMarker">
-              <option value="none">None</option>
-              <option value="arrow">Arrow</option>
-              <option value="open">Open</option>
-              <option value="diamond">Diamond</option>
-              <option value="circle">Circle</option>
-            </select>
-          </div>
-          <div class="panel-row">
-            <label for="edgeStartMarkerSize">Size</label>
-            <input type="number" id="edgeStartMarkerSize" min="4" max="30" step="1" value="12">
-          </div>
-          <div class="panel-row">
-            <label for="edgeStartMarkerFill">Fill</label>
-            <div class="color-input-group">
-              <input type="color" id="edgeStartMarkerFill" value="#666666">
-              <input type="text" id="edgeStartMarkerFillText" placeholder="#666666" title="Color text">
-              <input type="number" id="edgeStartMarkerOpacity" min="0" max="1" step="0.1" value="1" title="Opacity">
-            </div>
-          </div>
-        </div>
-
-        <!-- End Marker Section -->
-        <div class="panel-section">
-          <div class="panel-section-title">End Marker</div>
-          <div class="panel-row">
-            <label for="edgeEndMarker">Type</label>
-            <select id="edgeEndMarker">
-              <option value="none">None</option>
-              <option value="arrow">Arrow</option>
-              <option value="open">Open</option>
-              <option value="diamond">Diamond</option>
-              <option value="circle">Circle</option>
-            </select>
-          </div>
-          <div class="panel-row">
-            <label for="edgeEndMarkerSize">Size</label>
-            <input type="number" id="edgeEndMarkerSize" min="4" max="30" step="1" value="12">
-          </div>
-          <div class="panel-row">
-            <label for="edgeEndMarkerFill">Fill</label>
-            <div class="color-input-group">
-              <input type="color" id="edgeEndMarkerFill" value="#666666">
-              <input type="text" id="edgeEndMarkerFillText" placeholder="#666666" title="Color text">
-              <input type="number" id="edgeEndMarkerOpacity" min="0" max="1" step="0.1" value="1" title="Opacity">
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Group Style Panel -->
-      <div class="panel hidden" id="groupStylePanel">
-        <div class="panel-title">Group Style</div>
-        <div class="panel-row">
-          <label for="groupLabel">Label</label>
-          <textarea id="groupLabel" placeholder="Group label"></textarea>
-        </div>
-        <div class="panel-row">
-          <label for="groupPadding">Padding</label>
-          <input type="number" id="groupPadding" min="0" max="120" step="1" value="20">
-        </div>
-        <div class="panel-row">
-          <label for="groupFillColor">Fill</label>
-          <div class="color-input-group">
-            <input type="color" id="groupFillColor" value="#c8c8c8">
-            <input type="text" id="groupFillColorText" placeholder="rgba(200, 200, 200, 0.2)" title="Color text">
-          </div>
-        </div>
-        <div class="panel-row">
-          <label for="groupStrokeColor">Stroke</label>
-          <div class="color-input-group">
-            <input type="color" id="groupStrokeColor" value="#999999">
-            <input type="text" id="groupStrokeColorText" placeholder="#999999" title="Color text">
-          </div>
-        </div>
-        <div class="panel-row">
-          <label for="groupStrokeWidth">Stroke Width</label>
-          <input type="number" id="groupStrokeWidth" min="0" max="10" step="1" value="1">
-        </div>
-        <div class="panel-row">
-          <label for="groupLineStyle">Stroke Style</label>
-          <select id="groupLineStyle">
-            <option value="solid">Solid</option>
-            <option value="dashed">Dashed</option>
-          </select>
-        </div>
-        <div class="panel-row hidden" id="groupLineDashRow">
-          <label for="groupLineDash">Pattern</label>
-          <input type="text" id="groupLineDash" placeholder="e.g. 8,4" value="8,4">
-        </div>
-        <div class="panel-row">
-          <label for="groupOpacity">Opacity</label>
-          <input type="number" id="groupOpacity" min="0" max="1" step="0.1" value="1">
-        </div>
-      </div>
-
-      <!-- Info Panel (default) -->
-      <div class="panel info" id="infoPanel">
-        <strong>Controls</strong>
-        <ul>
-          <li>Click to select nodes</li>
-          <li><kbd>Ctrl</kbd> + Click for multi-select</li>
-          <li>Drag nodes to move them</li>
-          <li><kbd>Shift</kbd> + drag from node to connect</li>
-          <li>Mouse wheel to zoom</li>
-          <li>Drag empty area to pan</li>
-          <li><kbd>Ctrl</kbd>+<kbd>C</kbd>/<kbd>V</kbd> copy/paste</li>
-          <li><kbd>Delete</kbd> to remove selection</li>
-          <li><kbd>Ctrl</kbd>+<kbd>Z</kbd>/<kbd>Y</kbd> undo/redo</li>
-        </ul>
-      </div>
-    </div>
-  </div>
-</div>
-
-<script type="module">
-  import {
-    DiagramRenderer,
-    RectangleNode,
-    CircleNode,
-    DiamondNode,
-    CustomShapeNode,
-    Edge,
-    TextLabel,
-    StyleManager,
-    ImageExporter,
-    SvgExporter,
-    Serializer,
-    GridOverlay,
-    MiniMap,
-    Group,
-    SearchManager,
-  } from '../dist/papirus.js';
-
-  // Initialize renderer
-  const renderer = new DiagramRenderer('#canvas', {
-    width: 900,
-    height: 600,
-    backgroundColor: '#fafafa',
-    retina: true,
-    animations: { enabled: false },
-    snapToGrid: true,
-    scrollbarOverlay: true,
-  });
-
-  const imageExporter = new ImageExporter(renderer);
-  const svgExporter = new SvgExporter(renderer);
-
-  const nodeFactory = (data) => {
-    const baseOptions = {
-      id: data.id,
-      x: data.x,
-      y: data.y,
-      width: data.width,
-      height: data.height,
-      style: data.style,
-      styleClass: data.styleClass,
-      label: data.label
-        ? typeof data.label === 'string'
-          ? { text: data.label, styleClass: data.labelStyleClass }
-          : data.label
-        : undefined,
-      icon: data.icon,
-      anchorPoints: data.anchorPoints,
-      ports: data.ports?.map((port) => ({
-        id: port.id,
-        type: port.type,
-        position: port.position,
-        styleClass: port.styleClass,
-      })),
-    };
-
-    switch (data.type) {
-      case 'circle':
-        return new CircleNode(baseOptions);
-      case 'diamond':
-        return new DiamondNode(baseOptions);
-      case 'custom':
-        return new CustomShapeNode({
-          ...baseOptions,
-          path: createChamferedRectPath,
-        });
-      case 'rectangle':
-      default:
-        return new RectangleNode(baseOptions);
-    }
-  };
-
-  const edgeFactory = (data) =>
-    new Edge({
-      id: data.id,
-      from: data.from,
-      to: data.to,
-      type: data.type,
-      arrowType: data.arrowType,
-      startMarker: data.startMarker,
-      endMarker: data.endMarker,
-      style: data.style,
-      styleClass: data.styleClass,
-      label: data.label
-        ? typeof data.label === 'string'
-          ? { text: data.label, styleClass: data.labelStyleClass }
-          : data.label
-        : undefined,
-      labelOffset: data.labelOffset,
-      labelBackground: data.labelBackground,
+  <script>
+    // Theme toggle
+    const themeToggle = document.getElementById('themeToggle');
+    const html = document.documentElement;
+    
+    // Check for saved theme
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    html.setAttribute('data-theme', savedTheme);
+    themeToggle.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+    
+    themeToggle.addEventListener('click', () => {
+      const current = html.getAttribute('data-theme');
+      const next = current === 'dark' ? 'light' : 'dark';
+      html.setAttribute('data-theme', next);
+      localStorage.setItem('theme', next);
+      themeToggle.textContent = next === 'dark' ? '☀️' : '🌙';
     });
-
-  const serializer = new Serializer(renderer, { nodeFactory, edgeFactory });
-
-  const styles = new StyleManager();
-  styles.registerClass({
-    name: 'success',
-    node: { fillColor: '#dcfce7', strokeColor: '#16a34a', strokeWidth: 1 },
-  });
-  styles.registerClass({
-    name: 'warning',
-    node: { fillColor: '#fef3c7', strokeColor: '#d97706', strokeWidth: 1},
-  });
-  styles.registerClass({
-    name: 'error',
-    node: { fillColor: '#fee2e2', strokeColor: '#dc2626', strokeWidth: 1},
-    text: { color: '#991b1b' },
-  });
-  renderer.setStyleManager(styles);
-
-  const gridOverlay = new GridOverlay({ gridSize: 20, color: '#e5e5e5' });
-  const miniMap = new MiniMap({ width: 120, height: 60, padding: 20 });
-  renderer.use(gridOverlay);
-  renderer.use(miniMap);
-
-  const interactions = renderer.enableInteractions({
-    nodeFactory,
-    edgeFactory,
-    createEdge: (from, to) => new Edge({
-      from,
-      to,
-      type: 'bezier',
-      endMarker: { type: 'open', size: 12 },
-    }),
-  });
-
-  const searchManager = new SearchManager(renderer);
-  searchManager.find('Start', { highlight: true });
-
-  const createQuickNode = (point, label) => {
-    const node = new RectangleNode({
-      x: point.x - 60,
-      y: point.y - 30,
-      width: 120,
-      height: 60,
-      label,
-    });
-    renderer.addNode(node);
-    return node;
-  };
-
-  const menuIconDelete = `
-    <svg width="14" height="14" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-      <path d="M6 6l8 8M14 6l-8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-    </svg>
-  `;
-
-  renderer.enableContextMenu({
-    menu: {
-      node: (target) => {
-        const groupsWithNode = Array.from(renderer.groups.values()).filter((group) =>
-          group.hasChild(target.node.id)
-        );
-        return [
-          {
-            label: 'Удалить узел',
-            icon: { type: 'svg', value: menuIconDelete },
-            action: () => interactions.deleteByIds([target.node.id]),
-          },
-          { separator: true },
-          {
-            label: 'Удалить из группы',
-            icon: 'D',
-            enabled: groupsWithNode.length > 0,
-            action: () => {
-              interactions.removeNodeFromGroups(target.node.id, groupsWithNode.map((group) => group.id));
-            },
-          },
-          { separator: true },
-          {
-            label: 'Стиль',
-            icon: 'S',
-            items: [
-              {
-                label: 'Success',
-                action: () => {
-                  interactions.changeNodeProperties(target.node.id, (node) => {
-                    node.clearStyleOverrides();
-                    node.styleClass = 'success';
-                    if (node.label) {
-                      node.label.styleClass = 'success';
-                    }
-                  });
-                },
-              },
-              {
-                label: 'Warning',
-                action: () => {
-                  interactions.changeNodeProperties(target.node.id, (node) => {
-                    node.clearStyleOverrides();
-                    node.styleClass = 'warning';
-                    if (node.label) {
-                      node.label.styleClass = 'warning';
-                    }
-                  });
-                },
-              },
-              {
-                label: 'Error',
-                action: () => {
-                  interactions.changeNodeProperties(target.node.id, (node) => {
-                    node.clearStyleOverrides();
-                    node.styleClass = 'error';
-                    if (node.label) {
-                      node.label.styleClass = 'error';
-                    }
-                  });
-                },
-              },
-            ],
-          },
-        ];
-      },
-      edge: (target) => [
-        {
-          label: 'Удалить связь',
-          icon: { type: 'svg', value: menuIconDelete },
-          action: () => interactions.deleteByIds([target.edge.id]),
-        }
-      ],
-      canvas: [
-        {
-          label: 'Фильтр: Warning',
-          icon: 'W',
-          action: () => {
-            searchManager.filter({ styleClass: 'warning' });
-          },
-        },
-        {
-          label: 'Снять фильтр',
-          icon: 'C',
-          action: () => {
-            searchManager.clearFilter();
-          },
-        },
-      ],
-    },
-  });
-
-  const iconSvg = `
-      <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
-        <rect x="6" y="10" width="36" height="26" rx="6" fill="#2563eb"/>
-        <path d="M16 24h16" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
-        <path d="M24 16v16" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
-      </svg>
-    `;
-
-  function createNodeByType(type, options) {
-    switch (type) {
-      case 'circle':
-        return new CircleNode(options);
-      case 'diamond':
-        return new DiamondNode(options);
-      case 'custom':
-        return new CustomShapeNode(options);
-      case 'rectangle':
-      default:
-        return new RectangleNode(options);
-    }
-  }
-
-  const createChamferedRectPath = (width, height) => {
-    const cut = Math.max(6, Math.min(20, width * 0.18, height * 0.18));
-    const path = new Path2D();
-    path.moveTo(cut, 0);
-    path.lineTo(width - cut, 0);
-    path.lineTo(width, cut);
-    path.lineTo(width, height - cut);
-    path.lineTo(width - cut, height);
-    path.lineTo(cut, height);
-    path.lineTo(0, height - cut);
-    path.lineTo(0, cut);
-    path.closePath();
-    return path;
-  };
-
-  const nodeDefinitions = [
-    {
-      key: 'start',
-      type: 'rectangle',
-      options: {
-        x: 100,
-        y: 100,
-        width: 120,
-        height: 60,
-        label: 'Start',
-        anchorPoints: { top: 3, right: 1, bottom: 3, left: 1 },
-        style: { cornerRadius: 8, fillColor: '#e0f2fe', strokeColor: '#0284c7' },
-      },
-    },
-    {
-      key: 'process',
-      type: 'rectangle',
-      options: {
-        x: 300,
-        y: 100,
-        width: 140,
-        height: 60,
-        label: 'Process',
-        anchorPoints: { top: 3, right: 1, bottom: 3, left: 1 },
-        style: { cornerRadius: 4 },
-        icon: {
-          source: iconSvg,
-          placement: 'left',
-          fit: 'contain',
-          padding: 10,
-        },
-      },
-    },
-    {
-      key: 'check',
-      type: 'diamond',
-      options: {
-        x: 520,
-        y: 80,
-        width: 100,
-        height: 100,
-        label: 'Check',
-        anchorPoints: { top: 1, right: 1, bottom: 1, left: 1 },
-        styleClass: 'warning',
-      },
-    },
-    {
-      key: 'custom',
-      type: 'custom',
-      options: {
-        x: 700,
-        y: 360,
-        width: 140,
-        height: 70,
-        label: 'Chamfered',
-        anchorPoints: { top: 3, right: 1, bottom: 3, left: 1 },
-        path: createChamferedRectPath,
-        style: { fillColor: '#ede9fe', strokeColor: '#7c3aed', strokeWidth: 2 },
-      },
-    },
-    {
-      key: 'end',
-      type: 'circle',
-      options: {
-        x: 700,
-        y: 100,
-        width: 80,
-        height: 60,
-        label: 'End',
-        anchorPoints: { top: 1, right: 1, bottom: 1, left: 1 },
-        styleClass: 'success',
-      },
-    },
-    {
-      key: 'error',
-      type: 'rectangle',
-      options: {
-        x: 520,
-        y: 280,
-        width: 120,
-        height: 60,
-        label: 'Error',
-        anchorPoints: { top: 3, right: 1, bottom: 3, left: 1 },
-        style: { cornerRadius: 4 },
-        styleClass: 'error',
-      },
-    },
-    {
-      key: 'cover',
-      type: 'rectangle',
-      options: {
-        x: 100,
-        y: 280,
-        width: 140,
-        height: 80,
-        label: 'Top Cover',
-        anchorPoints: { top: 3, right: 1, bottom: 3, left: 1 },
-        style: { cornerRadius: 8 },
-        icon: {
-          source: iconSvg,
-          placement: 'top',
-          fit: 'cover',
-          padding: 6,
-        },
-      },
-    },
-    {
-      key: 'stretch',
-      type: 'rectangle',
-      options: {
-        x: 300,
-        y: 280,
-        width: 140,
-        height: 80,
-        label: 'Bottom Stretch',
-        anchorPoints: { top: 3, right: 1, bottom: 3, left: 1 },
-        style: { cornerRadius: 8 },
-        icon: {
-          source: iconSvg,
-          placement: 'bottom',
-          fit: 'stretch',
-          padding: 6,
-        },
-      },
-    },
-    {
-      key: 'right',
-      type: 'rectangle',
-      options: {
-        x: 700,
-        y: 240,
-        width: 120,
-        height: 90,
-        label: 'Right None',
-        anchorPoints: { top: 3, right: 1, bottom: 3, left: 1 },
-        style: { cornerRadius: 8 },
-        icon: {
-          source: iconSvg,
-          placement: 'right',
-          fit: 'none',
-          padding: 6,
-        },
-      },
-    },
-  ];
-
-  const nodes = new Map();
-  nodeDefinitions.forEach((definition) => {
-    const node = createNodeByType(definition.type, definition.options);
-    nodes.set(definition.key, node);
-    renderer.addNode(node);
-  });
-
-  const mainGroup = new Group({ label: 'Main Flow' });
-  mainGroup.addChild(nodes.get('start'));
-  mainGroup.addChild(nodes.get('process'));
-  mainGroup.addChild(nodes.get('check'));
-  mainGroup.addChild(nodes.get('end'));
-  renderer.addGroup(mainGroup);
-
-  const edgeDefinitions = [
-    {
-      from: 'start',
-      to: 'process',
-      type: 'polyline',
-      endMarker: { type: 'open', size: 12 },
-    },
-    {
-      from: 'process',
-      to: 'check',
-      type: 'polyline',
-      endMarker: { type: 'open', size: 12 },
-    },
-    {
-      from: 'check',
-      to: 'end',
-      type: 'polyline',
-      endMarker: { type: 'open', size: 12 },
-      label: 'Yes',
-      labelBackground: { color: '#dcfce7', padding: 6, borderRadius: 4 },
-    },
-    {
-      from: 'check',
-      to: 'error',
-      type: 'polyline',
-      endMarker: { type: 'open', size: 12 },
-      label: 'No',
-      labelOffset: 10,
-      labelBackground: { color: '#fee2e2', padding: 6, borderRadius: 4 },
-    },
-    {
-      from: 'cover',
-      to: 'stretch',
-      type: 'bezier',
-      endMarker: { type: 'arrow', size: 12 },
-      label: 'Arrow',
-      labelBackground: { color: '#e0f2fe', padding: 4, borderRadius: 3 },
-    },
-    {
-      from: 'stretch',
-      to: 'error',
-      type: 'bezier',
-      startMarker: { type: 'circle', size: 5 },
-      endMarker: { type: 'diamond', size: 10 },
-      label: 'Circle → Diamond',
-      labelBackground: { color: '#fef3c7', padding: 4, borderRadius: 3 },
-    },
-    {
-      from: 'error',
-      to: 'right',
-      type: 'straight',
-      endMarker: { type: 'diamond', size: 12 },
-      style: { lineDash: [8, 4], lineCap: 'round' },
-      label: 'Diamond (dashed)',
-      labelBackground: { color: '#f1f5f9', padding: 4, borderRadius: 3 },
-    },
-    {
-      from: 'end',
-      to: 'right',
-      type: 'bezier',
-      startMarker: { type: 'circle', size: 4, fillColor: '#ffffff' },
-      endMarker: { type: 'circle', size: 4 },
-      style: { strokeColor: '#16a34a', lineDash: [4, 2], lineDashOffset: 2 },
-    },
-  ];
-
-  edgeDefinitions.forEach((definition) => {
-    const edge = new Edge({
-      from: { nodeId: nodes.get(definition.from).id },
-      to: { nodeId: nodes.get(definition.to).id },
-      type: definition.type,
-      startMarker: definition.startMarker,
-      endMarker: definition.endMarker,
-      label: definition.label,
-      labelOffset: definition.labelOffset,
-      labelBackground: definition.labelBackground,
-      style: definition.style,
-    });
-    renderer.addEdge(edge);
-  });
-
-  // Style Panel Logic
-  const nodeStylePanel = document.getElementById('nodeStylePanel');
-  const edgeStylePanel = document.getElementById('edgeStylePanel');
-  const groupStylePanel = document.getElementById('groupStylePanel');
-  const infoPanel = document.getElementById('infoPanel');
-
-  let selectedNode = null;
-  let selectedEdge = null;
-  let selectedGroup = null;
-
-  function showPanel(panel) {
-    nodeStylePanel.classList.add('hidden');
-    edgeStylePanel.classList.add('hidden');
-    groupStylePanel.classList.add('hidden');
-    infoPanel.classList.add('hidden');
-    panel.classList.remove('hidden');
-  }
-
-  function updateNodePanel(node) {
-    document.getElementById('nodeLabel').value = node.label?.text || '';
-    const labelStyle = node.label?.style || {};
-    document.getElementById('nodeLabelColor').value = labelStyle.color || '#333333';
-    document.getElementById('nodeLabelColorText').value = labelStyle.color || '#333333';
-    document.getElementById('nodeLabelSize').value = labelStyle.fontSize || 12;
-    document.getElementById('nodeLabelPadding').value = node.label?.padding ?? 8;
-    document.getElementById('nodeLabelMargin').value = node.label?.margin ?? 0;
-    document.getElementById('nodeLabelPlacement').value = node.labelPlacement || 'auto';
-    const iconPlacementSelect = document.getElementById('nodeIconPlacement');
-    iconPlacementSelect.value = node.icon?.placement || 'center';
-    iconPlacementSelect.disabled = !node.icon;
-    const iconPaddingInput = document.getElementById('nodeIconPadding');
-    const iconMarginInput = document.getElementById('nodeIconMargin');
-    iconPaddingInput.value = node.icon?.options.padding ?? 8;
-    iconMarginInput.value = node.icon?.options.margin ?? 0;
-    iconPaddingInput.disabled = !node.icon;
-    iconMarginInput.disabled = !node.icon;
-    const style = node.style || {};
-    document.getElementById('nodeFillColor').value = style.fillColor || '#ffffff';
-    document.getElementById('nodeFillColorText').value = style.fillColor || '#ffffff';
-    document.getElementById('nodeStrokeColor').value = style.strokeColor || '#333333';
-    document.getElementById('nodeStrokeColorText').value = style.strokeColor || '#333333';
-    document.getElementById('nodeStrokeWidth').value = style.strokeWidth || 2;
-    const nodeLineDash = style.lineDash || [];
-    const nodeLineDashRow = document.getElementById('nodeLineDashRow');
-    const nodeLineStyle = nodeLineDash.length > 0 ? 'dashed' : 'solid';
-    document.getElementById('nodeLineStyle').value = nodeLineStyle;
-    document.getElementById('nodeLineDash').value =
-      nodeLineDash.length > 0 ? nodeLineDash.join(',') : '8,4';
-    nodeLineDashRow.classList.toggle('hidden', nodeLineStyle !== 'dashed');
-    document.getElementById('nodeCornerRadius').value = node.cornerRadius ?? 0;
-    document.getElementById('nodeOpacity').value = style.opacity || 1;
-  }
-
-  function getEdgeBaseStyle(edge) {
-    const computed = edge.style || {};
-    const styleManager = renderer.getStyleManager?.();
-    if (!styleManager || edge.state === 'normal') {
-      return { ...computed };
-    }
-
-    const stateStyle = styleManager.getEdgeStyle(edge.state, edge.styleClass);
-    const normalStyle = styleManager.getEdgeStyle('normal', edge.styleClass);
-    const baseStyle = { ...computed };
-    const keys = [
-      'strokeColor',
-      'strokeWidth',
-      'opacity',
-      'lineDash',
-      'lineDashOffset',
-      'lineCap',
-      'lineJoin',
-      'flowSpeed',
-      'flowDash',
-    ];
-
-    keys.forEach((key) => {
-      if (computed[key] === stateStyle[key] && normalStyle[key] !== undefined) {
-        baseStyle[key] = normalStyle[key];
-      }
-    });
-
-    return baseStyle;
-  }
-
-  function applyEdgeStyle(updates) {
-    if (!selectedEdge) {
-      return;
-    }
-    interactions.changeEdgeProperties(selectedEdge.id, (edge) => {
-      const baseStyle = getEdgeBaseStyle(edge);
-      edge.style = { ...baseStyle, ...updates };
-    });
-  }
-
-  function applyNodeStyle(updates) {
-    if (!selectedNode) {
-      return;
-    }
-    interactions.changeNodeProperties(selectedNode.id, (node) => {
-      const baseStyle = node.style || {};
-      node.style = { ...baseStyle, ...updates };
-    });
-  }
-
-  function rebuildNodeLabel(node, overrides) {
-    if (!node.label) {
-      return;
-    }
-    const label = node.label;
-    const padding =
-      overrides?.padding !== undefined ? Math.max(0, overrides.padding) : label.padding;
-    const margin = overrides?.margin !== undefined ? Math.max(0, overrides.margin) : label.margin;
-    node.label = new TextLabel({
-      text: label.text,
-      style: { ...label.style },
-      maxWidth: label.maxWidth,
-      padding,
-      margin,
-      styleClass: label.styleClass,
-    });
-  }
-
-  function updateGroupPanel(group) {
-    document.getElementById('groupLabel').value = group.label || '';
-    document.getElementById('groupPadding').value = group.padding ?? 20;
-    const style = group.style || {};
-    const fillColor = style.fillColor || 'rgba(200, 200, 200, 0.2)';
-    document.getElementById('groupFillColor').value = typeof fillColor === 'string' && fillColor.startsWith('#') ? fillColor : '#c8c8c8';
-    document.getElementById('groupFillColorText').value = fillColor;
-    const strokeColor = style.strokeColor || '#999999';
-    document.getElementById('groupStrokeColor').value = typeof strokeColor === 'string' && strokeColor.startsWith('#') ? strokeColor : '#999999';
-    document.getElementById('groupStrokeColorText').value = strokeColor;
-    document.getElementById('groupStrokeWidth').value = style.strokeWidth ?? 1;
-    const groupLineDash = style.lineDash || [];
-    const groupLineDashRow = document.getElementById('groupLineDashRow');
-    const groupLineStyle = groupLineDash.length > 0 ? 'dashed' : 'solid';
-    document.getElementById('groupLineStyle').value = groupLineStyle;
-    document.getElementById('groupLineDash').value =
-      groupLineDash.length > 0 ? groupLineDash.join(',') : '8,4';
-    groupLineDashRow.classList.toggle('hidden', groupLineStyle !== 'dashed');
-    document.getElementById('groupOpacity').value = style.opacity ?? 1;
-  }
-
-  function applyGroupStyle(updates) {
-    if (!selectedGroup) {
-      return;
-    }
-    interactions.changeGroupProperties(selectedGroup.id, (group) => {
-      const baseStyle = group.style || {};
-      group.style = { ...baseStyle, ...updates };
-    });
-  }
-
-  function updateEdgePanel(edge) {
-    // Label settings
-    document.getElementById('edgeLabel').value = edge.label?.text || '';
-    const labelStyle = edge.label?.style || {};
-    document.getElementById('edgeLabelColor').value = labelStyle.color || '#333333';
-    document.getElementById('edgeLabelColorText').value = labelStyle.color || '#333333';
-    document.getElementById('edgeLabelOpacity').value = 1; // Text opacity not directly supported, use 1
-    document.getElementById('edgeLabelSize').value = labelStyle.fontSize || 12;
-
-    // Label background
-    const labelBg = edge.labelBackground || {};
-    document.getElementById('edgeLabelBg').value = labelBg.color || '#ffffff';
-    document.getElementById('edgeLabelBgText').value = labelBg.color || '#ffffff';
-    document.getElementById('edgeLabelBgOpacity').value = labelBg.opacity ?? 1;
-
-    // Line settings
-    document.getElementById('edgeType').value = edge.type || 'bezier';
-    const style = getEdgeBaseStyle(edge);
-    document.getElementById('edgeStrokeColor').value = style.strokeColor || '#666666';
-    document.getElementById('edgeStrokeColorText').value = style.strokeColor || '#666666';
-    document.getElementById('edgeStrokeOpacity').value = style.opacity ?? 1;
-    document.getElementById('edgeStrokeWidth').value = style.strokeWidth || 2;
-
-    // Line style and dash pattern
-    const lineDash = style.flowDash || style.lineDash || [];
-    const lineDashRow = document.getElementById('edgeLineDashRow');
-    const lineStyle = lineDash.length > 0 ? 'dashed' : 'solid';
-    document.getElementById('edgeLineStyle').value = lineStyle;
-    document.getElementById('edgeLineDash').value = lineDash.length > 0 ? lineDash.join(',') : '8,4';
-    lineDashRow.classList.toggle('hidden', lineStyle !== 'dashed');
-    document.getElementById('edgeDashAnimate').checked = false;
-    document.getElementById('edgeDashAnimateRow').classList.add('hidden');
-
-    // Start marker
-    document.getElementById('edgeStartMarker').value = edge.startMarker?.type || (edge.arrowType === 'double' ? 'open' : 'none');
-    document.getElementById('edgeStartMarkerSize').value = edge.startMarker?.size || 12;
-    const startMarkerFill = edge.startMarker?.fillColor || style.strokeColor || '#666666';
-    document.getElementById('edgeStartMarkerFill').value = startMarkerFill;
-    document.getElementById('edgeStartMarkerFillText').value = startMarkerFill;
-    document.getElementById('edgeStartMarkerOpacity').value = edge.startMarker?.fillOpacity ?? 1;
-
-    // End marker
-    document.getElementById('edgeEndMarker').value = edge.endMarker?.type || (edge.arrowType === 'none' ? 'none' : 'open');
-    document.getElementById('edgeEndMarkerSize').value = edge.endMarker?.size || 12;
-    const endMarkerFill = edge.endMarker?.fillColor || style.strokeColor || '#666666';
-    document.getElementById('edgeEndMarkerFill').value = endMarkerFill;
-    document.getElementById('edgeEndMarkerFillText').value = endMarkerFill;
-    document.getElementById('edgeEndMarkerOpacity').value = edge.endMarker?.fillOpacity ?? 1;
-  }
-
-  // Selection event handler
-  renderer.on('select', (elementIds) => {
-    selectedNode = null;
-    selectedEdge = null;
-    selectedGroup = null;
-
-    if (elementIds.length === 0) {
-      showPanel(infoPanel);
-      return;
-    }
-
-    // Check if it's a node
-    const node = renderer.getNode(elementIds[0]);
-    if (node) {
-      selectedNode = node;
-      updateNodePanel(node);
-      showPanel(nodeStylePanel);
-      return;
-    }
-
-    // Check if it's an edge
-    const edge = renderer.getEdge(elementIds[0]);
-    if (edge) {
-      selectedEdge = edge;
-      updateEdgePanel(edge);
-      showPanel(edgeStylePanel);
-      return;
-    }
-
-    // Check if it's a group
-    const group = renderer.getGroup(elementIds[0]);
-    if (group) {
-      selectedGroup = group;
-      updateGroupPanel(group);
-      showPanel(groupStylePanel);
-      return;
-    }
-
-    showPanel(infoPanel);
-  });
-
-  // Node style change handlers
-  document.getElementById('nodeLabel').addEventListener('input', (e) => {
-    if (selectedNode) {
-      interactions.changeNodeProperties(selectedNode.id, (node) => {
-        if (e.target.value) {
-          const padding = parseFloat(document.getElementById('nodeLabelPadding').value);
-          const margin = parseFloat(document.getElementById('nodeLabelMargin').value);
-          const color = document.getElementById('nodeLabelColor').value;
-          const fontSize = parseFloat(document.getElementById('nodeLabelSize').value);
-          if (node.label) {
-            node.label.text = e.target.value;
-          } else {
-            node.label = new TextLabel({
-              text: e.target.value,
-              padding: Number.isFinite(padding) ? Math.max(0, padding) : 8,
-              margin: Number.isFinite(margin) ? Math.max(0, margin) : 0,
-              style: {
-                color,
-                fontSize: Number.isFinite(fontSize) ? fontSize : 12,
-              },
-            });
-          }
-        } else {
-          node.label = undefined;
-        }
-      });
-    }
-  });
-
-  document.getElementById('nodeLabelColor').addEventListener('input', (e) => {
-    document.getElementById('nodeLabelColorText').value = e.target.value;
-    if (selectedNode && selectedNode.label) {
-      interactions.changeNodeProperties(selectedNode.id, (node) => {
-        if (node.label) {
-          node.label.style = { ...node.label.style, color: e.target.value };
-        }
-      });
-    }
-  });
-
-  document.getElementById('nodeLabelColorText').addEventListener('change', (e) => {
-    document.getElementById('nodeLabelColor').value = e.target.value;
-    if (selectedNode && selectedNode.label) {
-      interactions.changeNodeProperties(selectedNode.id, (node) => {
-        if (node.label) {
-          node.label.style = { ...node.label.style, color: e.target.value };
-        }
-      });
-    }
-  });
-
-  document.getElementById('nodeLabelSize').addEventListener('input', (e) => {
-    if (selectedNode && selectedNode.label) {
-      interactions.changeNodeProperties(selectedNode.id, (node) => {
-        if (node.label) {
-          node.label.style = { ...node.label.style, fontSize: parseFloat(e.target.value) };
-        }
-      });
-    }
-  });
-
-  document.getElementById('nodeLabelPadding').addEventListener('input', (e) => {
-    if (selectedNode && selectedNode.label) {
-      const padding = parseFloat(e.target.value);
-      interactions.changeNodeProperties(selectedNode.id, (node) => {
-        rebuildNodeLabel(node, { padding });
-      });
-    }
-  });
-
-  document.getElementById('nodeLabelMargin').addEventListener('input', (e) => {
-    if (selectedNode && selectedNode.label) {
-      const margin = parseFloat(e.target.value);
-      interactions.changeNodeProperties(selectedNode.id, (node) => {
-        rebuildNodeLabel(node, { margin });
-      });
-    }
-  });
-
-  document.getElementById('nodeLabelPlacement').addEventListener('change', (e) => {
-    if (selectedNode) {
-      interactions.changeNodeProperties(selectedNode.id, (node) => {
-        node.labelPlacement = e.target.value;
-      });
-    }
-  });
-
-  document.getElementById('nodeIconPlacement').addEventListener('change', (e) => {
-    if (selectedNode && selectedNode.icon) {
-      interactions.changeNodeProperties(selectedNode.id, (node) => {
-        if (node.icon) {
-          node.icon.options = { ...node.icon.options, placement: e.target.value };
-        }
-      });
-    }
-  });
-
-  document.getElementById('nodeIconPadding').addEventListener('input', (e) => {
-    if (selectedNode && selectedNode.icon) {
-      const padding = parseFloat(e.target.value);
-      interactions.changeNodeProperties(selectedNode.id, (node) => {
-        if (node.icon) {
-          node.icon.options = {
-            ...node.icon.options,
-            padding: Number.isFinite(padding) ? Math.max(0, padding) : 8,
-          };
-        }
-      });
-    }
-  });
-
-  document.getElementById('nodeIconMargin').addEventListener('input', (e) => {
-    if (selectedNode && selectedNode.icon) {
-      const margin = parseFloat(e.target.value);
-      interactions.changeNodeProperties(selectedNode.id, (node) => {
-        if (node.icon) {
-          node.icon.options = {
-            ...node.icon.options,
-            margin: Number.isFinite(margin) ? Math.max(0, margin) : 0,
-          };
-        }
-      });
-    }
-  });
-
-  document.getElementById('nodeFillColor').addEventListener('input', (e) => {
-    document.getElementById('nodeFillColorText').value = e.target.value;
-    applyNodeStyle({ fillColor: e.target.value });
-  });
-
-  document.getElementById('nodeFillColorText').addEventListener('change', (e) => {
-    document.getElementById('nodeFillColor').value = e.target.value;
-    applyNodeStyle({ fillColor: e.target.value });
-  });
-
-  document.getElementById('nodeStrokeColor').addEventListener('input', (e) => {
-    document.getElementById('nodeStrokeColorText').value = e.target.value;
-    applyNodeStyle({ strokeColor: e.target.value });
-  });
-
-  document.getElementById('nodeStrokeColorText').addEventListener('change', (e) => {
-    document.getElementById('nodeStrokeColor').value = e.target.value;
-    applyNodeStyle({ strokeColor: e.target.value });
-  });
-
-  document.getElementById('nodeStrokeWidth').addEventListener('input', (e) => {
-    applyNodeStyle({ strokeWidth: parseFloat(e.target.value) });
-  });
-
-  document.getElementById('nodeLineStyle').addEventListener('change', (e) => {
-    const nodeLineDashRow = document.getElementById('nodeLineDashRow');
-    const style = e.target.value;
-
-    nodeLineDashRow.classList.toggle('hidden', style !== 'dashed');
-
-    let lineDash;
-    switch (style) {
-      case 'dashed': {
-        const pattern = document.getElementById('nodeLineDash').value.trim() || '8,4';
-        lineDash = pattern.split(',').map(v => parseFloat(v.trim())).filter(v => !isNaN(v));
-        break;
-      }
-      default:
-        lineDash = undefined;
-    }
-    applyNodeStyle({ lineDash });
-  });
-
-  document.getElementById('nodeLineDash').addEventListener('change', (e) => {
-    if (document.getElementById('nodeLineStyle').value === 'dashed') {
-      const value = e.target.value.trim() || '8,4';
-      const lineDash = value.split(',').map(v => parseFloat(v.trim())).filter(v => !isNaN(v));
-      if (lineDash.length > 0) {
-        applyNodeStyle({ lineDash });
-      }
-    }
-  });
-
-  document.getElementById('nodeCornerRadius').addEventListener('input', (e) => {
-    if (selectedNode && 'cornerRadius' in selectedNode) {
-      interactions.changeNodeProperties(selectedNode.id, (node) => {
-        if ('cornerRadius' in node) {
-          node.cornerRadius = parseFloat(e.target.value);
-        }
-      });
-    }
-  });
-
-  document.getElementById('nodeOpacity').addEventListener('input', (e) => {
-    applyNodeStyle({ opacity: parseFloat(e.target.value) });
-  });
-
-  // Group style change handlers
-  document.getElementById('groupLabel').addEventListener('input', (e) => {
-    if (!selectedGroup) {
-      return;
-    }
-    interactions.changeGroupProperties(selectedGroup.id, (group) => {
-      group.label = e.target.value || undefined;
-    });
-  });
-
-  document.getElementById('groupPadding').addEventListener('input', (e) => {
-    if (!selectedGroup) {
-      return;
-    }
-    interactions.changeGroupProperties(selectedGroup.id, (group) => {
-      group.padding = parseFloat(e.target.value);
-    });
-  });
-
-  document.getElementById('groupFillColor').addEventListener('input', (e) => {
-    document.getElementById('groupFillColorText').value = e.target.value;
-    applyGroupStyle({ fillColor: e.target.value });
-  });
-
-  document.getElementById('groupFillColorText').addEventListener('change', (e) => {
-    document.getElementById('groupFillColor').value = e.target.value;
-    applyGroupStyle({ fillColor: e.target.value });
-  });
-
-  document.getElementById('groupStrokeColor').addEventListener('input', (e) => {
-    document.getElementById('groupStrokeColorText').value = e.target.value;
-    applyGroupStyle({ strokeColor: e.target.value });
-  });
-
-  document.getElementById('groupStrokeColorText').addEventListener('change', (e) => {
-    document.getElementById('groupStrokeColor').value = e.target.value;
-    applyGroupStyle({ strokeColor: e.target.value });
-  });
-
-  document.getElementById('groupStrokeWidth').addEventListener('input', (e) => {
-    applyGroupStyle({ strokeWidth: parseFloat(e.target.value) });
-  });
-
-  document.getElementById('groupLineStyle').addEventListener('change', (e) => {
-    const groupLineDashRow = document.getElementById('groupLineDashRow');
-    const style = e.target.value;
-    groupLineDashRow.classList.toggle('hidden', style !== 'dashed');
-
-    let lineDash;
-    switch (style) {
-      case 'dashed': {
-        const pattern = document.getElementById('groupLineDash').value.trim() || '8,4';
-        lineDash = pattern.split(',').map(v => parseFloat(v.trim())).filter(v => !isNaN(v));
-        break;
-      }
-      default:
-        lineDash = [];
-    }
-    applyGroupStyle({ lineDash });
-  });
-
-  document.getElementById('groupLineDash').addEventListener('change', (e) => {
-    if (document.getElementById('groupLineStyle').value === 'dashed') {
-      const value = e.target.value.trim() || '8,4';
-      const lineDash = value.split(',').map(v => parseFloat(v.trim())).filter(v => !isNaN(v));
-      if (lineDash.length > 0) {
-        applyGroupStyle({ lineDash });
-      }
-    }
-  });
-
-  document.getElementById('groupOpacity').addEventListener('input', (e) => {
-    applyGroupStyle({ opacity: parseFloat(e.target.value) });
-  });
-
-  // Edge style change handlers
-
-  // Label text
-  document.getElementById('edgeLabel').addEventListener('input', (e) => {
-    if (selectedEdge) {
-      interactions.changeEdgeProperties(selectedEdge.id, (edge) => {
-        if (e.target.value) {
-          if (edge.label) {
-            edge.label.text = e.target.value;
-          } else {
-            edge.label = e.target.value;
-          }
-        } else {
-          edge.label = undefined;
-        }
-      });
-    }
-  });
-
-  // Label color
-  document.getElementById('edgeLabelColor').addEventListener('input', (e) => {
-    document.getElementById('edgeLabelColorText').value = e.target.value;
-    if (selectedEdge && selectedEdge.label) {
-      interactions.changeEdgeProperties(selectedEdge.id, (edge) => {
-        if (edge.label) {
-          edge.label.style = { ...edge.label.style, color: e.target.value };
-        }
-      });
-    }
-  });
-
-  document.getElementById('edgeLabelColorText').addEventListener('change', (e) => {
-    document.getElementById('edgeLabelColor').value = e.target.value;
-    if (selectedEdge && selectedEdge.label) {
-      interactions.changeEdgeProperties(selectedEdge.id, (edge) => {
-        if (edge.label) {
-          edge.label.style = { ...edge.label.style, color: e.target.value };
-        }
-      });
-    }
-  });
-
-  document.getElementById('edgeLabelOpacity').addEventListener('input', (e) => {
-    // Label text opacity - not directly supported by TextLabel, could be extended
-    renderer.markDirty();
-  });
-
-  // Label size
-  document.getElementById('edgeLabelSize').addEventListener('input', (e) => {
-    if (selectedEdge && selectedEdge.label) {
-      interactions.changeEdgeProperties(selectedEdge.id, (edge) => {
-        if (edge.label) {
-          edge.label.style = { ...edge.label.style, fontSize: parseFloat(e.target.value) };
-        }
-      });
-    }
-  });
-
-  // Label background
-  function updateLabelBackground() {
-    if (selectedEdge) {
-      const color = document.getElementById('edgeLabelBg').value;
-      const opacity = parseFloat(document.getElementById('edgeLabelBgOpacity').value);
-      interactions.changeEdgeProperties(selectedEdge.id, (edge) => {
-        edge.labelBackground = {
-          ...edge.labelBackground,
-          color: opacity < 1 ? hexToRgba(color, opacity) : color
-        };
-      });
-    }
-  }
-
-  function hexToRgba(hex, alpha) {
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-  }
-
-  document.getElementById('edgeLabelBg').addEventListener('input', (e) => {
-    document.getElementById('edgeLabelBgText').value = e.target.value;
-    updateLabelBackground();
-  });
-
-  document.getElementById('edgeLabelBgText').addEventListener('change', (e) => {
-    document.getElementById('edgeLabelBg').value = e.target.value;
-    updateLabelBackground();
-  });
-
-  document.getElementById('edgeLabelBgOpacity').addEventListener('input', updateLabelBackground);
-
-  // Edge type
-  document.getElementById('edgeType').addEventListener('change', (e) => {
-    if (selectedEdge) {
-      interactions.changeEdgeProperties(selectedEdge.id, (edge) => {
-        edge.type = e.target.value;
-      });
-    }
-  });
-
-  // Stroke color
-  document.getElementById('edgeStrokeColor').addEventListener('input', (e) => {
-    document.getElementById('edgeStrokeColorText').value = e.target.value;
-    applyEdgeStyle({ strokeColor: e.target.value });
-  });
-
-  document.getElementById('edgeStrokeColorText').addEventListener('change', (e) => {
-    document.getElementById('edgeStrokeColor').value = e.target.value;
-    applyEdgeStyle({ strokeColor: e.target.value });
-  });
-
-  // Stroke opacity
-  document.getElementById('edgeStrokeOpacity').addEventListener('input', (e) => {
-    applyEdgeStyle({ opacity: parseFloat(e.target.value) });
-  });
-
-  // Stroke width
-  document.getElementById('edgeStrokeWidth').addEventListener('input', (e) => {
-    applyEdgeStyle({ strokeWidth: parseFloat(e.target.value) });
-  });
-
-  // Line style
-  document.getElementById('edgeLineStyle').addEventListener('change', (e) => {
-    const lineDashRow = document.getElementById('edgeLineDashRow');
-    const style = e.target.value;
-    lineDashRow.classList.toggle('hidden', style !== 'dashed');
-
-    let lineDash;
-    switch (style) {
-      case 'dashed':
-        const pattern = document.getElementById('edgeLineDash').value.trim() || '8,4';
-        lineDash = pattern.split(',').map(v => parseFloat(v.trim())).filter(v => !isNaN(v));
-        break;
-      default:
-        lineDash = undefined;
-    }
-    applyEdgeStyle({ lineDash });
-  });
-
-  // Line dash pattern (only for dashed style)
-  document.getElementById('edgeLineDash').addEventListener('change', (e) => {
-    if (document.getElementById('edgeLineStyle').value === 'dashed') {
-      const value = e.target.value.trim() || '8,4';
-      const lineDash = value.split(',').map(v => parseFloat(v.trim())).filter(v => !isNaN(v));
-      if (lineDash.length > 0) {
-        applyEdgeStyle({ lineDash });
-      }
-    }
-  });
-
-  document.getElementById('edgeDashAnimate').addEventListener('change', () => {});
-
-  // Markers
-  function updateMarkers() {
-    if (selectedEdge) {
-      const startType = document.getElementById('edgeStartMarker').value;
-      const endType = document.getElementById('edgeEndMarker').value;
-      const startSize = parseFloat(document.getElementById('edgeStartMarkerSize').value);
-      const endSize = parseFloat(document.getElementById('edgeEndMarkerSize').value);
-      const startFill = document.getElementById('edgeStartMarkerFill').value;
-      const endFill = document.getElementById('edgeEndMarkerFill').value;
-      const startOpacity = parseFloat(document.getElementById('edgeStartMarkerOpacity').value);
-      const endOpacity = parseFloat(document.getElementById('edgeEndMarkerOpacity').value);
-
-      interactions.changeEdgeProperties(selectedEdge.id, (edge) => {
-        edge.startMarker = startType === 'none'
-          ? undefined
-          : { type: startType, size: startSize, fillColor: startFill, fillOpacity: startOpacity };
-        edge.endMarker = endType === 'none'
-          ? undefined
-          : { type: endType, size: endSize, fillColor: endFill, fillOpacity: endOpacity };
-        edge.arrowType = 'none';
-      });
-    }
-  }
-
-  document.getElementById('edgeStartMarker').addEventListener('change', updateMarkers);
-  document.getElementById('edgeStartMarkerSize').addEventListener('input', updateMarkers);
-
-  document.getElementById('edgeStartMarkerFill').addEventListener('input', (e) => {
-    document.getElementById('edgeStartMarkerFillText').value = e.target.value;
-    updateMarkers();
-  });
-
-  document.getElementById('edgeStartMarkerFillText').addEventListener('change', (e) => {
-    document.getElementById('edgeStartMarkerFill').value = e.target.value;
-    updateMarkers();
-  });
-
-  document.getElementById('edgeStartMarkerOpacity').addEventListener('input', updateMarkers);
-
-  document.getElementById('edgeEndMarker').addEventListener('change', updateMarkers);
-  document.getElementById('edgeEndMarkerSize').addEventListener('input', updateMarkers);
-
-  document.getElementById('edgeEndMarkerFill').addEventListener('input', (e) => {
-    document.getElementById('edgeEndMarkerFillText').value = e.target.value;
-    updateMarkers();
-  });
-
-  document.getElementById('edgeEndMarkerFillText').addEventListener('change', (e) => {
-    document.getElementById('edgeEndMarkerFill').value = e.target.value;
-    updateMarkers();
-  });
-
-  document.getElementById('edgeEndMarkerOpacity').addEventListener('input', updateMarkers);
-
-  // Toolbar handlers
-  let nodeCount = 8;
-
-  document.getElementById('addRect').addEventListener('click', () => {
-    const node = new RectangleNode({
-      x: 100 + Math.random() * 400,
-      y: 100 + Math.random() * 300,
-      width: 120,
-      height: 60,
-      label: `Node ${++nodeCount}`,
-      style: { cornerRadius: 4 },
-    });
-    renderer.addNode(node);
-  });
-
-  document.getElementById('addCircle').addEventListener('click', () => {
-    const node = new CircleNode({
-      x: 100 + Math.random() * 400,
-      y: 100 + Math.random() * 300,
-      width: 80,
-      height: 80,
-      label: `Node ${++nodeCount}`,
-    });
-    renderer.addNode(node);
-  });
-
-  document.getElementById('addDiamond').addEventListener('click', () => {
-    const node = new DiamondNode({
-      x: 100 + Math.random() * 400,
-      y: 100 + Math.random() * 300,
-      width: 100,
-      height: 100,
-      label: `Node ${++nodeCount}`,
-      style: { fillColor: '#fef3c7', strokeColor: '#d97706' },
-    });
-    renderer.addNode(node);
-  });
-
-  document.getElementById('fitView').addEventListener('click', () => {
-    interactions.navigation.fitToView();
-  });
-
-  document.getElementById('zoomSelection').addEventListener('click', () => {
-    interactions.zoomToSelection();
-  });
-
-  document.getElementById('resetView').addEventListener('click', () => {
-    interactions.navigation.resetView();
-  });
-
-  const gridButton = document.getElementById('toggleGrid');
-  const miniMapButton = document.getElementById('toggleMiniMap');
-  const snapButton = document.getElementById('toggleSnap');
-  let gridVisible = true;
-  let miniMapVisible = true;
-  let snapEnabled = false;
-
-  const updateToggleLabels = () => {
-    gridButton.textContent = gridVisible ? 'Hide Grid' : 'Show Grid';
-    miniMapButton.textContent = miniMapVisible ? 'Hide Minimap' : 'Show Minimap';
-    snapButton.textContent = snapEnabled ? 'Disable Snap' : 'Enable Snap';
-  };
-
-  gridButton.addEventListener('click', () => {
-    gridVisible = !gridVisible;
-    gridOverlay.setEnabled(gridVisible);
-    renderer.markDirty();
-    updateToggleLabels();
-  });
-
-  miniMapButton.addEventListener('click', () => {
-    miniMapVisible = !miniMapVisible;
-    miniMap.setEnabled(miniMapVisible);
-    renderer.markDirty();
-    updateToggleLabels();
-  });
-
-  snapButton.addEventListener('click', () => {
-    snapEnabled = !snapEnabled;
-    interactions.drag.setSnapToGrid(snapEnabled);
-    updateToggleLabels();
-  });
-
-  updateToggleLabels();
-
-  document.getElementById('exportPng').addEventListener('click', async () => {
-    await imageExporter.download('diagram.png', { scale: 2 });
-  });
-
-  document.getElementById('exportSvg').addEventListener('click', async () => {
-    await svgExporter.download('diagram.svg');
-  });
-
-  document.getElementById('exportJson').addEventListener('click', () => {
-    const json = serializer.toJSON(true);
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'diagram.json';
-    a.click();
-    URL.revokeObjectURL(url);
-  });
-</script>
+  </script>
 </body>
 </html>

@@ -8,6 +8,11 @@
 - [Оверлеи](./overlays.md)
 - [Утилиты](./utils.md)
 
+## Основная документация
+
+- [README (English)](../README.md)
+- [README (Русский)](../README.ru.md)
+
 ## Быстрые ссылки
 
 - Пример: `examples/index.html`

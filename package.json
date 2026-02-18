@@ -36,8 +36,16 @@
     "interactive",
     "typescript"
   ],
-  "author": "",
+  "author": "Nikolay Groznykh <nikolay@groznykh.ru>",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://gitverse.ru/ngroznykh/papirus.git"
+  },
+  "bugs": {
+    "url": "https://gitverse.ru/ngroznykh/papirus/issues"
+  },
+  "homepage": "https://gitverse.ru/ngroznykh/papirus#readme",
   "devDependencies": {
     "@eslint/js": "^9.39.0",
     "@types/node": "^22.10.0",

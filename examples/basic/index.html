@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Basic Flowchart - Papirus Examples</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="page">
+    <!-- Header -->
+    <header class="header">
+      <a href="../index.html" class="logo">
+        <div class="logo-icon">P</div>
+        <div class="title-group">
+          <div class="title">Papirus</div>
+          <div class="subtitle">Basic Flowchart Example</div>
+        </div>
+      </a>
+      <div class="header-actions">
+        <nav class="nav">
+          <a href="index.html" class="nav-item active">Basic</a>
+          <a href="../ports/index.html" class="nav-item">Ports</a>
+          <a href="../animations/index.html" class="nav-item">Animations</a>
+          <a href="../custom-shapes/index.html" class="nav-item">Shapes</a>
+        </nav>
+        <button class="theme-toggle" id="themeToggle" title="Toggle theme">🌙</button>
+      </div>
+    </header>
+
+    <!-- Toolbar -->
+    <div class="card">
+      <div class="toolbar">
+        <div class="toolbar-group">
+          <button class="btn btn-primary" id="addRect">➕ Rectangle</button>
+          <button class="btn btn-primary" id="addCircle">➕ Circle</button>
+          <button class="btn btn-primary" id="addDiamond">➕ Diamond</button>
+        </div>
+        <div class="toolbar-group">
+          <button class="btn" id="fitView">⊡ Fit to View</button>
+          <button class="btn" id="zoomSelection">⊕ Zoom to Selection</button>
+          <button class="btn" id="resetView">⟲ Reset View</button>
+        </div>
+        <div class="toolbar-group">
+          <button class="btn" id="toggleGrid">⊞ Grid</button>
+          <button class="btn" id="toggleMiniMap">🗺 Minimap</button>
+          <button class="btn" id="toggleSnap">🧲 Snap</button>
+        </div>
+        <div class="toolbar-group">
+          <button class="btn" id="exportPng">📷 PNG</button>
+          <button class="btn" id="exportSvg">📄 SVG</button>
+          <button class="btn" id="exportJson">💾 JSON</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Content -->
+    <div class="content">
+      <!-- Canvas -->
+      <div class="card">
+        <div class="canvas-wrapper">
+          <canvas id="canvas" width="1000" height="550"></canvas>
+        </div>
+      </div>
+
+      <!-- Sidebar -->
+      <div class="sidebar">
+        <!-- Node Style Panel -->
+        <div class="panel hidden" id="nodeStylePanel">
+          <div class="panel-header">
+            <div class="panel-title">Node Style</div>
+          </div>
+          <div class="panel-body">
+            <div class="form-row">
+              <label class="form-label">Label</label>
+              <textarea class="form-input" id="nodeLabel" rows="2" placeholder="Label text"></textarea>
+            </div>
+            <div class="form-row">
+              <label class="form-label">Label Color</label>
+              <input type="color" class="form-color" id="nodeLabelColor" value="#333333">
+              <input type="text" class="form-input" id="nodeLabelColorText" placeholder="#333333">
+            </div>
+            <div class="form-row">
+              <label class="form-label">Size</label>
+              <input type="number" class="form-input" id="nodeLabelSize" min="8" max="32" value="12">
+            </div>
+            <div class="form-row">
+              <label class="form-label">Placement</label>
+              <select class="form-select" id="nodeLabelPlacement">
+                <option value="auto">Auto</option>
+                <option value="center">Center</option>
+                <option value="top">Top</option>
+                <option value="bottom">Bottom</option>
+                <option value="left">Left</option>
+                <option value="right">Right</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <label class="form-label">Fill</label>
+              <input type="color" class="form-color" id="nodeFillColor" value="#ffffff">
+              <input type="text" class="form-input" id="nodeFillColorText" placeholder="#ffffff">
+            </div>
+            <div class="form-row">
+              <label class="form-label">Stroke</label>
+              <input type="color" class="form-color" id="nodeStrokeColor" value="#333333">
+              <input type="text" class="form-input" id="nodeStrokeColorText" placeholder="#333333">
+            </div>
+            <div class="form-row">
+              <label class="form-label">Stroke W</label>
+              <input type="number" class="form-input" id="nodeStrokeWidth" min="0" max="20" value="2">
+            </div>
+            <div class="form-row">
+              <label class="form-label">Radius</label>
+              <input type="number" class="form-input" id="nodeCornerRadius" min="0" max="50" value="4">
+            </div>
+            <div class="form-row">
+              <label class="form-label">Opacity</label>
+              <input type="number" class="form-input" id="nodeOpacity" min="0" max="1" step="0.1" value="1">
+            </div>
+          </div>
+        </div>
+
+        <!-- Edge Style Panel -->
+        <div class="panel hidden" id="edgeStylePanel">
+          <div class="panel-header">
+            <div class="panel-title">Edge Style</div>
+          </div>
+          <div class="panel-body">
+            <div class="form-row">
+              <label class="form-label">Label</label>
+              <textarea class="form-input" id="edgeLabel" rows="2" placeholder="Label text"></textarea>
+            </div>
+            <div class="form-row">
+              <label class="form-label">Type</label>
+              <select class="form-select" id="edgeType">
+                <option value="straight">Straight</option>
+                <option value="polyline">Polyline</option>
+                <option value="bezier">Bezier</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <label class="form-label">Stroke</label>
+              <input type="color" class="form-color" id="edgeStrokeColor" value="#666666">
+              <input type="text" class="form-input" id="edgeStrokeColorText" placeholder="#666666">
+            </div>
+            <div class="form-row">
+              <label class="form-label">Width</label>
+              <input type="number" class="form-input" id="edgeStrokeWidth" min="1" max="10" value="2">
+            </div>
+            <div class="form-row">
+              <label class="form-label">Start ➤</label>
+              <select class="form-select" id="edgeStartMarker">
+                <option value="none">None</option>
+                <option value="arrow">Arrow</option>
+                <option value="open">Open</option>
+                <option value="diamond">Diamond</option>
+                <option value="circle">Circle</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <label class="form-label">Start Size</label>
+              <input type="number" class="form-input" id="edgeStartMarkerSize" min="4" max="30" value="12">
+            </div>
+            <div class="form-row">
+              <label class="form-label">End ➤</label>
+              <select class="form-select" id="edgeEndMarker">
+                <option value="none">None</option>
+                <option value="arrow">Arrow</option>
+                <option value="open" selected>Open</option>
+                <option value="diamond">Diamond</option>
+                <option value="circle">Circle</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <label class="form-label">End Size</label>
+              <input type="number" class="form-input" id="edgeEndMarkerSize" min="4" max="30" value="12">
+            </div>
+          </div>
+        </div>
+
+        <!-- Group Style Panel -->
+        <div class="panel hidden" id="groupStylePanel">
+          <div class="panel-header">
+            <div class="panel-title">Group Style</div>
+          </div>
+          <div class="panel-body">
+            <div class="form-row">
+              <label class="form-label">Label</label>
+              <textarea class="form-input" id="groupLabel" rows="2" placeholder="Group label"></textarea>
+            </div>
+            <div class="form-row">
+              <label class="form-label">Padding</label>
+              <input type="number" class="form-input" id="groupPadding" min="0" max="120" value="20">
+            </div>
+            <div class="form-row">
+              <label class="form-label">Fill</label>
+              <input type="color" class="form-color" id="groupFillColor" value="#c8c8c8">
+              <input type="text" class="form-input" id="groupFillColorText" placeholder="rgba(200,200,200,0.2)">
+            </div>
+            <div class="form-row">
+              <label class="form-label">Stroke</label>
+              <input type="color" class="form-color" id="groupStrokeColor" value="#999999">
+              <input type="text" class="form-input" id="groupStrokeColorText" placeholder="#999999">
+            </div>
+          </div>
+        </div>
+
+        <!-- Info Panel -->
+        <div class="panel" id="infoPanel">
+          <div class="panel-header">
+            <div class="panel-title">Controls</div>
+          </div>
+          <div class="panel-body">
+            <div class="info-panel">
+              <ul>
+                <li>Click to select nodes</li>
+                <li><kbd>Ctrl</kbd> + Click for multi-select</li>
+                <li>Drag nodes to move</li>
+                <li><kbd>Shift</kbd> + drag to connect</li>
+                <li>Mouse wheel to zoom</li>
+                <li>Drag empty area to pan</li>
+                <li><kbd>Ctrl</kbd>+<kbd>C</kbd>/<kbd>V</kbd> copy/paste</li>
+                <li><kbd>Delete</kbd> to remove</li>
+                <li><kbd>Ctrl</kbd>+<kbd>Z</kbd>/<kbd>Y</kbd> undo/redo</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

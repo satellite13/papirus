@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Custom Shapes - Papirus Examples</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="page">
+    <!-- Header -->
+    <header class="header">
+      <a href="../index.html" class="logo">
+        <div class="logo-icon">P</div>
+        <div class="title-group">
+          <div class="title">Papirus</div>
+          <div class="subtitle">Custom Shapes Example</div>
+        </div>
+      </a>
+      <div class="header-actions">
+        <nav class="nav">
+          <a href="../basic/index.html" class="nav-item">Basic</a>
+          <a href="../ports/index.html" class="nav-item">Ports</a>
+          <a href="../animations/index.html" class="nav-item">Animations</a>
+          <a href="index.html" class="nav-item active">Shapes</a>
+        </nav>
+        <button class="theme-toggle" id="themeToggle" title="Toggle theme">🌙</button>
+      </div>
+    </header>
+
+    <!-- Toolbar -->
+    <div class="card">
+      <div class="toolbar">
+        <div class="toolbar-group">
+          <button class="btn btn-primary" id="addChamfer">➕ Chamfered</button>
+          <button class="btn btn-primary" id="addHexagon">➕ Hexagon</button>
+          <button class="btn btn-primary" id="addCylinder">➕ Cylinder</button>
+          <button class="btn btn-primary" id="addDocument">➕ Document</button>
+        </div>
+        <div class="toolbar-group">
+          <button class="btn" id="fitView">⊡ Fit</button>
+          <button class="btn" id="resetView">⟲ Reset</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Content -->
+    <div class="content">
+      <div class="card">
+        <div class="canvas-wrapper">
+          <canvas id="canvas" width="1000" height="550"></canvas>
+        </div>
+      </div>
+
+      <div class="sidebar">
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">Custom Shapes</div>
+          </div>
+          <div class="panel-body">
+            <div class="info-panel">
+              <p style="margin-bottom: 12px;">
+                Create custom node shapes using <code>Path2D</code>.
+              </p>
+              <ul>
+                <li><strong>Chamfered Rect</strong> — Beveled corners</li>
+                <li><strong>Hexagon</strong> — 6-sided polygon</li>
+                <li><strong>Cylinder</strong> — Database shape</li>
+                <li><strong>Document</strong> — Page with fold</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">Shape Properties</div>
+          </div>
+          <div class="panel-body" id="shapeProps">
+            <p style="color: var(--muted); font-size: 13px;">
+              Select a shape to see its properties
+            </p>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">Code Example</div>
+          </div>
+          <div class="panel-body">
+            <pre style="font-size: 11px; overflow-x: auto; background: var(--bg); padding: 12px; border-radius: 6px;"><code>const path = new Path2D();
+path.moveTo(10, 0);
+path.lineTo(w - 10, 0);
+path.quadraticCurveTo(w, 0, w, 10);
+// ... more path commands
+
+const node = new CustomShapeNode({
+  x: 100, y: 100,
+  width: 140, height: 80,
+  path: () => path,
+});</code></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

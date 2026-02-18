@@ -355,6 +355,8 @@ export class ContextMenuManager extends EventEmitter<ContextMenuEvents> {
       if (this.isSvgString(icon)) {
         iconEl.innerHTML = icon;
       } else {
+        iconEl.classList.add('material-symbols-outlined');
+        iconEl.style.fontSize = '16px';
         iconEl.textContent = icon;
       }
       return iconEl;
@@ -363,6 +365,8 @@ export class ContextMenuManager extends EventEmitter<ContextMenuEvents> {
     if (icon.type === 'svg' || icon.type === 'html') {
       iconEl.innerHTML = icon.value;
     } else {
+      iconEl.classList.add('material-symbols-outlined');
+      iconEl.style.fontSize = '16px';
       iconEl.textContent = icon.value;
     }
 

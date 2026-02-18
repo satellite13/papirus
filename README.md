@@ -1,80 +1,34 @@
 # Papirus
 
-Papirus — библиотека на TypeScript для построения интерактивных 2D‑схем на HTML Canvas. Поддерживает узлы, связи, группы, стили, сериализацию, экспорт и интерактивность.
+[![npm version](https://img.shields.io/npm/v/papirus.svg)](https://www.npmjs.com/package/papirus)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-## О проекте
+TypeScript library for building interactive 2D diagrams and flowcharts on HTML Canvas. Supports nodes, edges, groups, styling, serialization, export, and interactivity.
 
-Papirus — это движок рендера и взаимодействия с диаграммами, рассчитанный на встраивание в любой UI (SPA, статические страницы, дизайн‑системы). Библиотека поставляет:
+[Русская версия](./README.ru.md)
 
-- Рендерер (`DiagramRenderer`) с системой координат, масштабированием и панорамированием.
-- Набор элементов (узлы/рёбра/группы) и базовые типы.
-- Менеджеры взаимодействий (выделение, перемещение, соединение, история).
-- Контекстное меню и поиск/фильтрация.
-- Базовые анимации и анимированный поток рёбер.
-- Темизацию и стили через `StyleManager`.
-- Оверлеи (сетка, миникарта, линейки, направляющие) и утилиты экспорта.
+## About
 
-## Документация
+Papirus is a diagram rendering and interaction engine designed to be embedded in any UI (SPA, static pages, design systems). The library provides:
 
-- Краткий обзор API: `docs/api.md`
-- Элементы и узлы: `docs/elements.md`
-- Интерактивность: `docs/interactions.md`
-- Оверлеи: `docs/overlays.md`
-- Утилиты: `docs/utils.md`
+- `DiagramRenderer` with coordinate system, zoom, and panning
+- Set of elements (nodes/edges/groups) and base types
+- Interaction managers (selection, drag, connection, history)
+- Context menu and search/filtering
+- Basic animations and animated edge flow
+- Theming and styling via `StyleManager`
+- Overlays (grid, minimap, rulers, guides) and export utilities
 
-## Интеграции
-
-- Vue 3: `packages/vue`
-
-## Установка
+## Installation
 
 ```bash
 npm install papirus
 ```
 
-## Использование в своем проекте
-
-### Минимальный сценарий
-
-1. Добавьте `<canvas>` в разметку.
-2. Создайте `DiagramRenderer`, добавьте элементы и включите взаимодействия.
-
-### Импорт из ESM
+## Quick Start
 
 ```ts
 import { DiagramRenderer, RectangleNode, Edge } from 'papirus';
-```
-
-### Пример интеграции
-
-```ts
-const renderer = new DiagramRenderer('#canvas', {
-  width: 900,
-  height: 600,
-  backgroundColor: '#fafafa',
-  scrollbarOverlay: true,
-});
-
-const nodeA = new RectangleNode({ x: 80, y: 80, width: 140, height: 60, label: 'Start' });
-const nodeB = new RectangleNode({ x: 320, y: 80, width: 140, height: 60, label: 'Process' });
-renderer.addNode(nodeA);
-renderer.addNode(nodeB);
-renderer.addEdge(new Edge({ from: { nodeId: nodeA.id }, to: { nodeId: nodeB.id }, type: 'bezier' }));
-
-renderer.enableInteractions({ gridSize: 20, snapToGrid: true });
-```
-
-Параметр `scrollbarOverlay` включает встроенные скролл‑индикаторы для панорамирования.
-
-## Быстрый старт
-
-```ts
-import {
-  DiagramRenderer,
-  RectangleNode,
-  Edge,
-  StyleManager,
-} from 'papirus';
 
 const renderer = new DiagramRenderer('#canvas', {
   width: 900,
@@ -82,63 +36,45 @@ const renderer = new DiagramRenderer('#canvas', {
   backgroundColor: '#fafafa',
 });
 
-const styles = new StyleManager();
-styles.registerClass({
-  name: 'warning',
-  node: { fillColor: '#fef3c7', strokeColor: '#d97706' },
-});
-renderer.setStyleManager(styles);
-
-const nodeA = new RectangleNode({
-  x: 100,
-  y: 100,
-  width: 140,
-  height: 60,
-  label: 'Start',
-});
-
-const nodeB = new RectangleNode({
-  x: 360,
-  y: 100,
-  width: 140,
-  height: 60,
-  label: 'Process',
-  styleClass: 'warning',
-});
+const nodeA = new RectangleNode({ x: 100, y: 100, width: 140, height: 60, label: 'Start' });
+const nodeB = new RectangleNode({ x: 360, y: 100, width: 140, height: 60, label: 'Process' });
 
 renderer.addNode(nodeA);
 renderer.addNode(nodeB);
-
-const edge = new Edge({
+renderer.addEdge(new Edge({
   from: { nodeId: nodeA.id },
   to: { nodeId: nodeB.id },
   type: 'bezier',
-});
-renderer.addEdge(edge);
+}));
 
 renderer.enableInteractions();
 ```
 
-## Интерактивность
+## Documentation
 
-Встроенный `InteractionManager` включает:
+- [API Overview](./docs/api.md)
+- [Elements](./docs/elements.md)
+- [Interactions](./docs/interactions.md)
+- [Overlays](./docs/overlays.md)
+- [Utils](./docs/utils.md)
 
+## Features
+
+### Interactivity
+
+Built-in `InteractionManager` includes:
 - drag/select/connect/undo/redo/copy/paste
-- panning по пустому месту канваса
-- zoom колесом, pinch‑to‑zoom, two‑finger pan
-
-Пример:
+- Pan on empty canvas area
+- Zoom with mouse wheel, pinch-to-zoom, two-finger pan
 
 ```ts
 const interactions = renderer.enableInteractions({ gridSize: 20, snapToGrid: true });
 interactions.navigation.fitToView();
-interactions.zoomToSelection(40);
-interactions.drag.setSnapToGrid(true, 20);
 ```
 
-Создание связи по умолчанию: `Shift + drag` от узла к узлу (чтобы не мешать обычному перетаскиванию).
+Default edge creation: `Shift + drag` from node to node (to avoid interfering with regular drag).
 
-## Элементы, группы и порты
+### Elements & Groups
 
 ```ts
 const group = new Group({ label: 'Main Flow', padding: 16 });
@@ -147,18 +83,15 @@ group.addChild(nodeB);
 renderer.addGroup(group);
 
 const node = new RectangleNode({
-  x: 20,
-  y: 20,
-  width: 120,
-  height: 60,
+  x: 20, y: 20, width: 120, height: 60,
   ports: [{ type: 'input', position: 'left' }],
   icon: { source: '/icons/start.svg', fit: 'contain', scaleWithBounds: true },
 });
 ```
 
-## Стили
+### Styling
 
-`StyleManager` применяет темы и классы к узлам/рёбрам/тексту/портам/группам.
+`StyleManager` applies themes and classes to nodes/edges/text/ports/groups.
 
 ```ts
 const styles = new StyleManager('dark');
@@ -170,9 +103,9 @@ styles.registerClass({
 renderer.setStyleManager(styles);
 ```
 
-Доступны готовые темы: `DEFAULT_THEME`, `DARK_THEME`.
+Built-in themes: `DEFAULT_THEME`, `DARK_THEME`.
 
-## Сериализация
+### Serialization
 
 ```ts
 import { Serializer } from 'papirus';
@@ -186,9 +119,7 @@ const json = serializer.toJSON(true);
 serializer.fromJSON(json);
 ```
 
-Сериализация сохраняет тему и классы стилей, если установлен `StyleManager`.
-
-## Экспорт
+### Export
 
 ```ts
 import { ImageExporter, SvgExporter } from 'papirus';
@@ -200,7 +131,7 @@ const svgExporter = new SvgExporter(renderer);
 await svgExporter.download('diagram.svg');
 ```
 
-## Оверлеи и утилиты
+### Overlays
 
 ```ts
 import { GridOverlay, MiniMap } from 'papirus';
@@ -209,26 +140,38 @@ renderer.use(new GridOverlay({ gridSize: 20 }));
 renderer.use(new MiniMap({ width: 180, height: 120, padding: 12 }));
 ```
 
-Доступны также `RulersOverlay`, `GuidesOverlay`, `AutoLayout`, `AutoRouting`, `alignNodes`, `distributeNodes`.
+Also available: `RulersOverlay`, `GuidesOverlay`, `AutoLayout`, `AutoRouting`, `alignNodes`, `distributeNodes`.
 
-## Пример
+## Framework Integrations
 
-См. `examples/index.html`.
+- [Vue 3](./packages/vue)
 
-## Разработка
+## Example
+
+See [`examples/index.html`](./examples/index.html) for a complete interactive demo.
+
+## Development
 
 ```bash
 npm install
 npm run dev
 ```
 
-Полезные команды:
+Useful commands:
 
 ```bash
-npm run typecheck
-npm run lint
-npm run format
-npm run build
-npm run test
-npm run test:coverage
+npm run typecheck       # TypeScript type checking
+npm run lint            # ESLint
+npm run format          # Prettier formatting
+npm run build           # Build library
+npm run test            # Run tests
+npm run test:coverage   # Tests with coverage
 ```
+
+## Contributing
+
+Please read [CONTRIBUTING.md](./CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.

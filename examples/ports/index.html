@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ports & Connections - Papirus Examples</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="page">
+    <!-- Header -->
+    <header class="header">
+      <a href="../index.html" class="logo">
+        <div class="logo-icon">P</div>
+        <div class="title-group">
+          <div class="title">Papirus</div>
+          <div class="subtitle">Ports & Connections Example</div>
+        </div>
+      </a>
+      <div class="header-actions">
+        <nav class="nav">
+          <a href="../basic/index.html" class="nav-item">Basic</a>
+          <a href="index.html" class="nav-item active">Ports</a>
+          <a href="../animations/index.html" class="nav-item">Animations</a>
+          <a href="../custom-shapes/index.html" class="nav-item">Shapes</a>
+        </nav>
+        <button class="theme-toggle" id="themeToggle" title="Toggle theme">🌙</button>
+      </div>
+    </header>
+
+    <!-- Toolbar -->
+    <div class="card">
+      <div class="toolbar">
+        <div class="toolbar-group">
+          <button class="btn btn-primary" id="addInput">➕ Input Node</button>
+          <button class="btn btn-primary" id="addProcess">➕ Process Node</button>
+          <button class="btn btn-primary" id="addOutput">➕ Output Node</button>
+        </div>
+        <div class="toolbar-group">
+          <button class="btn" id="pathStraight">➙ Straight</button>
+          <button class="btn" id="pathPolyline">➚ Polyline</button>
+          <button class="btn btn-primary" id="pathBezier">➜ Bezier</button>
+        </div>
+        <div class="toolbar-group">
+          <button class="btn" id="fitView">⊡ Fit</button>
+          <button class="btn" id="clearAll">🗑 Clear</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Content -->
+    <div class="content">
+      <div class="card">
+        <div class="canvas-wrapper">
+          <canvas id="canvas" width="1000" height="550"></canvas>
+        </div>
+      </div>
+
+      <div class="sidebar">
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">About Ports</div>
+          </div>
+          <div class="panel-body">
+            <div class="info-panel">
+              <p style="margin-bottom: 12px;">
+                This example demonstrates connection points (ports) on nodes.
+              </p>
+              <ul>
+                <li><strong>Input nodes</strong> have input ports on the left</li>
+                <li><strong>Process nodes</strong> have both input and output ports</li>
+                <li><strong>Output nodes</strong> have output ports on the right</li>
+                <li>Drag from an output port to an input port to connect</li>
+                <li>Connections snap to the nearest port</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">Connection Settings</div>
+          </div>
+          <div class="panel-body">
+            <div class="form-row">
+              <label class="form-label">Path Type</label>
+              <select class="form-select" id="defaultPathType">
+                <option value="straight">Straight</option>
+                <option value="polyline">Polyline</option>
+                <option value="bezier" selected>Bezier</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <label class="form-label">Arrow</label>
+              <select class="form-select" id="defaultArrow">
+                <option value="none">None</option>
+                <option value="open" selected>Open</option>
+                <option value="arrow">Arrow</option>
+                <option value="diamond">Diamond</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <label class="form-label">Color</label>
+              <input type="color" class="form-color" id="defaultColor" value="#3b82f6">
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">Stats</div>
+          </div>
+          <div class="panel-body">
+            <div class="form-row">
+              <label class="form-label">Nodes</label>
+              <span id="nodeCount">0</span>
+            </div>
+            <div class="form-row">
+              <label class="form-label">Edges</label>
+              <span id="edgeCount">0</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

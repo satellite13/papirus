@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Animations & Themes - Papirus Examples</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="page">
+    <!-- Header -->
+    <header class="header">
+      <a href="../index.html" class="logo">
+        <div class="logo-icon">P</div>
+        <div class="title-group">
+          <div class="title">Papirus</div>
+          <div class="subtitle">Animations & Themes Example</div>
+        </div>
+      </a>
+      <div class="header-actions">
+        <nav class="nav">
+          <a href="../basic/index.html" class="nav-item">Basic</a>
+          <a href="../ports/index.html" class="nav-item">Ports</a>
+          <a href="index.html" class="nav-item active">Animations</a>
+          <a href="../custom-shapes/index.html" class="nav-item">Shapes</a>
+        </nav>
+        <button class="theme-toggle" id="themeToggle" title="Toggle theme">🌙</button>
+      </div>
+    </header>
+
+    <!-- Toolbar -->
+    <div class="card">
+      <div class="toolbar">
+        <div class="toolbar-group">
+          <button class="btn" id="toggleFlow">▶ Flow Animation</button>
+          <button class="btn" id="togglePulse">◉ Pulse</button>
+          <button class="btn" id="toggleParticles">✦ Particles</button>
+        </div>
+        <div class="toolbar-group">
+          <button class="btn btn-primary" id="themeLight">☀️ Light</button>
+          <button class="btn" id="themeDark">🌙 Dark</button>
+          <button class="btn" id="themeBlue">🔵 Blue</button>
+        </div>
+        <div class="toolbar-group">
+          <button class="btn" id="speedSlow">🐢 Slow</button>
+          <button class="btn btn-primary" id="speedNormal">🚶 Normal</button>
+          <button class="btn" id="speedFast">⚡ Fast</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Content -->
+    <div class="content">
+      <div class="card">
+        <div class="canvas-wrapper">
+          <canvas id="canvas" width="1000" height="550"></canvas>
+        </div>
+      </div>
+
+      <div class="sidebar">
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">Flow Animation</div>
+          </div>
+          <div class="panel-body">
+            <div class="info-panel">
+              <p style="margin-bottom: 12px;">
+                Edges can have animated flow effects showing direction and activity.
+              </p>
+              <ul>
+                <li>Toggle flow animation on/off</li>
+                <li>Adjust speed (slow/normal/fast)</li>
+                <li>Works with all path types</li>
+                <li>Combines with any theme</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">Themes</div>
+          </div>
+          <div class="panel-body">
+            <div class="form-row">
+              <label class="form-label">Active Theme</label>
+              <span id="activeTheme" class="badge">Light</span>
+            </div>
+            <div class="form-row">
+              <label class="form-label">Flow Speed</label>
+              <span id="flowSpeedDisplay">30 px/s</span>
+            </div>
+            <div class="form-row">
+              <label class="form-label">Animations</label>
+              <span id="animStatus" class="badge">Active</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">Style Classes</div>
+          </div>
+          <div class="panel-body">
+            <div class="form-row">
+              <span class="badge" style="background: #dbeafe; color: #2563eb;">Primary</span>
+              <span class="badge" style="background: #dcfce7; color: #16a34a;">Success</span>
+            </div>
+            <div class="form-row">
+              <span class="badge" style="background: #fef3c7; color: #d97706;">Warning</span>
+              <span class="badge" style="background: #fee2e2; color: #dc2626;">Error</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
