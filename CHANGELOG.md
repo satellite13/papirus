@@ -10,6 +10,10 @@
 ### Added
 - Подготовка к open source release
 - Добавлены файлы: LICENSE, CONTRIBUTING.md, CODE_OF_CONDUCT.md, SECURITY.md
+- Пакет опубликован в npmjs как `@ngroznykh/papirus`
+
+### Changed
+- Обновлены `README.md` и `README.ru.md` под npm-пакет `@ngroznykh/papirus` (бейдж, ссылка, установка и примеры импортов)
 
 ## [0.1.0] - 2026-02-18
 

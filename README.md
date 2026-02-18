@@ -1,6 +1,6 @@
 # Papirus
 
-[![npm version](https://img.shields.io/npm/v/papirus.svg)](https://www.npmjs.com/package/papirus)
+[![npm version](https://img.shields.io/npm/v/%40ngroznykh%2Fpapirus.svg)](https://www.npmjs.com/package/@ngroznykh/papirus)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 TypeScript library for building interactive 2D diagrams and flowcharts on HTML Canvas. Supports nodes, edges, groups, styling, serialization, export, and interactivity.
@@ -22,13 +22,13 @@ Papirus is a diagram rendering and interaction engine designed to be embedded in
 ## Installation
 
 ```bash
-npm install papirus
+npm install @ngroznykh/papirus
 ```
 
 ## Quick Start
 
 ```ts
-import { DiagramRenderer, RectangleNode, Edge } from 'papirus';
+import { DiagramRenderer, RectangleNode, Edge } from '@ngroznykh/papirus';
 
 const renderer = new DiagramRenderer('#canvas', {
   width: 900,
@@ -108,7 +108,7 @@ Built-in themes: `DEFAULT_THEME`, `DARK_THEME`.
 ### Serialization
 
 ```ts
-import { Serializer } from 'papirus';
+import { Serializer } from '@ngroznykh/papirus';
 
 const serializer = new Serializer(renderer, {
   nodeFactory: (data) => new RectangleNode(data),
@@ -122,7 +122,7 @@ serializer.fromJSON(json);
 ### Export
 
 ```ts
-import { ImageExporter, SvgExporter } from 'papirus';
+import { ImageExporter, SvgExporter } from '@ngroznykh/papirus';
 
 const imageExporter = new ImageExporter(renderer);
 await imageExporter.download('diagram.png', { scale: 2 });
@@ -134,7 +134,7 @@ await svgExporter.download('diagram.svg');
 ### Overlays
 
 ```ts
-import { GridOverlay, MiniMap } from 'papirus';
+import { GridOverlay, MiniMap } from '@ngroznykh/papirus';
 
 renderer.use(new GridOverlay({ gridSize: 20 }));
 renderer.use(new MiniMap({ width: 180, height: 120, padding: 12 }));

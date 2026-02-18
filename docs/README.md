@@ -15,6 +15,7 @@
 
 ## Быстрые ссылки
 
+- npm: `https://www.npmjs.com/package/@ngroznykh/papirus`
 - Пример: `examples/index.html`
 - Входная точка API: `src/index.ts` (список экспортов)
 
