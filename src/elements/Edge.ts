@@ -911,6 +911,21 @@ export class Edge extends Element {
     return this.getPolylineMidpoint(path);
   }
 
+  /**
+   * Get world position of label center along path.
+   */
+  getLabelPosition(): Point | null {
+    if (this._path.length < 2) {
+      return null;
+    }
+
+    const midpoint = this.getPathMidpoint();
+    return {
+      x: midpoint.x,
+      y: midpoint.y + this._labelOffset,
+    };
+  }
+
   private getPolylineMidpoint(path: Point[]): Point {
     if (path.length === 0) {
       return { x: 0, y: 0 };

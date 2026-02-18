@@ -1,6 +1,6 @@
 import { Node, type NodeOptions } from '../Node';
 import { NODE_HITBOX_PADDING } from '@/constants';
-import type { Point } from '@/types';
+import type { Bounds, Point } from '@/types';
 
 /**
  * Diamond/rhombus node for decision points
@@ -44,6 +44,17 @@ export class DiamondNode extends Node {
     return {
       x: center.x + dx * t,
       y: center.y + dy * t,
+    };
+  }
+
+  protected override getLabelContainerBounds(bounds: Bounds): Bounds {
+    const width = bounds.width / 2;
+    const height = bounds.height / 2;
+    return {
+      x: bounds.x + (bounds.width - width) / 2,
+      y: bounds.y + (bounds.height - height) / 2,
+      width,
+      height,
     };
   }
 

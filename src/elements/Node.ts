@@ -337,6 +337,27 @@ export abstract class Node extends Element {
   }
 
   /**
+   * Get world position of label center.
+   */
+  getLabelPosition(): Point {
+    const bounds = this.getBounds();
+    const placement = this._labelPlacement === 'auto' ? 'center' : this._labelPlacement;
+
+    switch (placement) {
+      case 'top':
+        return { x: bounds.x + bounds.width / 2, y: bounds.y };
+      case 'bottom':
+        return { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height };
+      case 'left':
+        return { x: bounds.x, y: bounds.y + bounds.height / 2 };
+      case 'right':
+        return { x: bounds.x + bounds.width, y: bounds.y + bounds.height / 2 };
+      default:
+        return { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
+    }
+  }
+
+  /**
    * Render icon, label, and ports
    */
   protected renderContents(ctx: CanvasRenderingContext2D): void {
@@ -345,16 +366,26 @@ export abstract class Node extends Element {
     ctx.lineDashOffset = 0;
 
     let bounds = this.getBounds();
-    const labelSize = this._label ? this._label.measure(ctx) : undefined;
-    const iconBoxSize = this._icon ? this.getIconBoxSize() : undefined;
+    let iconBoxSize = this._icon ? this.getIconBoxSize() : undefined;
+
+    if (this._label) {
+      this._label.setAutoMaxWidth(this.getAutoLabelBounds(bounds, iconBoxSize).width);
+    }
+    let labelSize = this._label ? this._label.measure(ctx) : undefined;
 
     if (labelSize || iconBoxSize) {
       this.ensureContentsFit(labelSize, iconBoxSize);
       bounds = this.getBounds();
+
+      iconBoxSize = this._icon ? this.getIconBoxSize() : undefined;
+      if (this._label) {
+        this._label.setAutoMaxWidth(this.getAutoLabelBounds(bounds, iconBoxSize).width);
+        labelSize = this._label.measure(ctx);
+      }
     }
 
     let iconBounds = bounds;
-    let labelBounds = bounds;
+    let labelBounds = this.getLabelContainerBounds(bounds);
 
     if (this._icon && iconBoxSize) {
       iconBounds = this.getIconBounds(bounds, iconBoxSize, this._icon.placement);
@@ -374,9 +405,10 @@ export abstract class Node extends Element {
       if (isCornerPlacement(placement)) {
         // For corner placements, icon goes in corner, label uses remaining space
         iconBounds = this.getIconBounds(bounds, iconBoxSize, placement);
-        // Label gets full bounds (will be centered by default)
-        labelBounds = bounds;
+        // Label gets shape-safe content bounds (centered by default)
+        labelBounds = this.getLabelContainerBounds(bounds);
       } else {
+        const contentBounds = this.getLabelContainerBounds(bounds);
         switch (placement) {
           case 'top':
             iconBounds = {
@@ -386,10 +418,10 @@ export abstract class Node extends Element {
               height: iconBoxSize.height,
             };
             labelBounds = {
-              x: bounds.x,
-              y: bounds.y + iconBoxSize.height + gap,
-              width: bounds.width,
-              height: Math.max(0, bounds.height - iconBoxSize.height - gap),
+              x: contentBounds.x,
+              y: contentBounds.y + iconBoxSize.height + gap,
+              width: contentBounds.width,
+              height: Math.max(0, contentBounds.height - iconBoxSize.height - gap),
             };
             break;
           case 'bottom':
@@ -400,10 +432,10 @@ export abstract class Node extends Element {
               height: iconBoxSize.height,
             };
             labelBounds = {
-              x: bounds.x,
-              y: bounds.y,
-              width: bounds.width,
-              height: Math.max(0, bounds.height - iconBoxSize.height - gap),
+              x: contentBounds.x,
+              y: contentBounds.y,
+              width: contentBounds.width,
+              height: Math.max(0, contentBounds.height - iconBoxSize.height - gap),
             };
             break;
           case 'left':
@@ -414,10 +446,10 @@ export abstract class Node extends Element {
               height: bounds.height,
             };
             labelBounds = {
-              x: bounds.x + iconBoxSize.width + gap,
-              y: bounds.y,
-              width: Math.max(0, bounds.width - iconBoxSize.width - gap),
-              height: bounds.height,
+              x: contentBounds.x + iconBoxSize.width + gap,
+              y: contentBounds.y,
+              width: Math.max(0, contentBounds.width - iconBoxSize.width - gap),
+              height: contentBounds.height,
             };
             break;
           case 'right':
@@ -428,10 +460,10 @@ export abstract class Node extends Element {
               height: bounds.height,
             };
             labelBounds = {
-              x: bounds.x,
-              y: bounds.y,
-              width: Math.max(0, bounds.width - iconBoxSize.width - gap),
-              height: bounds.height,
+              x: contentBounds.x,
+              y: contentBounds.y,
+              width: Math.max(0, contentBounds.width - iconBoxSize.width - gap),
+              height: contentBounds.height,
             };
             break;
           default:
@@ -439,7 +471,7 @@ export abstract class Node extends Element {
         }
       }
     } else if (this._label && labelSize) {
-      labelBounds = this.getLabelBounds(bounds, labelSize, this._labelPlacement);
+      labelBounds = this.getLabelBounds(this.getAutoLabelBounds(bounds, iconBoxSize), labelSize, this._labelPlacement);
     }
 
     if (this._icon) {
@@ -454,9 +486,10 @@ export abstract class Node extends Element {
    * Minimal size required to fit current contents
    */
   getContentMinSize(ctx: CanvasRenderingContext2D): Size {
+    const bounds = this.getBounds();
     const labelSize = this._label ? this._label.measure(ctx) : undefined;
     const iconBoxSize = this._icon ? this.getIconBoxSize() : undefined;
-    return this.calculateContentMinSize(labelSize, iconBoxSize);
+    return this.calculateContentMinSize(labelSize, iconBoxSize, bounds);
   }
 
   /**
@@ -672,7 +705,7 @@ export abstract class Node extends Element {
 
   private ensureContentsFit(labelSize?: Size, iconBoxSize?: Size): void {
     const bounds = this.getBounds();
-    const minSize = this.calculateContentMinSize(labelSize, iconBoxSize);
+    const minSize = this.calculateContentMinSize(labelSize, iconBoxSize, bounds);
 
     if (minSize.width > bounds.width) {
       this.width = minSize.width;
@@ -682,13 +715,17 @@ export abstract class Node extends Element {
     }
   }
 
-  private calculateContentMinSize(labelSize?: Size, iconBoxSize?: Size): Size {
+  private calculateContentMinSize(labelSize: Size | undefined, iconBoxSize: Size | undefined, bounds: Bounds): Size {
     let minWidth = 0;
     let minHeight = 0;
 
+    const labelContainer = this.getLabelContainerBounds(bounds);
+    const widthFactor = labelContainer.width > 0 ? bounds.width / labelContainer.width : 1;
+    const heightFactor = labelContainer.height > 0 ? bounds.height / labelContainer.height : 1;
+
     if (labelSize) {
-      minWidth = Math.max(minWidth, labelSize.width);
-      minHeight = Math.max(minHeight, labelSize.height);
+      minWidth = Math.max(minWidth, labelSize.width * widthFactor);
+      minHeight = Math.max(minHeight, labelSize.height * heightFactor);
     }
 
     if (iconBoxSize) {
@@ -718,6 +755,9 @@ export abstract class Node extends Element {
         const labelVertical = labelPlacement === 'top' || labelPlacement === 'bottom';
         const iconHorizontal = iconPlacement === 'left' || iconPlacement === 'right';
         const iconVertical = iconPlacement === 'top' || iconPlacement === 'bottom';
+        const labelSharesIconAxis =
+          (iconHorizontal && (labelPlacement === 'center' || labelPlacement === iconPlacement)) ||
+          (iconVertical && (labelPlacement === 'center' || labelPlacement === iconPlacement));
 
         if (labelHorizontal && iconHorizontal && labelPlacement !== iconPlacement) {
           minWidth = Math.max(minWidth, iconBoxSize.width + gap + labelSize.width);
@@ -725,10 +765,67 @@ export abstract class Node extends Element {
         if (labelVertical && iconVertical && labelPlacement !== iconPlacement) {
           minHeight = Math.max(minHeight, iconBoxSize.height + gap + labelSize.height);
         }
+        if (labelSharesIconAxis) {
+          if (iconHorizontal) {
+            minWidth = Math.max(minWidth, iconBoxSize.width + gap + labelSize.width);
+          }
+          if (iconVertical) {
+            minHeight = Math.max(minHeight, iconBoxSize.height + gap + labelSize.height);
+          }
+        }
       }
     }
 
     return { width: minWidth, height: minHeight };
+  }
+
+  protected getLabelContainerBounds(bounds: Bounds): Bounds {
+    return bounds;
+  }
+
+  private getAutoLabelBounds(bounds: Bounds, iconBoxSize?: Size): Bounds {
+    const contentBounds = this.getLabelContainerBounds(bounds);
+    if (!this._icon || !iconBoxSize || this._icon.placement === 'center') {
+      return contentBounds;
+    }
+
+    const gap = this._icon.gap;
+    if (isCornerPlacement(this._icon.placement)) {
+      return contentBounds;
+    }
+
+    switch (this._icon.placement) {
+      case 'left':
+        return {
+          x: contentBounds.x + iconBoxSize.width + gap,
+          y: contentBounds.y,
+          width: Math.max(0, contentBounds.width - iconBoxSize.width - gap),
+          height: contentBounds.height,
+        };
+      case 'right':
+        return {
+          x: contentBounds.x,
+          y: contentBounds.y,
+          width: Math.max(0, contentBounds.width - iconBoxSize.width - gap),
+          height: contentBounds.height,
+        };
+      case 'top':
+        return {
+          x: contentBounds.x,
+          y: contentBounds.y + iconBoxSize.height + gap,
+          width: contentBounds.width,
+          height: Math.max(0, contentBounds.height - iconBoxSize.height - gap),
+        };
+      case 'bottom':
+        return {
+          x: contentBounds.x,
+          y: contentBounds.y,
+          width: contentBounds.width,
+          height: Math.max(0, contentBounds.height - iconBoxSize.height - gap),
+        };
+      default:
+        return contentBounds;
+    }
   }
 
   private getLabelBounds(bounds: Bounds, labelSize: Size, placement: LabelPlacement): Bounds {
