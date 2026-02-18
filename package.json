@@ -1,5 +1,5 @@
 {
-  "name": "papirus",
+  "name": "@ngroznykh/papirus",
   "version": "0.1.0",
   "description": "TypeScript library for building interactive 2D diagrams and flowcharts on HTML Canvas",
   "type": "module",
@@ -17,7 +17,9 @@
   ],
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "rm -rf dist && tsc && vite build",
+    "prepublishOnly": "npm run build",
+    "pack:check": "npm pack --dry-run",
     "serve": "open http://localhost:3000/examples/ && serve -l 3000",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -46,6 +48,9 @@
     "url": "https://gitverse.ru/ngroznykh/papirus/issues"
   },
   "homepage": "https://gitverse.ru/ngroznykh/papirus#readme",
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/"
+  },
   "devDependencies": {
     "@eslint/js": "^9.39.0",
     "@types/node": "^22.10.0",
