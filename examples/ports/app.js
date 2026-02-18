@@ -219,7 +219,7 @@ document.getElementById('fitView').addEventListener('click', () => {
 document.getElementById('clearAll').addEventListener('click', () => {
   // Удаляем все узлы (вместе с ними удалятся и рёбра)
   const nodeIds = Array.from(renderer.nodes.keys());
-  nodeIds.forEach(id => renderer.removeNode(id));
+  interactions.deleteByIds(nodeIds);
   inputCount = 0;
   processCount = 0;
   outputCount = 0;

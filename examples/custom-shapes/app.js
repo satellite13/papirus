@@ -120,6 +120,7 @@ function createChamferedNode(x, y) {
     anchorPoints: { top: 3, right: 2, bottom: 3, left: 2 },
     style: { fillColor: '#ede9fe', strokeColor: '#7c3aed', strokeWidth: 2 },
   });
+  node.shapeType = 'chamfered';
   renderer.addNode(node);
   return node;
 }
@@ -133,6 +134,7 @@ function createHexagonNode(x, y) {
     anchorPoints: { top: 2, right: 1, bottom: 2, left: 1 },
     style: { fillColor: '#cffafe', strokeColor: '#0891b2', strokeWidth: 2 },
   });
+  node.shapeType = 'hexagon';
   renderer.addNode(node);
   return node;
 }
@@ -145,6 +147,7 @@ function createCylinderNode(x, y) {
     style: { fillColor: '#fce7f3', strokeColor: '#db2777', strokeWidth: 2 },
     anchorPoints: { top: 1, right: 2, bottom: 1, left: 2 },
   });
+  node.shapeType = 'cylinder';
   renderer.addNode(node);
   return node;
 }
@@ -158,6 +161,7 @@ function createDocumentNode(x, y) {
     anchorPoints: { top: 2, right: 2, bottom: 2, left: 2 },
     style: { fillColor: '#fef3c7', strokeColor: '#d97706', strokeWidth: 2 },
   });
+  node.shapeType = 'document';
   renderer.addNode(node);
   return node;
 }
@@ -216,10 +220,15 @@ function updateShapeProps(node) {
     return;
   }
 
-  const pathName = node instanceof DatabaseNode ? 'Database (Cylinder)' :
-                   node.path === createChamferedRectPath ? 'Chamfered Rectangle' :
-                   node.path === createHexagonPath ? 'Hexagon' :
-                   node.path === createDocumentPath ? 'Document' : 'Custom';
+  const shapeType = node.shapeType || 'custom';
+  const shapeNames = {
+    chamfered: 'Chamfered Rectangle',
+    hexagon: 'Hexagon',
+    cylinder: 'Database (Cylinder)',
+    document: 'Document',
+    custom: 'Custom',
+  };
+  const pathName = shapeNames[shapeType] || shapeNames.custom;
 
   shapeProps.innerHTML = `
     <div class="form-row">

@@ -6,7 +6,7 @@
 
 ### Сообщить о проблеме
 
-- Используйте [GitHub Issues](https://gitverse.ru/ngroznykh/papirus/issues)
+- Используйте [Issues](https://gitverse.ru/ngroznykh/papirus/issues)
 - Опишите шаги для воспроизведения
 - Укажите версию браузера и ОС
 - Приложите минимальный пример кода, если возможно
@@ -55,6 +55,22 @@ npm run dev        # Vite dev server
 npm run test       # Запуск тестов
 npm run build      # Сборка
 ```
+
+## Быстрый старт для контрибьютора
+
+1. Форкните репозиторий.
+2. Клонируйте свой форк и установите зависимости: `npm install`.
+3. Создайте ветку: `git checkout -b feature/my-feature` или `fix/my-fix`.
+4. Перед PR запустите: `npm run typecheck && npm run lint && npm run test`.
+
+## Commit messages
+
+Рекомендуется формат [Conventional Commits](https://www.conventionalcommits.org/):
+- `feat:` новая функциональность
+- `fix:` исправление ошибки
+- `docs:` изменения документации
+- `test:` изменения тестов
+- `refactor:` рефакторинг без изменения поведения
 
 ## Лицензия
 

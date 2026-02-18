@@ -25,6 +25,11 @@ Papirus is a diagram rendering and interaction engine designed to be embedded in
 npm install @ngroznykh/papirus
 ```
 
+## Requirements
+
+- Node.js `>=18`
+- A modern browser with Canvas API support (Chrome, Edge, Firefox, Safari)
+
 ## Quick Start
 
 ```ts
@@ -52,11 +57,14 @@ renderer.enableInteractions();
 
 ## Documentation
 
+- [Docs Index](./docs/README.md)
 - [API Overview](./docs/api.md)
 - [Elements](./docs/elements.md)
 - [Interactions](./docs/interactions.md)
 - [Overlays](./docs/overlays.md)
 - [Utils](./docs/utils.md)
+- [Changelog](./CHANGELOG.md)
+- [Security Policy](./SECURITY.md)
 
 ## Features
 
@@ -144,11 +152,18 @@ Also available: `RulersOverlay`, `GuidesOverlay`, `AutoLayout`, `AutoRouting`, `
 
 ## Framework Integrations
 
-- [Vue 3](./packages/vue)
+Papirus is framework-agnostic. It can be embedded in Vue/React/Svelte/vanilla apps.
 
 ## Example
 
-See [`examples/index.html`](./examples/index.html) for a complete interactive demo.
+See [`examples/index.html`](./examples/index.html) for interactive local demos.
+
+## Versioning and Stability
+
+Papirus follows [Semantic Versioning](https://semver.org/).  
+Current major version is `0.x`, so some API changes are still possible between minor releases.
+
+Breaking and notable changes are documented in [CHANGELOG.md](./CHANGELOG.md).
 
 ## Development
 

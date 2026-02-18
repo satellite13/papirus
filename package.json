@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "description": "TypeScript library for building interactive 2D diagrams and flowcharts on HTML Canvas",
   "type": "module",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "main": "./dist/papirus.js",
   "module": "./dist/papirus.js",
   "types": "./dist/index.d.ts",

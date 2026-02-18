@@ -35,10 +35,6 @@ const renderer = new DiagramRenderer('#canvas', {
   width: 1000,
   height: 550,
   backgroundColor: savedTheme === 'dark' ? '#1a1a2e' : '#fafafa',
-  retina: true,
-  animations: { enabled: false },
-  snapToGrid: true,
-  scrollbarOverlay: true,
 });
 
 const imageExporter = new ImageExporter(renderer);
@@ -86,7 +82,6 @@ const edgeFactory = (data) =>
     from: data.from,
     to: data.to,
     type: data.type,
-    arrowType: data.arrowType,
     startMarker: data.startMarker,
     endMarker: data.endMarker,
     style: data.style,

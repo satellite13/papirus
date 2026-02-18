@@ -25,6 +25,11 @@ Papirus — это движок рендера и взаимодействия �
 npm install @ngroznykh/papirus
 ```
 
+## Требования
+
+- Node.js `>=18`
+- Современный браузер с поддержкой Canvas API (Chrome, Edge, Firefox, Safari)
+
 ## Быстрый старт
 
 ```ts
@@ -52,11 +57,14 @@ renderer.enableInteractions();
 
 ## Документация
 
+- [Индекс документации](./docs/README.md)
 - [Обзор API](./docs/api.md)
 - [Элементы](./docs/elements.md)
 - [Интерактивность](./docs/interactions.md)
 - [Оверлеи](./docs/overlays.md)
 - [Утилиты](./docs/utils.md)
+- [Changelog](./CHANGELOG.md)
+- [Политика безопасности](./SECURITY.md)
 
 ## Возможности
 
@@ -145,11 +153,18 @@ renderer.use(new MiniMap({ width: 180, height: 120, padding: 12 }));
 
 ## Интеграции
 
-- [Vue 3](./packages/vue)
+Papirus не привязан к конкретному фреймворку и может быть встроен в Vue/React/Svelte/vanilla приложения.
 
 ## Пример
 
-См. [`examples/index.html`](./examples/index.html).
+См. интерактивные локальные примеры в [`examples/index.html`](./examples/index.html).
+
+## Версионирование и стабильность API
+
+Papirus следует [Semantic Versioning](https://semver.org/lang/ru/).  
+Текущая мажорная версия `0.x`, поэтому между минорными релизами возможны изменения API.
+
+Все важные изменения фиксируются в [CHANGELOG.md](./CHANGELOG.md).
 
 ## Разработка
 

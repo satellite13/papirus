@@ -30,7 +30,6 @@
 - Поддержка портов (`Port`) и иконок в узлах (`NodeImage`)
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
-- Vue 3 интеграция в `packages/vue`
 
 [Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.1.0...HEAD
 [0.1.0]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.1.0
