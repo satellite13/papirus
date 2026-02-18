@@ -89,6 +89,12 @@ export class InteractionManager {
     }
   >();
   private propertyChangeDebounceMs = 350;
+  private activeLabelEditor: {
+    kind: 'node' | 'edge';
+    id: string;
+    textarea: HTMLTextAreaElement;
+    cleanup: () => void;
+  } | null = null;
 
   constructor(options: InteractionManagerOptions) {
     this.renderer = options.renderer;
@@ -241,6 +247,7 @@ export class InteractionManager {
   }
 
   destroy(): void {
+    this.finishInlineLabelEdit(false);
     this.inputHandler.destroy();
     this.overlayCleanup?.();
     this.overlayCleanup = null;
@@ -263,6 +270,7 @@ export class InteractionManager {
     this.inputHandler.on('mousemove', (event) => this.handleMouseMove(event));
     this.inputHandler.on('mouseup', (event) => this.handleMouseUp(event));
     this.inputHandler.on('click', (event) => this.handleClick(event));
+    this.inputHandler.on('dblclick', (event) => this.handleDoubleClick(event));
     this.inputHandler.on('wheel', (event) => this.handleWheel(event));
     this.inputHandler.on('pan', (event) => this.handlePan(event));
     this.inputHandler.on('pinch', (event) => this.handlePinch(event));
@@ -436,6 +444,72 @@ export class InteractionManager {
     this.selectionManager.handleClick(event);
   }
 
+  private handleDoubleClick(event: InputEvent): void {
+    if (
+      this.dragManager.handledMouseDown ||
+      this.resizeManager.handledMouseDown ||
+      this.connectionManager.connecting
+    ) {
+      return;
+    }
+
+    const point = { x: event.worldX, y: event.worldY };
+    const edgeByLabel = this.getEdgeLabelAtPoint(point);
+    if (edgeByLabel) {
+      const labelPosition = edgeByLabel.getLabelPosition() ?? point;
+      this.startInlineLabelEdit('edge', edgeByLabel.id, edgeByLabel.label?.text ?? '', labelPosition);
+      return;
+    }
+
+    const hitElement = this.renderer.getElementAtPoint(point);
+    if (!hitElement) {
+      this.finishInlineLabelEdit(true);
+      return;
+    }
+
+    if ('typeName' in hitElement) {
+      this.startInlineLabelEdit('node', hitElement.id, hitElement.label?.text ?? '', hitElement.getLabelPosition());
+      return;
+    }
+
+    if ('from' in hitElement && 'to' in hitElement) {
+      const labelPosition = hitElement.getLabelPosition() ?? point;
+      this.startInlineLabelEdit('edge', hitElement.id, hitElement.label?.text ?? '', labelPosition);
+    }
+  }
+
+  private getEdgeLabelAtPoint(point: Point): Edge | null {
+    const zoom = Math.max(this.renderer.zoom, 0.0001);
+    const maxDistance = 28 / zoom;
+    const maxDistanceSq = maxDistance * maxDistance;
+
+    let closestEdge: Edge | null = null;
+    let closestDistanceSq = Infinity;
+
+    for (const edge of this.renderer.edges.values()) {
+      if (!edge.visible || !edge.label) {
+        continue;
+      }
+
+      const labelPosition = edge.getLabelPosition();
+      if (!labelPosition) {
+        continue;
+      }
+
+      const dx = point.x - labelPosition.x;
+      const dy = point.y - labelPosition.y;
+      const distanceSq = dx * dx + dy * dy;
+      if (distanceSq > maxDistanceSq || distanceSq >= closestDistanceSq) {
+        continue;
+      }
+
+      closestDistanceSq = distanceSq;
+      closestEdge = edge;
+    }
+
+    return closestEdge;
+  }
+
   private handleWheel(event: WheelInputEvent): void {
     this.navigationManager.handleWheel(event);
   }
@@ -483,6 +557,122 @@ export class InteractionManager {
 
   private handleKeyUp(event: KeyboardEvent): void {
     this.navigationManager.handleKeyUp(event);
+  }
+
+  private startInlineLabelEdit(kind: 'node' | 'edge', id: string, text: string, worldPosition: Point): void {
+    this.finishInlineLabelEdit(true);
+
+    const screenPoint = this.renderer.worldToScreen(worldPosition.x, worldPosition.y);
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.rows = 1;
+    textarea.spellcheck = false;
+    textarea.setAttribute('aria-label', 'Edit label');
+    textarea.style.position = 'fixed';
+    textarea.style.left = `${screenPoint.x}px`;
+    textarea.style.top = `${screenPoint.y}px`;
+    textarea.style.transform = 'translate(-50%, -50%)';
+    textarea.style.zIndex = '10001';
+    textarea.style.minWidth = '120px';
+    textarea.style.maxWidth = '420px';
+    textarea.style.minHeight = '30px';
+    textarea.style.padding = '6px 8px';
+    textarea.style.border = '1px solid #6366f1';
+    textarea.style.borderRadius = '6px';
+    textarea.style.boxShadow = '0 8px 18px rgba(15, 23, 42, 0.15)';
+    textarea.style.background = '#ffffff';
+    textarea.style.color = '#0f172a';
+    textarea.style.font = '14px sans-serif';
+    textarea.style.lineHeight = '1.4';
+    textarea.style.resize = 'none';
+    textarea.style.overflow = 'hidden';
+
+    const resizeTextarea = (): void => {
+      textarea.style.height = 'auto';
+      textarea.style.height = `${Math.max(30, textarea.scrollHeight)}px`;
+    };
+    resizeTextarea();
+
+    const commitAndClose = (): void => this.finishInlineLabelEdit(true);
+    const cancelAndClose = (): void => this.finishInlineLabelEdit(false);
+
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        cancelAndClose();
+        return;
+      }
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        commitAndClose();
+      }
+    };
+    const onBlur = (): void => commitAndClose();
+    const onInput = (): void => resizeTextarea();
+
+    textarea.addEventListener('keydown', onKeyDown);
+    textarea.addEventListener('blur', onBlur);
+    textarea.addEventListener('input', onInput);
+
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+
+    this.activeLabelEditor = {
+      kind,
+      id,
+      textarea,
+      cleanup: () => {
+        textarea.removeEventListener('keydown', onKeyDown);
+        textarea.removeEventListener('blur', onBlur);
+        textarea.removeEventListener('input', onInput);
+        textarea.remove();
+      },
+    };
+  }
+
+  private finishInlineLabelEdit(commit: boolean): void {
+    if (!this.activeLabelEditor) {
+      return;
+    }
+
+    const { kind, id, textarea, cleanup } = this.activeLabelEditor;
+    this.activeLabelEditor = null;
+    const nextValue = textarea.value;
+    cleanup();
+
+    if (!commit) {
+      return;
+    }
+
+    if (kind === 'node') {
+      this.changeNodeProperties(id, (node) => {
+        const value = nextValue.trim();
+        if (value.length === 0) {
+          node.label = undefined;
+          return;
+        }
+        if (!node.label) {
+          node.label = value;
+          return;
+        }
+        node.label.text = value;
+      });
+      return;
+    }
+
+    this.changeEdgeProperties(id, (edge) => {
+      const value = nextValue.trim();
+      if (value.length === 0) {
+        edge.label = undefined;
+        return;
+      }
+      if (!edge.label) {
+        edge.label = value;
+        return;
+      }
+      edge.label.text = value;
+    });
   }
 
   private queuePropertyChange(

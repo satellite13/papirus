@@ -9,33 +9,48 @@ import {
   RulersOverlay,
 } from '../../dist/papirus.js';
 
-// Theme handling
-const themeToggle = document.getElementById('themeToggle');
-const html = document.documentElement;
-const savedTheme = localStorage.getItem('theme') || 'light';
-html.setAttribute('data-theme', savedTheme);
-themeToggle.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
-
-themeToggle.addEventListener('click', () => {
-  const current = html.getAttribute('data-theme');
-  const next = current === 'dark' ? 'light' : 'dark';
-  html.setAttribute('data-theme', next);
-  localStorage.setItem('theme', next);
-  themeToggle.textContent = next === 'dark' ? '☀️' : '🌙';
-  renderer.options.backgroundColor = next === 'dark' ? '#1a1a2e' : '#fafafa';
-});
-
 // Initialize renderer
 const renderer = new DiagramRenderer('#canvas', {
   width: 1000,
   height: 550,
-  backgroundColor: savedTheme === 'dark' ? '#1a1a2e' : '#fafafa',
+  backgroundColor: '#fafafa',
   retina: true,
   scrollbarOverlay: true,
+  animations: {
+    enabled: true,
+    enterDuration: 220,
+    exitDuration: 180,
+    highlightDuration: 420,
+    enterScale: 0.94,
+    exitScale: 0.98,
+  },
 });
 
+function syncCanvasSize() {
+  const canvas = renderer.getCanvas();
+  const parent = canvas.parentElement;
+  if (!parent) return;
+
+  const rect = parent.getBoundingClientRect();
+  const width = Math.max(320, Math.floor(rect.width));
+  const height = Math.max(240, Math.floor(rect.height));
+  if (renderer.width !== width || renderer.height !== height) {
+    renderer.resize(width, height);
+  }
+}
+
+function syncCanvasSizeAfterPageRender() {
+  requestAnimationFrame(() => requestAnimationFrame(syncCanvasSize));
+}
+
+if (document.readyState === 'complete') {
+  syncCanvasSizeAfterPageRender();
+} else {
+  window.addEventListener('load', syncCanvasSizeAfterPageRender, { once: true });
+}
+
 // Style manager
-const styles = new StyleManager(savedTheme === 'dark' ? 'dark' : 'default');
+const styles = new StyleManager('default');
 styles.registerClass({
   name: 'input',
   node: { fillColor: '#dbeafe', strokeColor: '#2563eb' },
@@ -54,7 +69,7 @@ styles.registerClass({
 renderer.setStyleManager(styles);
 
 // Overlays
-const gridOverlay = new GridOverlay({ gridSize: 20, color: savedTheme === 'dark' ? '#334155' : '#e5e5e5' });
+const gridOverlay = new GridOverlay({ gridSize: 20, color: '#e5e5e5' });
 const miniMap = new MiniMap({ width: 140, height: 100, padding: 16 });
 const rulers = new RulersOverlay({ thickness: 20 });
 renderer.use(gridOverlay);
@@ -154,24 +169,28 @@ const edges = [
     to: { nodeId: process1.id, portId: process1.ports[0].id },
     type: 'bezier',
     endMarker: { type: 'open', size: 10 },
+    label: 'ingest',
   }),
   new Edge({
     from: { nodeId: input2.id, portId: input2.ports[0].id },
     to: { nodeId: process2.id, portId: process2.ports[0].id },
     type: 'bezier',
     endMarker: { type: 'open', size: 10 },
+    label: 'ingest',
   }),
   new Edge({
     from: { nodeId: process1.id, portId: process1.ports[1].id },
     to: { nodeId: output1.id, portId: output1.ports[0].id },
     type: 'bezier',
     endMarker: { type: 'arrow', size: 10 },
+    label: 'result',
   }),
   new Edge({
     from: { nodeId: process2.id, portId: process2.ports[1].id },
     to: { nodeId: output2.id, portId: output2.ports[0].id },
     type: 'bezier',
     endMarker: { type: 'arrow', size: 10 },
+    label: 'result',
   }),
   new Edge({
     from: { nodeId: process1.id, portId: process1.ports[3].id },

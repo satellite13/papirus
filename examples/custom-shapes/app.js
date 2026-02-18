@@ -12,37 +12,52 @@ import { DatabaseNode } from './DatabaseNode.js';
 // Для проверки типа в updateShapeProps
 const isCustomShape = (node) => node instanceof CustomShapeNode;
 
-// Theme handling
-const themeToggle = document.getElementById('themeToggle');
-const html = document.documentElement;
-const savedTheme = localStorage.getItem('theme') || 'light';
-html.setAttribute('data-theme', savedTheme);
-themeToggle.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
-
-themeToggle.addEventListener('click', () => {
-  const current = html.getAttribute('data-theme');
-  const next = current === 'dark' ? 'light' : 'dark';
-  html.setAttribute('data-theme', next);
-  localStorage.setItem('theme', next);
-  renderer.options.backgroundColor = next === 'dark' ? '#1a1a2e' : '#fafafa';
-  gridOverlay.setColor(next === 'dark' ? '#334155' : '#e5e5e5');
-});
-
 // Initialize renderer
 const renderer = new DiagramRenderer('#canvas', {
   width: 1000,
   height: 550,
-  backgroundColor: savedTheme === 'dark' ? '#1a1a2e' : '#fafafa',
+  backgroundColor: '#fafafa',
   retina: true,
   scrollbarOverlay: true,
+  animations: {
+    enabled: true,
+    enterDuration: 220,
+    exitDuration: 180,
+    highlightDuration: 420,
+    enterScale: 0.94,
+    exitScale: 0.98,
+  },
 });
 
+function syncCanvasSize() {
+  const canvas = renderer.getCanvas();
+  const parent = canvas.parentElement;
+  if (!parent) return;
+
+  const rect = parent.getBoundingClientRect();
+  const width = Math.max(320, Math.floor(rect.width));
+  const height = Math.max(240, Math.floor(rect.height));
+  if (renderer.width !== width || renderer.height !== height) {
+    renderer.resize(width, height);
+  }
+}
+
+function syncCanvasSizeAfterPageRender() {
+  requestAnimationFrame(() => requestAnimationFrame(syncCanvasSize));
+}
+
+if (document.readyState === 'complete') {
+  syncCanvasSizeAfterPageRender();
+} else {
+  window.addEventListener('load', syncCanvasSizeAfterPageRender, { once: true });
+}
+
 // Style manager
-const styles = new StyleManager(savedTheme === 'dark' ? 'dark' : 'default');
+const styles = new StyleManager('default');
 renderer.setStyleManager(styles);
 
 // Overlays
-const gridOverlay = new GridOverlay({ gridSize: 20, color: savedTheme === 'dark' ? '#334155' : '#e5e5e5' });
+const gridOverlay = new GridOverlay({ gridSize: 20, color: '#e5e5e5' });
 const miniMap = new MiniMap({ width: 140, height: 100, padding: 16 });
 renderer.use(gridOverlay);
 renderer.use(miniMap);
@@ -181,24 +196,28 @@ const edges = [
     to: { nodeId: hexagon1.id },
     type: 'bezier',
     endMarker: { type: 'arrow', size: 10 },
+    label: 'step A',
   }),
   new Edge({
     from: { nodeId: hexagon1.id },
     to: { nodeId: cylinder1.id },
     type: 'bezier',
     endMarker: { type: 'arrow', size: 10 },
+    label: 'store',
   }),
   new Edge({
     from: { nodeId: doc1.id },
     to: { nodeId: chamfer2.id },
     type: 'bezier',
     endMarker: { type: 'arrow', size: 10 },
+    label: 'input',
   }),
   new Edge({
     from: { nodeId: chamfer2.id },
     to: { nodeId: hexagon2.id },
     type: 'bezier',
     endMarker: { type: 'arrow', size: 10 },
+    label: 'transform',
   }),
   new Edge({
     from: { nodeId: cylinder1.id },
@@ -206,6 +225,7 @@ const edges = [
     type: 'polyline',
     style: { lineDash: [4, 4] },
     endMarker: { type: 'open', size: 8 },
+    label: 'sync',
   }),
 ];
 

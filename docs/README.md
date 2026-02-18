@@ -3,8 +3,11 @@
 Здесь собрана расширенная документация по API и возможностям библиотеки.
 
 - [Обзор API](./api.md)
+- [DiagramRenderer](./renderer.md)
 - [Элементы диаграммы](./elements.md)
 - [Интерактивность и менеджеры](./interactions.md)
+- [InputHandler](./input.md)
+- [SearchManager](./search.md)
 - [Оверлеи](./overlays.md)
 - [Утилиты](./utils.md)
 
@@ -25,6 +28,7 @@
 - Иконки в узлах (`NodeImage` через `icon`).
 - Фон подписи ребра (`labelBackground`).
 - `zoomToSelection()` и управление снаппингом через `drag.setSnapToGrid()`.
+- Линейки в `ports`-примере — это встроенный оверлей `RulersOverlay`, подключаемый через `renderer.use(...)`.
 
 ## Что дальше
 

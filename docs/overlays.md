@@ -29,6 +29,7 @@ renderer.use(new RulersOverlay({ thickness: 20 }));
 
 - `thickness` — толщина линейки.
 - `backgroundColor`, `textColor`, `tickColor` — цвета оформления.
+- В `examples/ports` линейки нарисованы именно этим оверлеем, это часть библиотеки, а не отдельный кастомный код примера.
 
 ## GuidesOverlay
 

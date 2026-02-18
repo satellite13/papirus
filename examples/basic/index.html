@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Basic Flowchart - Papirus Examples</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0,0">
   <link rel="stylesheet" href="../shared/styles.css">
 </head>
 <body>
@@ -23,7 +24,6 @@
           <a href="../ports/index.html" class="nav-item">Ports</a>
           <a href="../custom-shapes/index.html" class="nav-item">Shapes</a>
         </nav>
-        <button class="theme-toggle" id="themeToggle" title="Toggle theme">🌙</button>
       </div>
     </header>
 
@@ -31,24 +31,24 @@
     <div class="card">
       <div class="toolbar">
         <div class="toolbar-group">
-          <button class="btn btn-primary" id="addRect">➕ Rectangle</button>
-          <button class="btn btn-primary" id="addCircle">➕ Circle</button>
-          <button class="btn btn-primary" id="addDiamond">➕ Diamond</button>
+          <button class="btn btn-primary" id="addRect"><span class="material-symbols-outlined">crop_square</span>Rectangle</button>
+          <button class="btn btn-primary" id="addCircle"><span class="material-symbols-outlined">circle</span>Circle</button>
+          <button class="btn btn-primary" id="addDiamond"><span class="material-symbols-outlined">diamond</span>Diamond</button>
         </div>
         <div class="toolbar-group">
-          <button class="btn" id="fitView">⊡ Fit to View</button>
-          <button class="btn" id="zoomSelection">⊕ Zoom to Selection</button>
-          <button class="btn" id="resetView">⟲ Reset View</button>
+          <button class="btn" id="fitView"><span class="material-symbols-outlined">fit_screen</span>Fit to View</button>
+          <button class="btn" id="zoomSelection"><span class="material-symbols-outlined">zoom_in_map</span>Zoom to Selection</button>
+          <button class="btn" id="resetView"><span class="material-symbols-outlined">restart_alt</span>Reset View</button>
         </div>
         <div class="toolbar-group">
-          <button class="btn" id="toggleGrid">⊞ Grid</button>
-          <button class="btn" id="toggleMiniMap">🗺 Minimap</button>
-          <button class="btn" id="toggleSnap">🧲 Snap</button>
+          <button class="btn" id="toggleGrid"><span class="material-symbols-outlined">grid_view</span><span id="toggleGridLabel">Grid</span></button>
+          <button class="btn" id="toggleMiniMap"><span class="material-symbols-outlined">map</span><span id="toggleMiniMapLabel">Minimap</span></button>
+          <button class="btn" id="toggleSnap"><span class="material-symbols-outlined">my_location</span><span id="toggleSnapLabel">Snap OFF</span></button>
         </div>
         <div class="toolbar-group">
-          <button class="btn" id="exportPng">📷 PNG</button>
-          <button class="btn" id="exportSvg">📄 SVG</button>
-          <button class="btn" id="exportJson">💾 JSON</button>
+          <button class="btn" id="exportPng"><span class="material-symbols-outlined">image</span>PNG</button>
+          <button class="btn" id="exportSvg"><span class="material-symbols-outlined">description</span>SVG</button>
+          <button class="btn" id="exportJson"><span class="material-symbols-outlined">data_object</span>JSON</button>
         </div>
       </div>
     </div>
@@ -213,6 +213,8 @@
             <div class="info-panel">
               <ul>
                 <li>Click to select nodes</li>
+                <li>Double-click a node or edge to edit label inline</li>
+                <li><kbd>Enter</kbd> save, <kbd>Shift</kbd>+<kbd>Enter</kbd> newline, <kbd>Esc</kbd> cancel</li>
                 <li><kbd>Ctrl</kbd> + Click for multi-select</li>
                 <li>Drag nodes to move</li>
                 <li><kbd>Shift</kbd> + drag to connect</li>

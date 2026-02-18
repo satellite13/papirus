@@ -337,6 +337,27 @@ export abstract class Node extends Element {
   }
 
   /**
+   * Get world position of label center.
+   */
+  getLabelPosition(): Point {
+    const bounds = this.getBounds();
+    const placement = this._labelPlacement === 'auto' ? 'center' : this._labelPlacement;
+
+    switch (placement) {
+      case 'top':
+        return { x: bounds.x + bounds.width / 2, y: bounds.y };
+      case 'bottom':
+        return { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height };
+      case 'left':
+        return { x: bounds.x, y: bounds.y + bounds.height / 2 };
+      case 'right':
+        return { x: bounds.x + bounds.width, y: bounds.y + bounds.height / 2 };
+      default:
+        return { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
+    }
+  }
+
+  /**
    * Render icon, label, and ports
    */
   protected renderContents(ctx: CanvasRenderingContext2D): void {

@@ -1,15 +1,17 @@
 # Интерактивность и менеджеры
 
-## Включение взаимодействий
+Этот раздел покрывает `InteractionManager`, связанные менеджеры (`selection`, `drag`, `resize`, `navigation`, `connection`, `history`), обработку ввода и контекстное меню.
+
+## Быстрый старт
 
 ```ts
 const interactions = renderer.enableInteractions({
-  gridSize: 20,
   snapToGrid: true,
+  gridSize: 20,
 });
 ```
 
-`enableInteractions()` возвращает `InteractionManager` с доступом к менеджерам:
+`enableInteractions()` возвращает `InteractionManager`:
 
 - `selection` — выбор элементов.
 - `drag` — перетаскивание.
@@ -18,20 +20,67 @@ const interactions = renderer.enableInteractions({
 - `connection` — создание и переподключение связей.
 - `history` — undo/redo.
 
-## InteractionManager API
+## Опции `enableInteractions()`
+
+- `createEdge` — фабрика для новых рёбер при интерактивном соединении.
+- `nodeFactory`, `edgeFactory` — используются для вставки (`Ctrl/Cmd+V`) и восстановления.
+- `snapToGrid`, `gridSize` — базовая настройка перемещения/ресайза.
+- `keymap` — кастомизация клавиш:
+  - `deleteKeys`
+  - `copyKey`
+  - `pasteKey`
+  - `undoKey`
+  - `redoKey`
+
+## Public API `InteractionManager`
+
+### Доступ к менеджерам
+
+- `selection`, `drag`, `resize`, `navigation`, `connection`, `history`.
+
+### Изменение свойств с историей
+
+Эти методы автоматически создают снапшот "до/после" и добавляют изменения в undo/redo:
+
+- `changeNodeProperties(nodeId, apply)`
+- `changeEdgeProperties(edgeId, apply)`
+- `changeGroupProperties(groupId, apply)`
 
 ```ts
-interactions.zoomToSelection(40);
-interactions.history.undo();
-interactions.history.redo();
+interactions.changeNodeProperties(node.id, (n) => {
+  n.style = { ...n.style, fillColor: '#dbeafe' };
+});
 ```
 
-### Опции `enableInteractions()`
+### Операции над выборкой
 
-- `createEdge` — фабрика для новых рёбер.
-- `nodeFactory`, `edgeFactory` — используются при вставке/восстановлении.
-- `snapToGrid`, `gridSize` — базовая настройка сетки.
-- `keymap` — настройка клавиш (copy/paste/undo/redo/delete).
+- `removeNodeFromGroups(nodeId, groupIds?)` — удалить узел из указанных/всех групп.
+- `deleteByIds(ids)` — удалить узлы/рёбра по id с поддержкой undo.
+- `zoomToSelection(padding?)` — приблизить камеру к выбранным узлам.
+
+### Жизненный цикл
+
+- `destroy()` — отписывает обработчики ввода и очищает оверлеи взаимодействия.
+
+## Клавиши по умолчанию
+
+- `Delete` / `Backspace` — удалить выделение.
+- `Ctrl/Cmd + C` — копировать.
+- `Ctrl/Cmd + V` — вставить.
+- `Ctrl/Cmd + Z` — undo.
+- `Ctrl/Cmd + Y` — redo.
+
+## Inline-редактирование меток
+
+Встроено в `InteractionManager`:
+
+- двойной клик по узлу или ребру открывает inline-редактор метки;
+- `Enter` — сохранить;
+- `Shift + Enter` — новая строка;
+- `Esc` — отменить;
+- `blur` — сохранить.
+
+Изменения меток также попадают в историю.
 
 ## Навигация
 
@@ -41,23 +90,25 @@ interactions.navigation.zoomToSelection(bounds, 40);
 interactions.navigation.resetView();
 ```
 
-## Перетаскивание
+## Перетаскивание и снаппинг
 
 ```ts
 interactions.drag.setSnapToGrid(true, 20);
 ```
 
-## События
+## События менеджеров
 
-Менеджеры являются `EventEmitter` и могут подписывать на события:
+Менеджеры реализованы через `EventEmitter` и поддерживают подписки:
 
 ```ts
 interactions.drag.on('dragstart', (ids) => {
-  // обработка id элементов
+  // ids перетаскиваемых узлов
 });
 ```
 
 ## Контекстное меню
+
+Контекстное меню подключается отдельно через `DiagramRenderer`:
 
 ```ts
 const interactions = renderer.enableInteractions();
@@ -76,3 +127,16 @@ renderer.enableContextMenu({
   },
 });
 ```
+
+Отключение:
+
+```ts
+renderer.disableContextMenu();
+renderer.disableInteractions();
+```
+
+## InputHandler (низкоуровневый ввод)
+
+`InteractionManager` использует `InputHandler` под капотом. Для кастомных сценариев можно использовать его напрямую.
+
+Подробная справка: `docs/input.md`.

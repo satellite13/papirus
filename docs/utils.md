@@ -52,6 +52,8 @@ search.filter({ nodeType: 'RectangleNode', styleClass: 'warning' });
 search.clear();
 ```
 
+Подробная справка: `docs/search.md`.
+
 ## Анимации
 
 Анимации включаются через опции рендерера:

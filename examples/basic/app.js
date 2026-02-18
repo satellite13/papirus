@@ -15,27 +15,43 @@ import {
   SearchManager,
 } from '../../dist/papirus.js';
 
-// Theme handling
-const themeToggle = document.getElementById('themeToggle');
-const html = document.documentElement;
-const savedTheme = localStorage.getItem('theme') || 'light';
-html.setAttribute('data-theme', savedTheme);
-themeToggle.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
-
-themeToggle.addEventListener('click', () => {
-  const current = html.getAttribute('data-theme');
-  const next = current === 'dark' ? 'light' : 'dark';
-  html.setAttribute('data-theme', next);
-  localStorage.setItem('theme', next);
-  themeToggle.textContent = next === 'dark' ? '☀️' : '🌙';
-});
-
 // Initialize renderer
 const renderer = new DiagramRenderer('#canvas', {
   width: 1000,
   height: 550,
-  backgroundColor: savedTheme === 'dark' ? '#1a1a2e' : '#fafafa',
+  backgroundColor: '#fafafa',
+  animations: {
+    enabled: true,
+    enterDuration: 220,
+    exitDuration: 180,
+    highlightDuration: 420,
+    enterScale: 0.94,
+    exitScale: 0.98,
+  },
 });
+
+function syncCanvasSize() {
+  const canvas = renderer.getCanvas();
+  const parent = canvas.parentElement;
+  if (!parent) return;
+
+  const rect = parent.getBoundingClientRect();
+  const width = Math.max(320, Math.floor(rect.width));
+  const height = Math.max(240, Math.floor(rect.height));
+  if (renderer.width !== width || renderer.height !== height) {
+    renderer.resize(width, height);
+  }
+}
+
+function syncCanvasSizeAfterPageRender() {
+  requestAnimationFrame(() => requestAnimationFrame(syncCanvasSize));
+}
+
+if (document.readyState === 'complete') {
+  syncCanvasSizeAfterPageRender();
+} else {
+  window.addEventListener('load', syncCanvasSizeAfterPageRender, { once: true });
+}
 
 const imageExporter = new ImageExporter(renderer);
 const svgExporter = new SvgExporter(renderer);
@@ -98,7 +114,7 @@ const edgeFactory = (data) =>
 const serializer = new Serializer(renderer, { nodeFactory, edgeFactory });
 
 // Style manager with theme classes
-const styles = new StyleManager(savedTheme === 'dark' ? 'dark' : 'default');
+const styles = new StyleManager('default');
 styles.registerClass({
   name: 'success',
   node: { fillColor: '#dcfce7', strokeColor: '#16a34a', strokeWidth: 1 },
@@ -115,7 +131,7 @@ styles.registerClass({
 renderer.setStyleManager(styles);
 
 // Overlays
-const gridOverlay = new GridOverlay({ gridSize: 20, color: savedTheme === 'dark' ? '#334155' : '#e5e5e5' });
+const gridOverlay = new GridOverlay({ gridSize: 20, color: '#e5e5e5' });
 const miniMap = new MiniMap({ width: 140, height: 100, padding: 16 });
 renderer.use(gridOverlay);
 renderer.use(miniMap);
@@ -356,12 +372,6 @@ const edgeDefinitions = [
     label: 'No',
     labelOffset: 10,
     labelBackground: { color: '#fee2e2', padding: 6, borderRadius: 4 },
-  },
-  {
-    from: 'check', to: 'end', type: 'bezier',
-    endMarker: { type: 'open', size: 12 },
-    label: 'Retry',
-    labelBackground: { color: '#e0f2fe', padding: 4, borderRadius: 3 },
   },
 ];
 
@@ -702,15 +712,18 @@ document.getElementById('resetView').addEventListener('click', () => {
 const gridButton = document.getElementById('toggleGrid');
 const miniMapButton = document.getElementById('toggleMiniMap');
 const snapButton = document.getElementById('toggleSnap');
+const gridButtonLabel = document.getElementById('toggleGridLabel');
+const miniMapButtonLabel = document.getElementById('toggleMiniMapLabel');
+const snapButtonLabel = document.getElementById('toggleSnapLabel');
 let gridVisible = true;
 let miniMapVisible = true;
 let snapEnabled = false;
 
 function updateToggleLabels() {
-  gridButton.textContent = gridVisible ? '⊞ Grid' : '⊡ Grid';
-  miniMapButton.textContent = miniMapVisible ? '🗺 Minimap' : '🗺 Minimap';
+  gridButtonLabel.textContent = gridVisible ? 'Grid ON' : 'Grid OFF';
+  miniMapButtonLabel.textContent = miniMapVisible ? 'Minimap ON' : 'Minimap OFF';
   miniMapButton.classList.toggle('btn-primary', miniMapVisible);
-  snapButton.textContent = snapEnabled ? '🧲 Snap ON' : '🧲 Snap OFF';
+  snapButtonLabel.textContent = snapEnabled ? 'Snap ON' : 'Snap OFF';
   snapButton.classList.toggle('btn-primary', snapEnabled);
 }
 
