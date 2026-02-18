@@ -7,13 +7,24 @@
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-02-18
+
 ### Added
-- Подготовка к open source release
-- Добавлены файлы: LICENSE, CONTRIBUTING.md, CODE_OF_CONDUCT.md, SECURITY.md
-- Пакет опубликован в npmjs как `@ngroznykh/papirus`
+- Inline-редактирование меток по двойному клику для узлов и рёбер (`InteractionManager`)
+- Новые справочные страницы документации: `renderer.md`, `input.md`, `search.md`
+- Настройки `Label Pad/Margin` и `Icon Pad/Margin/Gap` в панели `Node Style` примера `basic`
 
 ### Changed
-- Обновлены `README.md` и `README.ru.md` под npm-пакет `@ngroznykh/papirus` (бейдж, ссылка, установка и примеры импортов)
+- Улучшен layout текста в узлах:
+  - перенос по словам учитывает доступную область текста при наличии иконки
+  - для круга и ромба используется область вписанного прямоугольника
+  - расширение узла происходит только если перенос не решает переполнение
+- Обновлены примеры (`basic`, `ports`, `custom-shapes`):
+  - улучшены тулбары и иконки
+  - добавлены подсказки по inline-редактированию
+  - упрощено поведение темы
+  - улучшено управление размером canvas после отрисовки страницы
+- Расширена документация по интерактивности, оверлеям и элементам
 
 ## [0.1.0] - 2026-02-18
 
@@ -31,5 +42,6 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.1.0...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.2.0...HEAD
+[0.2.0]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.2.0
 [0.1.0]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.1.0

@@ -1,6 +1,6 @@
 import { Node, type NodeOptions } from '../Node';
 import { NODE_HITBOX_PADDING } from '@/constants';
-import type { Point } from '@/types';
+import type { Bounds, Point } from '@/types';
 
 /**
  * Ellipse/circle node
@@ -55,6 +55,17 @@ export class CircleNode extends Node {
     return {
       x: center.x + dx * scale,
       y: center.y + dy * scale,
+    };
+  }
+
+  protected override getLabelContainerBounds(bounds: Bounds): Bounds {
+    const width = bounds.width / Math.SQRT2;
+    const height = bounds.height / Math.SQRT2;
+    return {
+      x: bounds.x + (bounds.width - width) / 2,
+      y: bounds.y + (bounds.height - height) / 2,
+      width,
+      height,
     };
   }
 

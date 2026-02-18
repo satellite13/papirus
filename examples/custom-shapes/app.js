@@ -130,7 +130,7 @@ function createChamferedNode(x, y) {
   const node = new CustomShapeNode({
     x, y,
     width: 140, height: 70,
-    label: `Chamfered ${++chamferCount}`,
+    label: { text: `Chamfered ${++chamferCount}`, padding: 6, margin: 3 },
     path: createChamferedRectPath,
     anchorPoints: { top: 3, right: 2, bottom: 3, left: 2 },
     style: { fillColor: '#ede9fe', strokeColor: '#7c3aed', strokeWidth: 2 },
@@ -144,7 +144,7 @@ function createHexagonNode(x, y) {
   const node = new CustomShapeNode({
     x, y,
     width: 120, height: 100,
-    label: `Hexagon ${++hexagonCount}`,
+    label: { text: `Hexagon ${++hexagonCount}`, padding: 6, margin: 3 },
     path: createHexagonPath,
     anchorPoints: { top: 2, right: 1, bottom: 2, left: 1 },
     style: { fillColor: '#cffafe', strokeColor: '#0891b2', strokeWidth: 2 },
@@ -158,7 +158,7 @@ function createCylinderNode(x, y) {
   const node = new DatabaseNode({
     x, y,
     width: 100, height: 120,
-    label: `DB ${++cylinderCount}`,
+    label: { text: `DB ${++cylinderCount}`, padding: 6, margin: 3 },
     style: { fillColor: '#fce7f3', strokeColor: '#db2777', strokeWidth: 2 },
     anchorPoints: { top: 1, right: 2, bottom: 1, left: 2 },
   });
@@ -171,7 +171,7 @@ function createDocumentNode(x, y) {
   const node = new CustomShapeNode({
     x, y,
     width: 100, height: 130,
-    label: `Doc ${++documentCount}`,
+    label: { text: `Doc ${++documentCount}`, padding: 6, margin: 3 },
     path: createDocumentPath,
     anchorPoints: { top: 2, right: 2, bottom: 2, left: 2 },
     style: { fillColor: '#fef3c7', strokeColor: '#d97706', strokeWidth: 2 },

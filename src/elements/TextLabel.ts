@@ -31,6 +31,7 @@ export class TextLabel {
   private _style: TextStyle;
   private _localStyle: TextStyle;
   private _maxWidth?: number;
+  private _autoMaxWidth?: number;
   private readonly _padding: number;
   private readonly _margin: number;
   private _lines: string[] = [];
@@ -106,10 +107,25 @@ export class TextLabel {
   }
 
   set maxWidth(value: number | undefined) {
+    if (this._maxWidth === value) {
+      return;
+    }
     this._maxWidth = value;
     this._lines = [];
     this._measureDirty = true;
     this._onChange?.();
+  }
+
+  /**
+   * Internal max width used for automatic wrapping by container elements.
+   */
+  setAutoMaxWidth(value: number | undefined): void {
+    if (this._autoMaxWidth === value) {
+      return;
+    }
+    this._autoMaxWidth = value;
+    this._lines = [];
+    this._measureDirty = true;
   }
 
   /**
@@ -170,8 +186,10 @@ export class TextLabel {
 
     const lineHeight = (this._style.fontSize ?? 14) * 1.2;
 
-    if (this._maxWidth !== undefined) {
-      const maxWidth = Math.max(0, this._maxWidth - this._margin * 2);
+    const effectiveMaxWidth = this._maxWidth ?? this._autoMaxWidth;
+
+    if (effectiveMaxWidth !== undefined) {
+      const maxWidth = Math.max(0, effectiveMaxWidth - this._margin * 2);
       this._lines = this.wrapText(ctx, this._text, Math.max(0, maxWidth - this._padding * 2));
     } else {
       this._lines = this._text.split('\n');

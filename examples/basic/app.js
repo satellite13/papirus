@@ -272,7 +272,7 @@ const nodeDefinitions = [
     options: {
       x: 100, y: 100,
       width: 120, height: 60,
-      label: 'Start',
+      label: { text: 'Start', padding: 6, margin: 3 },
       anchorPoints: { top: 3, right: 1, bottom: 3, left: 1 },
       style: { cornerRadius: 8, fillColor: '#e0f2fe', strokeColor: '#0284c7' },
     },
@@ -283,10 +283,17 @@ const nodeDefinitions = [
     options: {
       x: 300, y: 100,
       width: 140, height: 60,
-      label: 'Process',
+      label: { text: 'Process', padding: 6, margin: 4 },
       anchorPoints: { top: 3, right: 1, bottom: 3, left: 1 },
       style: { cornerRadius: 4 },
-      icon: { source: iconSvg, placement: 'left', fit: 'contain', padding: 10 },
+      icon: {
+        source: iconSvg,
+        placement: 'left',
+        fit: 'contain',
+        padding: 8,
+        margin: 4,
+        gap: 10,
+      },
     },
   },
   {
@@ -408,13 +415,39 @@ function showPanel(panel) {
   panel.classList.remove('hidden');
 }
 
+function toNonNegativeNumber(value, fallback = 0) {
+  const next = Number.parseFloat(value);
+  if (!Number.isFinite(next)) {
+    return fallback;
+  }
+  return Math.max(0, next);
+}
+
+function rebuildNodeLabel(node, patch = {}) {
+  if (!node.label) return;
+  const label = node.label;
+  node.label = new TextLabel({
+    text: label.text,
+    style: label.style,
+    maxWidth: label.maxWidth,
+    styleClass: label.styleClass,
+    padding: patch.padding ?? label.padding,
+    margin: patch.margin ?? label.margin,
+  });
+}
+
 function updateNodePanel(node) {
   document.getElementById('nodeLabel').value = node.label?.text || '';
   const labelStyle = node.label?.style || {};
   document.getElementById('nodeLabelColor').value = labelStyle.color || '#333333';
   document.getElementById('nodeLabelColorText').value = labelStyle.color || '#333333';
   document.getElementById('nodeLabelSize').value = labelStyle.fontSize || 12;
+  document.getElementById('nodeLabelPadding').value = node.label?.padding ?? 8;
+  document.getElementById('nodeLabelMargin').value = node.label?.margin ?? 0;
   document.getElementById('nodeLabelPlacement').value = node.labelPlacement || 'auto';
+  document.getElementById('nodeIconPadding').value = node.icon?.options.padding ?? 8;
+  document.getElementById('nodeIconMargin').value = node.icon?.options.margin ?? 0;
+  document.getElementById('nodeIconGap').value = node.icon?.options.gap ?? 6;
   const style = node.style || {};
   document.getElementById('nodeFillColor').value = style.fillColor || '#ffffff';
   document.getElementById('nodeFillColorText').value = style.fillColor || '#ffffff';
@@ -494,10 +527,17 @@ document.getElementById('nodeLabel').addEventListener('input', (e) => {
     if (e.target.value) {
       const fontSize = parseFloat(document.getElementById('nodeLabelSize').value);
       const color = document.getElementById('nodeLabelColor').value;
+      const padding = toNonNegativeNumber(document.getElementById('nodeLabelPadding').value, 8);
+      const margin = toNonNegativeNumber(document.getElementById('nodeLabelMargin').value, 0);
       if (node.label) {
         node.label.text = e.target.value;
       } else {
-        node.label = new TextLabel({ text: e.target.value, style: { color, fontSize } });
+        node.label = new TextLabel({
+          text: e.target.value,
+          style: { color, fontSize },
+          padding,
+          margin,
+        });
       }
     } else {
       node.label = undefined;
@@ -528,6 +568,53 @@ document.getElementById('nodeLabelPlacement').addEventListener('change', (e) => 
       node.labelPlacement = e.target.value;
     });
   }
+});
+
+document.getElementById('nodeLabelPadding').addEventListener('input', (e) => {
+  if (!selectedNode?.label) return;
+  interactions.changeNodeProperties(selectedNode.id, (node) => {
+    rebuildNodeLabel(node, { padding: toNonNegativeNumber(e.target.value, node.label?.padding ?? 8) });
+  });
+});
+
+document.getElementById('nodeLabelMargin').addEventListener('input', (e) => {
+  if (!selectedNode?.label) return;
+  interactions.changeNodeProperties(selectedNode.id, (node) => {
+    rebuildNodeLabel(node, { margin: toNonNegativeNumber(e.target.value, node.label?.margin ?? 0) });
+  });
+});
+
+document.getElementById('nodeIconPadding').addEventListener('input', (e) => {
+  if (!selectedNode?.icon) return;
+  interactions.changeNodeProperties(selectedNode.id, (node) => {
+    if (!node.icon) return;
+    node.icon.options = {
+      ...node.icon.options,
+      padding: toNonNegativeNumber(e.target.value, node.icon.options.padding ?? 8),
+    };
+  });
+});
+
+document.getElementById('nodeIconMargin').addEventListener('input', (e) => {
+  if (!selectedNode?.icon) return;
+  interactions.changeNodeProperties(selectedNode.id, (node) => {
+    if (!node.icon) return;
+    node.icon.options = {
+      ...node.icon.options,
+      margin: toNonNegativeNumber(e.target.value, node.icon.options.margin ?? 0),
+    };
+  });
+});
+
+document.getElementById('nodeIconGap').addEventListener('input', (e) => {
+  if (!selectedNode?.icon) return;
+  interactions.changeNodeProperties(selectedNode.id, (node) => {
+    if (!node.icon) return;
+    node.icon.options = {
+      ...node.icon.options,
+      gap: toNonNegativeNumber(e.target.value, node.icon.options.gap ?? 6),
+    };
+  });
 });
 
 document.getElementById('nodeFillColor').addEventListener('input', (e) => {

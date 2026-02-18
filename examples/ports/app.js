@@ -105,7 +105,7 @@ function createInputNode(x, y) {
   const node = new RectangleNode({
     x, y,
     width: 120, height: 60,
-    label: `Input ${++inputCount}`,
+    label: { text: `Input ${++inputCount}`, padding: 5, margin: 3 },
     styleClass: 'input',
     ports: [
       { type: 'output', position: 'right', styleClass: 'input' },
@@ -121,7 +121,7 @@ function createProcessNode(x, y) {
   const node = new CircleNode({
     x, y,
     width: 100, height: 100,
-    label: `Process ${++processCount}`,
+    label: { text: `Process ${++processCount}`, padding: 5, margin: 3 },
     styleClass: 'process',
     ports: [
       { type: 'input', position: 'left', styleClass: 'process' },
@@ -140,7 +140,7 @@ function createOutputNode(x, y) {
   const node = new RectangleNode({
     x, y,
     width: 120, height: 60,
-    label: `Output ${++outputCount}`,
+    label: { text: `Output ${++outputCount}`, padding: 5, margin: 3 },
     styleClass: 'output',
     ports: [
       { type: 'input', position: 'left', styleClass: 'output' },
