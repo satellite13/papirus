@@ -81,7 +81,13 @@ const interactions = renderer.enableInteractions({ gridSize: 20, snapToGrid: tru
 interactions.navigation.fitToView();
 ```
 
-Создание связи по умолчанию: `Shift + drag` от узла к узлу.
+Создание связи по умолчанию: перетягивание от одной точки (anchor) узла к другой, без модификаторов.
+
+Горячие клавиши по умолчанию:
+- `Delete/Backspace` — удалить выделение
+- `Ctrl/Cmd + C` / `Ctrl/Cmd + V` — копировать/вставить
+- `Ctrl/Cmd + Z` — отмена
+- `Ctrl/Cmd + Y` или `Ctrl/Cmd + Shift + Z` — повтор
 
 ### Элементы и группы
 

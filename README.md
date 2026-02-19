@@ -80,7 +80,13 @@ const interactions = renderer.enableInteractions({ gridSize: 20, snapToGrid: tru
 interactions.navigation.fitToView();
 ```
 
-Default edge creation: `Shift + drag` from node to node (to avoid interfering with regular drag).
+Default edge creation: drag from one node anchor point to another (no modifier key required).
+
+Default keyboard shortcuts:
+- `Delete/Backspace` — delete selection
+- `Ctrl/Cmd + C` / `Ctrl/Cmd + V` — copy/paste
+- `Ctrl/Cmd + Z` — undo
+- `Ctrl/Cmd + Y` or `Ctrl/Cmd + Shift + Z` — redo
 
 ### Elements & Groups
 

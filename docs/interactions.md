@@ -69,6 +69,17 @@ interactions.changeNodeProperties(node.id, (n) => {
 - `Ctrl/Cmd + V` — вставить.
 - `Ctrl/Cmd + Z` — undo.
 - `Ctrl/Cmd + Y` — redo.
+- `Ctrl/Cmd + Shift + Z` — redo (альтернатива).
+
+## Комбинации мыши/клавиатуры
+
+- `Ctrl/Cmd + Click` — добавить/убрать элемент из выделения.
+- `Ctrl/Cmd + drag` по пустому месту — рамочное выделение.
+- `Click + drag` по пустому месту — панорамирование.
+- `Space + Left Mouse drag` — панорамирование.
+- `Middle Mouse drag` — панорамирование.
+- `Wheel` — zoom.
+- `Esc` — закрыть открытое контекстное меню.
 
 ## Inline-редактирование меток
 
