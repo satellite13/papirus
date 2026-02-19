@@ -4,6 +4,7 @@ import type { Edge } from '@/elements/Edge';
 import type { Node } from '@/elements/Node';
 import type { Group } from '@/elements/Group';
 import type { ArrowMarkerConfig, TextStyle } from '@/types';
+import { ARROW_ANGLE } from '@/constants';
 import { applyStyleManagerToElements } from './applyStyleManager';
 import { getContentBounds } from './contentBounds';
 import { downloadBlob } from './download';
@@ -57,17 +58,15 @@ export class SvgExporter {
     );
 
     const parts: string[] = [];
-    const markerDefs = new Map<string, string>();
     const renderedEdges: string[] = [];
     parts.push(
       `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`
     );
     for (const edge of this.renderer.edges.values()) {
       if (edge.visible) {
-        renderedEdges.push(this.renderEdge(edge, markerDefs, edgeLabelOffset));
+        renderedEdges.push(this.renderEdge(edge, edgeLabelOffset));
       }
     }
-    parts.push(this.buildDefs(markerDefs));
     if (includeBackground) {
       parts.push(`<rect width="100%" height="100%" fill="${backgroundColor}"/>`);
     }
@@ -173,7 +172,7 @@ export class SvgExporter {
     ].join('');
   }
 
-  private renderEdge(edge: Edge, markerDefs: Map<string, string>, edgeLabelOffset: number): string {
+  private renderEdge(edge: Edge, edgeLabelOffset: number): string {
     const path = edge.path;
     if (path.length < 2) {
       return '';
@@ -189,20 +188,13 @@ export class SvgExporter {
       style.lineDashOffset !== undefined ? ` stroke-dashoffset="${style.lineDashOffset}"` : '';
 
     const d = this.buildPath(edge);
-    const startMarkerConfig = this.resolveMarkerConfig(edge, 'start');
-    const endMarkerConfig = this.resolveMarkerConfig(edge, 'end');
-    const markerStart = startMarkerConfig
-      ? ` marker-start="url(#${this.ensureMarkerDef(markerDefs, startMarkerConfig, 'start', stroke)})"`
-      : '';
-    const markerEnd = endMarkerConfig
-      ? ` marker-end="url(#${this.ensureMarkerDef(markerDefs, endMarkerConfig, 'end', stroke)})"`
-      : '';
+    const markerShapes = this.renderEdgeMarkers(edge, stroke);
 
     const label = edge.label
       ? this.renderTextLabel(edge.label.text, this.getEdgeLabelPoint(edge, edgeLabelOffset), edge.label.style)
       : '';
 
-    return `<path d="${d}" fill="none" stroke="${stroke}" stroke-width="${strokeWidth}" opacity="${opacity}" color="${stroke}"${dash}${dashOffset}${markerStart}${markerEnd}/>${label}`;
+    return `<path d="${d}" fill="none" stroke="${stroke}" stroke-width="${strokeWidth}" opacity="${opacity}" color="${stroke}"${dash}${dashOffset}/>${markerShapes}${label}`;
   }
 
   private resolveMarkerConfig(edge: Edge, side: 'start' | 'end'): ArrowMarkerConfig | null {
@@ -218,63 +210,116 @@ export class SvgExporter {
     return edge.arrowType === 'double' ? { type: 'arrow' } : null;
   }
 
-  private ensureMarkerDef(
-    markerDefs: Map<string, string>,
-    marker: ArrowMarkerConfig,
-    side: 'start' | 'end',
-    stroke: string
-  ): string {
-    const size = marker.size ?? 12;
-    const markerStroke = marker.strokeColor ?? stroke;
-    const markerFill = marker.fillColor ?? markerStroke;
-    const fillOpacity = marker.fillOpacity ?? 1;
-    const markerId = this.buildMarkerId(side, marker.type, size, markerFill, markerStroke, fillOpacity);
+  private renderEdgeMarkers(edge: Edge, edgeStroke: string): string {
+    const startMarker = this.resolveMarkerConfig(edge, 'start');
+    const endMarker = this.resolveMarkerConfig(edge, 'end');
+    const parts: string[] = [];
 
-    if (!markerDefs.has(markerId)) {
-      const refX = marker.type === 'circle' ? 5 : 10;
-      markerDefs.set(
-        markerId,
-        [
-          `<marker id="${markerId}" viewBox="0 0 10 10" refX="${refX}" refY="5" markerWidth="${size}" markerHeight="${size}" orient="auto-start-reverse" markerUnits="userSpaceOnUse">`,
-          this.renderMarkerShape(marker, markerFill, markerStroke, fillOpacity),
-          `</marker>`,
-        ].join('')
-      );
+    if (endMarker) {
+      const points = this.getMarkerPoints(edge, 'end');
+      if (points) {
+        parts.push(this.renderMarkerShape(endMarker, points.from, points.to, edgeStroke));
+      }
     }
 
-    return markerId;
+    if (startMarker) {
+      const points = this.getMarkerPoints(edge, 'start');
+      if (points) {
+        parts.push(this.renderMarkerShape(startMarker, points.from, points.to, edgeStroke));
+      }
+    }
+
+    return parts.join('');
   }
 
-  private buildMarkerId(
-    side: 'start' | 'end',
-    type: string,
-    size: number,
-    fill: string,
-    stroke: string,
-    fillOpacity: number
-  ): string {
-    const token = `${side}-${type}-${size}-${fill}-${stroke}-${fillOpacity}`
-      .toLowerCase()
-      .replace(/[^a-z0-9_-]+/g, '-');
-    return `marker-${token}`;
+  private getMarkerPoints(edge: Edge, position: 'start' | 'end'): { from: Point; to: Point } | null {
+    const path = edge.path;
+    if (path.length < 2) {
+      return null;
+    }
+
+    if (edge.type === 'bezier' && path.length >= 4) {
+      const epsilon = 0.001;
+      const isSame = (a: Point, b: Point): boolean =>
+        Math.abs(a.x - b.x) < epsilon && Math.abs(a.y - b.y) < epsilon;
+
+      if (position === 'end') {
+        const endIndex = path.length - 1;
+        const endPoint = path[endIndex]!;
+        let from = path[endIndex - 1]!;
+        if (isSame(from, endPoint)) {
+          from = path[endIndex - 2]!;
+          if (isSame(from, endPoint)) {
+            from = path[0]!;
+          }
+        }
+        return { from, to: endPoint };
+      }
+
+      const start = path[0]!;
+      let next = path[1]!;
+      if (isSame(next, start)) {
+        next = path[2]!;
+        if (isSame(next, start)) {
+          next = path[path.length - 1]!;
+        }
+      }
+      return { from: next, to: start };
+    }
+
+    if (position === 'end') {
+      return { from: path[path.length - 2]!, to: path[path.length - 1]! };
+    }
+
+    return { from: path[1]!, to: path[0]! };
   }
 
   private renderMarkerShape(
     marker: ArrowMarkerConfig,
-    fill: string,
-    stroke: string,
-    fillOpacity: number
+    from: Point,
+    to: Point,
+    edgeStroke: string
   ): string {
+    const angle = Math.atan2(to.y - from.y, to.x - from.x);
+    const size = marker.size ?? 12;
+    const stroke = marker.strokeColor ?? edgeStroke;
+    const fill = marker.fillColor ?? stroke;
+    const fillOpacity = marker.fillOpacity ?? 1;
+
     switch (marker.type) {
-      case 'open':
-        return `<path d="M 10 0 L 0 5 L 10 10" fill="none" stroke="${stroke}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>`;
-      case 'diamond':
-        return `<path d="M 10 5 L 5 0 L 0 5 L 5 10 z" fill="${fill}" fill-opacity="${fillOpacity}" stroke="${stroke}" stroke-width="1"/>`;
-      case 'circle':
-        return `<circle cx="5" cy="5" r="4" fill="${fill}" fill-opacity="${fillOpacity}" stroke="${stroke}" stroke-width="1"/>`;
+      case 'open': {
+        const x1 = to.x - size * Math.cos(angle - ARROW_ANGLE);
+        const y1 = to.y - size * Math.sin(angle - ARROW_ANGLE);
+        const x2 = to.x - size * Math.cos(angle + ARROW_ANGLE);
+        const y2 = to.y - size * Math.sin(angle + ARROW_ANGLE);
+        return `<path d="M ${to.x} ${to.y} L ${x1} ${y1} M ${to.x} ${to.y} L ${x2} ${y2}" fill="none" stroke="${stroke}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>`;
+      }
+      case 'diamond': {
+        const halfLength = size / 2;
+        const halfWidth = size * 0.3;
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+        const p1x = to.x - halfLength * cos + halfWidth * sin;
+        const p1y = to.y - halfLength * sin - halfWidth * cos;
+        const backX = to.x - size * cos;
+        const backY = to.y - size * sin;
+        const p2x = to.x - halfLength * cos - halfWidth * sin;
+        const p2y = to.y - halfLength * sin + halfWidth * cos;
+        return `<path d="M ${to.x} ${to.y} L ${p1x} ${p1y} L ${backX} ${backY} L ${p2x} ${p2y} Z" fill="${fill}" fill-opacity="${fillOpacity}" stroke="${stroke}" stroke-width="1"/>`;
+      }
+      case 'circle': {
+        const cx = to.x - size * Math.cos(angle);
+        const cy = to.y - size * Math.sin(angle);
+        return `<circle cx="${cx}" cy="${cy}" r="${size}" fill="${fill}" fill-opacity="${fillOpacity}" stroke="${stroke}" stroke-width="1"/>`;
+      }
       case 'arrow':
-      default:
-        return `<path d="M 0 0 L 10 5 L 0 10 z" fill="${fill}" fill-opacity="${fillOpacity}" stroke="${stroke}" stroke-width="1"/>`;
+      default: {
+        const x1 = to.x - size * Math.cos(angle - ARROW_ANGLE);
+        const y1 = to.y - size * Math.sin(angle - ARROW_ANGLE);
+        const x2 = to.x - size * Math.cos(angle + ARROW_ANGLE);
+        const y2 = to.y - size * Math.sin(angle + ARROW_ANGLE);
+        return `<path d="M ${to.x} ${to.y} L ${x1} ${y1} L ${x2} ${y2} Z" fill="${fill}" fill-opacity="${fillOpacity}" stroke="${stroke}" stroke-width="1"/>`;
+      }
     }
   }
 
@@ -365,13 +410,6 @@ export class SvgExporter {
     return `<text x="${point.x}" y="${point.y}" fill="${fill}" font-size="${fontSize}" font-family="${fontFamily}" font-weight="${fontWeight}" text-anchor="${anchor}" dominant-baseline="${baseline}">${this.escapeText(
       text
     )}</text>`;
-  }
-
-  private buildDefs(markerDefs: Map<string, string>): string {
-    if (markerDefs.size === 0) {
-      return '<defs></defs>';
-    }
-    return `<defs>${Array.from(markerDefs.values()).join('')}</defs>`;
   }
 
   private createEmptySvg(width: number, height: number, backgroundColor: string, includeBackground: boolean): string {

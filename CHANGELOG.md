@@ -7,6 +7,11 @@
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-02-19
+
+### Fixed
+- Исправлен рендер наконечников при экспорте в `SVG` для схем с разными типами маркеров: наконечники теперь выводятся как геометрия (`path`/`circle`), что устраняет проблемы совместимости SVG-viewer'ов с `marker-start/marker-end`.
+
 ## [0.3.1] - 2026-02-19
 
 ### Fixed
@@ -61,7 +66,8 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.3.1...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.3.2...HEAD
+[0.3.2]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.2
 [0.3.1]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.1
 [0.3.0]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.0
 [0.2.0]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.2.0
