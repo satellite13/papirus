@@ -3,7 +3,7 @@ import type { Point } from '@/types';
 import type { Edge } from '@/elements/Edge';
 import type { Node } from '@/elements/Node';
 import type { Group } from '@/elements/Group';
-import type { TextStyle } from '@/types';
+import type { ArrowMarkerConfig, TextStyle } from '@/types';
 import { applyStyleManagerToElements } from './applyStyleManager';
 import { getContentBounds } from './contentBounds';
 import { downloadBlob } from './download';
@@ -12,6 +12,11 @@ export interface SvgExportOptions {
   padding?: number;
   backgroundColor?: string;
   includeBackground?: boolean;
+  /**
+   * Global Y-offset for edge labels in SVG export.
+   * Does not use runtime edge.labelOffset unless explicitly passed here.
+   */
+  edgeLabelOffset?: number;
 }
 
 /**
@@ -28,6 +33,7 @@ export class SvgExporter {
     const padding = options.padding ?? 20;
     const includeBackground = options.includeBackground ?? true;
     const backgroundColor = options.backgroundColor ?? '#ffffff';
+    const edgeLabelOffset = options.edgeLabelOffset ?? 0;
 
     const bounds = getContentBounds({
       nodes: this.renderer.nodes.values(),
@@ -51,10 +57,17 @@ export class SvgExporter {
     );
 
     const parts: string[] = [];
+    const markerDefs = new Map<string, string>();
+    const renderedEdges: string[] = [];
     parts.push(
       `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`
     );
-    parts.push(this.arrowDefs());
+    for (const edge of this.renderer.edges.values()) {
+      if (edge.visible) {
+        renderedEdges.push(this.renderEdge(edge, markerDefs, edgeLabelOffset));
+      }
+    }
+    parts.push(this.buildDefs(markerDefs));
     if (includeBackground) {
       parts.push(`<rect width="100%" height="100%" fill="${backgroundColor}"/>`);
     }
@@ -66,11 +79,7 @@ export class SvgExporter {
       }
     }
 
-    for (const edge of this.renderer.edges.values()) {
-      if (edge.visible) {
-        parts.push(this.renderEdge(edge));
-      }
-    }
+    parts.push(...renderedEdges);
 
     for (const node of this.renderer.nodes.values()) {
       if (node.visible) {
@@ -164,7 +173,7 @@ export class SvgExporter {
     ].join('');
   }
 
-  private renderEdge(edge: Edge): string {
+  private renderEdge(edge: Edge, markerDefs: Map<string, string>, edgeLabelOffset: number): string {
     const path = edge.path;
     if (path.length < 2) {
       return '';
@@ -180,14 +189,93 @@ export class SvgExporter {
       style.lineDashOffset !== undefined ? ` stroke-dashoffset="${style.lineDashOffset}"` : '';
 
     const d = this.buildPath(edge);
-    const markerEnd = edge.arrowType === 'none' ? '' : ` marker-end="url(#arrow)"`;
-    const markerStart = edge.arrowType === 'double' ? ` marker-start="url(#arrow)"` : '';
+    const startMarkerConfig = this.resolveMarkerConfig(edge, 'start');
+    const endMarkerConfig = this.resolveMarkerConfig(edge, 'end');
+    const markerStart = startMarkerConfig
+      ? ` marker-start="url(#${this.ensureMarkerDef(markerDefs, startMarkerConfig, 'start', stroke)})"`
+      : '';
+    const markerEnd = endMarkerConfig
+      ? ` marker-end="url(#${this.ensureMarkerDef(markerDefs, endMarkerConfig, 'end', stroke)})"`
+      : '';
 
     const label = edge.label
-      ? this.renderTextLabel(edge.label.text, this.getPathMidpoint(edge), edge.label.style)
+      ? this.renderTextLabel(edge.label.text, this.getEdgeLabelPoint(edge, edgeLabelOffset), edge.label.style)
       : '';
 
     return `<path d="${d}" fill="none" stroke="${stroke}" stroke-width="${strokeWidth}" opacity="${opacity}" color="${stroke}"${dash}${dashOffset}${markerStart}${markerEnd}/>${label}`;
+  }
+
+  private resolveMarkerConfig(edge: Edge, side: 'start' | 'end'): ArrowMarkerConfig | null {
+    const marker = side === 'start' ? edge.startMarker : edge.endMarker;
+    if (marker && marker.type !== 'none') {
+      return marker;
+    }
+
+    if (side === 'end') {
+      return edge.arrowType === 'none' ? null : { type: 'arrow' };
+    }
+
+    return edge.arrowType === 'double' ? { type: 'arrow' } : null;
+  }
+
+  private ensureMarkerDef(
+    markerDefs: Map<string, string>,
+    marker: ArrowMarkerConfig,
+    side: 'start' | 'end',
+    stroke: string
+  ): string {
+    const size = marker.size ?? 12;
+    const markerStroke = marker.strokeColor ?? stroke;
+    const markerFill = marker.fillColor ?? markerStroke;
+    const fillOpacity = marker.fillOpacity ?? 1;
+    const markerId = this.buildMarkerId(side, marker.type, size, markerFill, markerStroke, fillOpacity);
+
+    if (!markerDefs.has(markerId)) {
+      const refX = marker.type === 'circle' ? 5 : 10;
+      markerDefs.set(
+        markerId,
+        [
+          `<marker id="${markerId}" viewBox="0 0 10 10" refX="${refX}" refY="5" markerWidth="${size}" markerHeight="${size}" orient="auto-start-reverse" markerUnits="userSpaceOnUse">`,
+          this.renderMarkerShape(marker, markerFill, markerStroke, fillOpacity),
+          `</marker>`,
+        ].join('')
+      );
+    }
+
+    return markerId;
+  }
+
+  private buildMarkerId(
+    side: 'start' | 'end',
+    type: string,
+    size: number,
+    fill: string,
+    stroke: string,
+    fillOpacity: number
+  ): string {
+    const token = `${side}-${type}-${size}-${fill}-${stroke}-${fillOpacity}`
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]+/g, '-');
+    return `marker-${token}`;
+  }
+
+  private renderMarkerShape(
+    marker: ArrowMarkerConfig,
+    fill: string,
+    stroke: string,
+    fillOpacity: number
+  ): string {
+    switch (marker.type) {
+      case 'open':
+        return `<path d="M 10 0 L 0 5 L 10 10" fill="none" stroke="${stroke}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>`;
+      case 'diamond':
+        return `<path d="M 10 5 L 5 0 L 0 5 L 5 10 z" fill="${fill}" fill-opacity="${fillOpacity}" stroke="${stroke}" stroke-width="1"/>`;
+      case 'circle':
+        return `<circle cx="5" cy="5" r="4" fill="${fill}" fill-opacity="${fillOpacity}" stroke="${stroke}" stroke-width="1"/>`;
+      case 'arrow':
+      default:
+        return `<path d="M 0 0 L 10 5 L 0 10 z" fill="${fill}" fill-opacity="${fillOpacity}" stroke="${stroke}" stroke-width="1"/>`;
+    }
   }
 
   private buildPath(edge: Edge): string {
@@ -253,6 +341,14 @@ export class SvgExporter {
     return path[0]!;
   }
 
+  private getEdgeLabelPoint(edge: Edge, edgeLabelOffset: number): Point {
+    const midpoint = this.getPathMidpoint(edge);
+    return {
+      x: midpoint.x,
+      y: midpoint.y + edgeLabelOffset,
+    };
+  }
+
   private renderTextLabel(text: string, point: Point, style: TextStyle = {}): string {
     const fill = style.color ?? '#000000';
     const fontSize = style.fontSize ?? 14;
@@ -271,14 +367,11 @@ export class SvgExporter {
     )}</text>`;
   }
 
-  private arrowDefs(): string {
-    return [
-      '<defs>',
-      '<marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">',
-      '<path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>',
-      '</marker>',
-      '</defs>',
-    ].join('');
+  private buildDefs(markerDefs: Map<string, string>): string {
+    if (markerDefs.size === 0) {
+      return '<defs></defs>';
+    }
+    return `<defs>${Array.from(markerDefs.values()).join('')}</defs>`;
   }
 
   private createEmptySvg(width: number, height: number, backgroundColor: string, includeBackground: boolean): string {

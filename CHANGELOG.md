@@ -7,6 +7,15 @@
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-02-19
+
+### Fixed
+- Исправлен экспорт в `SVG` для новых маркеров рёбер (`startMarker`/`endMarker`): теперь корректно выгружаются наконечники типов `arrow`, `open`, `diamond`, `circle`.
+- Добавлен fallback на legacy `arrowType` при экспорте в `SVG`, чтобы поведение совпадало с canvas-рендером.
+
+### Changed
+- Изменено поведение подписи рёбер в `SVG`-экспорте: по умолчанию метка рендерится без смещения; для явного смещения добавлена опция `SvgExportOptions.edgeLabelOffset`.
+
 ## [0.3.0] - 2026-02-19
 
 ### Added
@@ -52,7 +61,8 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.3.0...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.3.1...HEAD
+[0.3.1]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.1
 [0.3.0]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.0
 [0.2.0]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.2.0
 [0.1.0]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.1.0
