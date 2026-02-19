@@ -3,6 +3,7 @@ import type { StyleManager } from '@/styles/StyleManager';
 import type { Node } from '@/elements/Node';
 import type { Edge } from '@/elements/Edge';
 import type { Group } from '@/elements/Group';
+import type { PathObstacle } from '@/elements/paths';
 import type { Bounds, DiagramOptions, Point, ViewportState } from '@/types';
 import { InteractionManager } from './InteractionManager';
 import type { InteractionManagerOptions } from './InteractionManager';
@@ -691,15 +692,7 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
     // Sync edge endpoints with node positions
     this.updateEdgeEndpoints();
 
-    // Render edges (middle layer)
-    for (const edge of this._edges.values()) {
-      if (edge.visible) {
-        this.renderElementWithAnimation(ctx, edge, () => edge.render(ctx));
-        edge.clearDirty();
-      }
-    }
-
-    // Render nodes (front layer)
+    // Render nodes (middle layer)
     for (const node of this._nodes.values()) {
       if (node.visible) {
         this.renderElementWithAnimation(ctx, node, () => node.render(ctx));
@@ -707,7 +700,15 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
       }
     }
 
-    // Render edge handles (topmost layer, so they're above nodes)
+    // Render edges above nodes so lines/markers stay visible over figures.
+    for (const edge of this._edges.values()) {
+      if (edge.visible) {
+        this.renderElementWithAnimation(ctx, edge, () => edge.render(ctx));
+        edge.clearDirty();
+      }
+    }
+
+    // Render edge handles (topmost layer)
     for (const edge of this._edges.values()) {
       if (edge.visible) {
         edge.renderHandles(ctx);
@@ -808,7 +809,21 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
           toDir = anchorId.split(':')[0];
         }
       }
-      edge.updateEndpoints(fromPoint, toPoint, fromDir, toDir);
+      const obstacles: PathObstacle[] = Array.from(this._nodes.values())
+        .map((node) => ({
+          x: node.x - 8,
+          y: node.y - 8,
+          width: node.width + 16,
+          height: node.height + 16,
+          role:
+            node.id === edge.from.nodeId
+              ? ('source' as const)
+              : node.id === edge.to.nodeId
+                ? ('target' as const)
+                : ('other' as const),
+        }));
+
+      edge.updateEndpoints(fromPoint, toPoint, fromDir, toDir, { obstacles });
     }
   }
 

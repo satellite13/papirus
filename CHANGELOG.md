@@ -7,6 +7,17 @@
 
 ## [Unreleased]
 
+## [0.3.4] - 2026-02-19
+
+### Added
+- Разрешено создавать self-loop связи (из ноды в саму себя) через `ConnectionManager`.
+- Для `polyline` добавлен obstacle-aware ортогональный роутинг с обходом фигур: используется расширение препятствий (`margin = 12`), штраф за повороты и приоритет горизонтального первого шага.
+- Для `bezier` добавлены правила self-loop/углового обхода, чтобы путь не проходил под фигурой в коротких локальных связях.
+
+### Changed
+- Порядок отрисовки в `DiagramRenderer` обновлён: рёбра теперь рендерятся поверх фигур (nodes), а handles рёбер остаются верхним слоем.
+- Специальные правила обхода для `bezier` и `polyline` ограничены self-loop сценариями там, где это требуется.
+
 ## [0.3.3] - 2026-02-19
 
 ### Fixed
@@ -74,7 +85,8 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.3.3...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.3.4...HEAD
+[0.3.4]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.4
 [0.3.3]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.3
 [0.3.2]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.2
 [0.3.1]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.1

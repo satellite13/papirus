@@ -1,8 +1,302 @@
 import type { Point } from '@/types';
-import type { PathStrategy, PathStrategyOptions } from './PathStrategy';
+import type { PathStrategy, PathStrategyOptions, PathObstacle } from './PathStrategy';
 import { distanceToSegment } from '@/utils/geometry';
 
 const MIN_SEGMENT_LENGTH = 20;
+const SELF_LOOP_MIN_DISTANCE = 1;
+const SELF_LOOP_OFFSET = 42;
+const SELF_LOOP_SPREAD = 20;
+const CORNER_BYPASS_DISTANCE = 220;
+const CORNER_BYPASS_CLEARANCE = 34;
+const OPPOSITE_BYPASS_DISTANCE = 280;
+const OPPOSITE_BYPASS_CLEARANCE = 36;
+const OPPOSITE_BYPASS_ARC = 48;
+const OBSTACLE_ROUTING_DISTANCE = 1200;
+const OBSTACLE_MARGIN = 12;
+const ROUTE_EXIT_DISTANCE = 32;
+const TURN_PENALTY = 70;
+const FIRST_VERTICAL_PENALTY = 28;
+
+function isHorizontal(dir?: string): boolean {
+  return dir === 'left' || dir === 'right';
+}
+
+function isVertical(dir?: string): boolean {
+  return dir === 'top' || dir === 'bottom';
+}
+
+function isOppositeDirections(fromDir?: string, toDir?: string): boolean {
+  return (
+    (fromDir === 'left' && toDir === 'right') ||
+    (fromDir === 'right' && toDir === 'left') ||
+    (fromDir === 'top' && toDir === 'bottom') ||
+    (fromDir === 'bottom' && toDir === 'top')
+  );
+}
+
+function expandObstacles(obstacles: PathObstacle[], margin: number): PathObstacle[] {
+  return obstacles.map((obstacle) => ({
+    ...obstacle,
+    x: obstacle.x - margin,
+    y: obstacle.y - margin,
+    width: obstacle.width + margin * 2,
+    height: obstacle.height + margin * 2,
+  }));
+}
+
+function pointInsideObstacle(point: Point, obstacle: PathObstacle): boolean {
+  return (
+    point.x >= obstacle.x &&
+    point.x <= obstacle.x + obstacle.width &&
+    point.y >= obstacle.y &&
+    point.y <= obstacle.y + obstacle.height
+  );
+}
+
+function segmentIntersectsExpandedObstacle(a: Point, b: Point, obstacle: PathObstacle): boolean {
+  const minX = obstacle.x;
+  const maxX = obstacle.x + obstacle.width;
+  const minY = obstacle.y;
+  const maxY = obstacle.y + obstacle.height;
+
+  if (Math.abs(a.x - b.x) < 0.001) {
+    const x = a.x;
+    const y1 = Math.min(a.y, b.y);
+    const y2 = Math.max(a.y, b.y);
+    return x >= minX && x <= maxX && y2 >= minY && y1 <= maxY;
+  }
+
+  if (Math.abs(a.y - b.y) < 0.001) {
+    const y = a.y;
+    const x1 = Math.min(a.x, b.x);
+    const x2 = Math.max(a.x, b.x);
+    return y >= minY && y <= maxY && x2 >= minX && x1 <= maxX;
+  }
+
+  return false;
+}
+
+function simplifyPath(path: Point[]): Point[] {
+  const out: Point[] = [];
+  for (const point of path) {
+    const prev = out[out.length - 1];
+    if (!prev || Math.abs(prev.x - point.x) > 0.001 || Math.abs(prev.y - point.y) > 0.001) {
+      out.push(point);
+    }
+  }
+  return out;
+}
+
+function manhattan(a: Point, b: Point): number {
+  return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+}
+
+function moveByDir(point: Point, dir: string | undefined, distance: number): Point {
+  switch (dir) {
+    case 'top':
+      return { x: point.x, y: point.y - distance };
+    case 'bottom':
+      return { x: point.x, y: point.y + distance };
+    case 'left':
+      return { x: point.x - distance, y: point.y };
+    case 'right':
+      return { x: point.x + distance, y: point.y };
+    default:
+      return point;
+  }
+}
+
+function inferDir(from: Point, to: Point): string {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  // Prefer horizontal decisions when comparable.
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    return dx >= 0 ? 'right' : 'left';
+  }
+  return dy >= 0 ? 'bottom' : 'top';
+}
+
+function oppositeDir(dir: string): string {
+  switch (dir) {
+    case 'left':
+      return 'right';
+    case 'right':
+      return 'left';
+    case 'top':
+      return 'bottom';
+    case 'bottom':
+      return 'top';
+    default:
+      return dir;
+  }
+}
+
+function buildRoutedPolyline(
+  from: Point,
+  to: Point,
+  fromDir: string | undefined,
+  toDir: string | undefined,
+  obstacles: PathObstacle[]
+): Point[] | null {
+  if (obstacles.length === 0) {
+    return null;
+  }
+
+  const effectiveFromDir = fromDir ?? inferDir(from, to);
+  const effectiveToDir = toDir ?? oppositeDir(effectiveFromDir);
+
+  const startExit = moveByDir(from, effectiveFromDir, ROUTE_EXIT_DISTANCE);
+  const endEntry = moveByDir(to, effectiveToDir, ROUTE_EXIT_DISTANCE);
+  const expanded = expandObstacles(obstacles, OBSTACLE_MARGIN);
+
+  const xs = new Set<number>([startExit.x, endEntry.x]);
+  const ys = new Set<number>([startExit.y, endEntry.y]);
+  for (const obstacle of expanded) {
+    xs.add(obstacle.x - 1);
+    xs.add(obstacle.x + obstacle.width + 1);
+    ys.add(obstacle.y - 1);
+    ys.add(obstacle.y + obstacle.height + 1);
+  }
+
+  type GraphNode = { x: number; y: number };
+  const nodes: GraphNode[] = [];
+  const nodeIndex = new Map<string, number>();
+  const nodeKey = (x: number, y: number): string => `${x}|${y}`;
+  const addNode = (x: number, y: number): void => {
+    const key = nodeKey(x, y);
+    if (nodeIndex.has(key)) return;
+    const point = { x, y };
+    if (expanded.some((obstacle) => pointInsideObstacle(point, obstacle))) {
+      return;
+    }
+    nodeIndex.set(key, nodes.length);
+    nodes.push(point);
+  };
+
+  for (const x of xs) {
+    for (const y of ys) {
+      addNode(x, y);
+    }
+  }
+  addNode(startExit.x, startExit.y);
+  addNode(endEntry.x, endEntry.y);
+
+  const startIdx = nodeIndex.get(nodeKey(startExit.x, startExit.y));
+  const goalIdx = nodeIndex.get(nodeKey(endEntry.x, endEntry.y));
+  if (startIdx == null || goalIdx == null) {
+    return null;
+  }
+
+  const edges = new Map<number, Array<{ to: number; dir: 'h' | 'v'; length: number }>>();
+  const pushEdge = (a: number, b: number, dir: 'h' | 'v', length: number): void => {
+    const list = edges.get(a) ?? [];
+    list.push({ to: b, dir, length });
+    edges.set(a, list);
+  };
+
+  const byX = new Map<number, number[]>();
+  const byY = new Map<number, number[]>();
+  for (let i = 0; i < nodes.length; i++) {
+    const node = nodes[i]!;
+    const xsList = byX.get(node.x) ?? [];
+    xsList.push(i);
+    byX.set(node.x, xsList);
+    const ysList = byY.get(node.y) ?? [];
+    ysList.push(i);
+    byY.set(node.y, ysList);
+  }
+
+  for (const list of byX.values()) {
+    list.sort((a, b) => nodes[a]!.y - nodes[b]!.y);
+    for (let i = 1; i < list.length; i++) {
+      const a = nodes[list[i - 1]!]!;
+      const b = nodes[list[i]!]!;
+      if (!expanded.some((obstacle) => segmentIntersectsExpandedObstacle(a, b, obstacle))) {
+        const length = manhattan(a, b);
+        pushEdge(list[i - 1]!, list[i]!, 'v', length);
+        pushEdge(list[i]!, list[i - 1]!, 'v', length);
+      }
+    }
+  }
+  for (const list of byY.values()) {
+    list.sort((a, b) => nodes[a]!.x - nodes[b]!.x);
+    for (let i = 1; i < list.length; i++) {
+      const a = nodes[list[i - 1]!]!;
+      const b = nodes[list[i]!]!;
+      if (!expanded.some((obstacle) => segmentIntersectsExpandedObstacle(a, b, obstacle))) {
+        const length = manhattan(a, b);
+        pushEdge(list[i - 1]!, list[i]!, 'h', length);
+        pushEdge(list[i]!, list[i - 1]!, 'h', length);
+      }
+    }
+  }
+
+  type DirState = 'h' | 'v' | 's';
+  type QueueState = { node: number; dir: DirState; g: number; f: number; key: string };
+  const makeStateKey = (node: number, dir: DirState): string => `${node}:${dir}`;
+  const open: QueueState[] = [];
+  const best = new Map<string, number>();
+  const prev = new Map<string, string>();
+  const startKey = makeStateKey(startIdx, 's');
+  best.set(startKey, 0);
+  open.push({
+    node: startIdx,
+    dir: 's',
+    g: 0,
+    f: manhattan(nodes[startIdx]!, nodes[goalIdx]!),
+    key: startKey,
+  });
+
+  let goalKey: string | null = null;
+  while (open.length > 0) {
+    let bestIdx = 0;
+    for (let i = 1; i < open.length; i++) {
+      if (open[i]!.f < open[bestIdx]!.f) bestIdx = i;
+    }
+    const current = open.splice(bestIdx, 1)[0]!;
+    if (current.node === goalIdx) {
+      goalKey = current.key;
+      break;
+    }
+
+    for (const edge of edges.get(current.node) ?? []) {
+      const nextDir = edge.dir;
+      let stepCost = edge.length;
+      if (current.dir !== 's' && current.dir !== nextDir) {
+        stepCost += TURN_PENALTY;
+      }
+      if (current.dir === 's' && nextDir === 'v') {
+        stepCost += FIRST_VERTICAL_PENALTY;
+      }
+      const nextG = current.g + stepCost;
+      const nextKey = makeStateKey(edge.to, nextDir);
+      if (nextG >= (best.get(nextKey) ?? Infinity)) {
+        continue;
+      }
+      best.set(nextKey, nextG);
+      prev.set(nextKey, current.key);
+      const h = manhattan(nodes[edge.to]!, nodes[goalIdx]!);
+      open.push({ node: edge.to, dir: nextDir, g: nextG, f: nextG + h, key: nextKey });
+    }
+  }
+
+  if (!goalKey) {
+    return null;
+  }
+
+  const routed: Point[] = [];
+  let cursor: string | undefined = goalKey;
+  while (cursor) {
+    const [nodePart] = cursor.split(':');
+    const node = nodes[Number(nodePart)]!;
+    routed.push({ x: node.x, y: node.y });
+    cursor = prev.get(cursor);
+  }
+  routed.reverse();
+
+  const internal = simplifyPath(routed).filter((_, idx, arr) => idx !== 0 && idx !== arr.length - 1);
+  return simplifyPath([from, startExit, ...internal, endEntry, to]);
+}
 
 /**
  * Polyline path strategy
@@ -15,6 +309,105 @@ export class PolylinePathStrategy implements PathStrategy {
     toDir?: string,
     _options?: PathStrategyOptions
   ): Point[] {
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    const selfLoop = _options?.selfLoop ?? false;
+    const obstacles = _options?.obstacles ?? [];
+
+    if (!selfLoop && distance < OBSTACLE_ROUTING_DISTANCE) {
+      const routed = buildRoutedPolyline(from, to, fromDir, toDir, obstacles);
+      if (routed) {
+        return routed;
+      }
+    }
+    if (selfLoop && distance < SELF_LOOP_MIN_DISTANCE && (fromDir || toDir)) {
+      const dir = fromDir ?? toDir;
+      switch (dir) {
+        case 'bottom':
+          return [
+            from,
+            { x: from.x - SELF_LOOP_SPREAD, y: from.y + SELF_LOOP_OFFSET },
+            { x: from.x + SELF_LOOP_SPREAD, y: from.y + SELF_LOOP_OFFSET },
+            to,
+          ];
+        case 'left':
+          return [
+            from,
+            { x: from.x - SELF_LOOP_OFFSET, y: from.y + SELF_LOOP_SPREAD },
+            { x: from.x - SELF_LOOP_OFFSET, y: from.y - SELF_LOOP_SPREAD },
+            to,
+          ];
+        case 'right':
+          return [
+            from,
+            { x: from.x + SELF_LOOP_OFFSET, y: from.y - SELF_LOOP_SPREAD },
+            { x: from.x + SELF_LOOP_OFFSET, y: from.y + SELF_LOOP_SPREAD },
+            to,
+          ];
+        case 'top':
+        default:
+          return [
+            from,
+            { x: from.x + SELF_LOOP_SPREAD, y: from.y - SELF_LOOP_OFFSET },
+            { x: from.x - SELF_LOOP_SPREAD, y: from.y - SELF_LOOP_OFFSET },
+            to,
+          ];
+      }
+    }
+
+    if (selfLoop && distance < OPPOSITE_BYPASS_DISTANCE && fromDir && toDir && isOppositeDirections(fromDir, toDir)) {
+      if (isHorizontal(fromDir) && isHorizontal(toDir)) {
+        const fromStepX = fromDir === 'left' ? -OPPOSITE_BYPASS_CLEARANCE : OPPOSITE_BYPASS_CLEARANCE;
+        const toStepX = toDir === 'left' ? -OPPOSITE_BYPASS_CLEARANCE : OPPOSITE_BYPASS_CLEARANCE;
+        const sideY = from.x <= to.x ? -1 : 1;
+        const outerY = from.y + sideY * OPPOSITE_BYPASS_ARC;
+        return [
+          from,
+          { x: from.x + fromStepX, y: from.y },
+          { x: from.x + fromStepX, y: outerY },
+          { x: to.x + toStepX, y: outerY },
+          { x: to.x + toStepX, y: to.y },
+          to,
+        ];
+      }
+      if (isVertical(fromDir) && isVertical(toDir)) {
+        const fromStepY = fromDir === 'top' ? -OPPOSITE_BYPASS_CLEARANCE : OPPOSITE_BYPASS_CLEARANCE;
+        const toStepY = toDir === 'top' ? -OPPOSITE_BYPASS_CLEARANCE : OPPOSITE_BYPASS_CLEARANCE;
+        const sideX = from.y <= to.y ? 1 : -1;
+        const outerX = from.x + sideX * OPPOSITE_BYPASS_ARC;
+        return [
+          from,
+          { x: from.x, y: from.y + fromStepY },
+          { x: outerX, y: from.y + fromStepY },
+          { x: outerX, y: to.y + toStepY },
+          { x: to.x, y: to.y + toStepY },
+          to,
+        ];
+      }
+    }
+
+    if (
+      selfLoop &&
+      distance < CORNER_BYPASS_DISTANCE &&
+      fromDir &&
+      toDir &&
+      ((isHorizontal(fromDir) && isVertical(toDir)) || (isVertical(fromDir) && isHorizontal(toDir)))
+    ) {
+      const fromOuter = {
+        x: from.x + (fromDir === 'left' ? -CORNER_BYPASS_CLEARANCE : fromDir === 'right' ? CORNER_BYPASS_CLEARANCE : 0),
+        y: from.y + (fromDir === 'top' ? -CORNER_BYPASS_CLEARANCE : fromDir === 'bottom' ? CORNER_BYPASS_CLEARANCE : 0),
+      };
+      const toOuter = {
+        x: to.x + (toDir === 'left' ? -CORNER_BYPASS_CLEARANCE : toDir === 'right' ? CORNER_BYPASS_CLEARANCE : 0),
+        y: to.y + (toDir === 'top' ? -CORNER_BYPASS_CLEARANCE : toDir === 'bottom' ? CORNER_BYPASS_CLEARANCE : 0),
+      };
+      const corner = isHorizontal(fromDir)
+        ? { x: fromOuter.x, y: toOuter.y }
+        : { x: toOuter.x, y: fromOuter.y };
+      return [from, fromOuter, corner, toOuter, to];
+    }
+
     // If directions are specified, route accordingly
     if (fromDir || toDir) {
       return this.calculateDirectedPath(from, to, fromDir, toDir);

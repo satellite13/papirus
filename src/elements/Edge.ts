@@ -14,6 +14,7 @@ import { shallowEqual } from '@/utils/style';
 import { bezierPoint } from '@/utils/geometry';
 import {
   type PathStrategy,
+  type PathStrategyOptions,
   StraightPathStrategy,
   PolylinePathStrategy,
   BezierPathStrategy,
@@ -73,6 +74,7 @@ export class Edge extends Element {
   private _autoUpdateEndpoints = true;
   private _lockAnchors: boolean;
   private _controlPoints?: Point[];
+  private _pathOptions?: PathStrategyOptions;
 
   // Cached positions for rendering
   private _fromPoint: Point = { x: 0, y: 0 };
@@ -355,12 +357,14 @@ export class Edge extends Element {
     fromPoint: Point,
     toPoint: Point,
     fromDir?: string,
-    toDir?: string
+    toDir?: string,
+    options?: PathStrategyOptions
   ): void {
     this._fromPoint = fromPoint;
     this._toPoint = toPoint;
     this._fromDir = fromDir;
     this._toDir = toDir;
+    this._pathOptions = options;
     this.recalculatePath();
   }
 
@@ -374,7 +378,9 @@ export class Edge extends Element {
       this._fromDir,
       this._toDir,
       {
+        ...this._pathOptions,
         controlPoints: this._controlPoints,
+        selfLoop: this._from.nodeId === this._to.nodeId,
       }
     );
     this.updateBounds();

@@ -322,16 +322,6 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
   }
 
   /**
-   * Get the node ID at the other end of the reconnecting edge
-   */
-  private getOtherNodeId(): string | null {
-    if (!this.reconnectingEdge) return null;
-    return this.reconnectingEndpoint === 'start'
-      ? this.reconnectingEdge.to.nodeId
-      : this.reconnectingEdge.from.nodeId;
-  }
-
-  /**
    * Handle mouse up to complete or cancel connection
    */
   handleMouseUp(event: InputEvent): boolean {
@@ -396,14 +386,15 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
         this._connectionValidator(this.sourceNode!.id, targetNode.id);
       if (allowed) {
         // Create the edge
-        const targetAnchor = targetNode.getNearestAnchor(point);
+        const nearestTargetAnchor = targetNode.getNearestAnchor(point);
+        const sourceAnchorId = this.sourceAnchorId;
         const from: EdgeEndpoint = {
           nodeId: this.sourceNode!.id,
-          portId: this.sourceAnchorId ? `${ANCHOR_PORT_PREFIX}${this.sourceAnchorId}` : undefined,
+          portId: sourceAnchorId ? `${ANCHOR_PORT_PREFIX}${sourceAnchorId}` : undefined,
         };
         const to: EdgeEndpoint = {
           nodeId: targetNode.id,
-          portId: targetAnchor ? `${ANCHOR_PORT_PREFIX}${targetAnchor.id}` : undefined,
+          portId: nearestTargetAnchor ? `${ANCHOR_PORT_PREFIX}${nearestTargetAnchor.id}` : undefined,
         };
 
         createdEdge = this.createEdge(from, to);
@@ -536,9 +527,9 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     ctx.stroke();
   }
 
-  private isCompatibleTarget(node: Node): boolean {
-    // Can't connect to same node
-    return node.id !== this.sourceNode?.id;
+  private isCompatibleTarget(_node: Node): boolean {
+    // Self-loop edges are allowed.
+    return true;
   }
 
   private setCursor(cursor: string): void {
@@ -690,10 +681,6 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
       }
 
       if (reconnecting) {
-        const otherId = this.getOtherNodeId();
-        if (otherId && node.id === otherId) {
-          continue;
-        }
         return node;
       }
 

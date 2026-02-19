@@ -25,6 +25,149 @@ describe('Edge', () => {
     expect(edge.path.length).toBe(4);
   });
 
+  it('builds an outer self-loop for bezier edges', () => {
+    const edge = new Edge({
+      from: { nodeId: 'a', portId: 'anchor:top:1' },
+      to: { nodeId: 'a', portId: 'anchor:top:1' },
+      type: 'bezier',
+    });
+
+    edge.updateEndpoints(
+      { x: 100, y: 100 },
+      { x: 100, y: 100 },
+      'top',
+      'top'
+    );
+
+    expect(edge.path.length).toBe(4);
+    expect(edge.path[0]).toEqual({ x: 100, y: 100 });
+    expect(edge.path[3]).toEqual({ x: 100, y: 100 });
+    expect(edge.path[1]!.y).toBeLessThan(100);
+    expect(edge.path[2]!.y).toBeLessThan(100);
+  });
+
+  it('routes close orthogonal bezier anchors around outer corner', () => {
+    const edge = new Edge({
+      from: { nodeId: 'a', portId: 'anchor:left:1' },
+      to: { nodeId: 'a', portId: 'anchor:bottom:1' },
+      type: 'bezier',
+    });
+
+    edge.updateEndpoints(
+      { x: 100, y: 120 }, // left anchor
+      { x: 130, y: 150 }, // bottom anchor
+      'left',
+      'bottom'
+    );
+
+    expect(edge.path.length).toBe(4);
+    // Both control points should stay outside the node corner area.
+    expect(edge.path[1]!.x).toBeLessThan(100);
+    expect(edge.path[2]!.y).toBeGreaterThan(150);
+  });
+
+  it('routes close opposite bezier anchors outside the node', () => {
+    const edge = new Edge({
+      from: { nodeId: 'a', portId: 'anchor:left:1' },
+      to: { nodeId: 'a', portId: 'anchor:right:1' },
+      type: 'bezier',
+    });
+
+    edge.updateEndpoints(
+      { x: 100, y: 120 }, // left anchor
+      { x: 160, y: 120 }, // right anchor
+      'left',
+      'right'
+    );
+
+    expect(edge.path.length).toBe(4);
+    // Both control points should be shifted vertically to create an outer arc.
+    expect(edge.path[1]!.y).toBeLessThan(120);
+    expect(edge.path[2]!.y).toBeLessThan(120);
+  });
+
+  it('routes close opposite polyline anchors outside the node', () => {
+    const edge = new Edge({
+      from: { nodeId: 'a', portId: 'anchor:left:1' },
+      to: { nodeId: 'a', portId: 'anchor:right:1' },
+      type: 'polyline',
+    });
+
+    edge.updateEndpoints(
+      { x: 100, y: 120 },
+      { x: 160, y: 120 },
+      'left',
+      'right'
+    );
+
+    expect(edge.path.length).toBe(6);
+    // Route should rise above the node instead of crossing center line.
+    expect(edge.path[2]!.y).toBeLessThan(120);
+    expect(edge.path[3]!.y).toBeLessThan(120);
+  });
+
+  it('keeps default polyline routing for non-self-loop opposite anchors', () => {
+    const edge = new Edge({
+      from: { nodeId: 'a', portId: 'anchor:left:1' },
+      to: { nodeId: 'b', portId: 'anchor:right:1' },
+      type: 'polyline',
+    });
+
+    edge.updateEndpoints(
+      { x: 100, y: 120 },
+      { x: 160, y: 120 },
+      'left',
+      'right'
+    );
+
+    // No self-loop bypass: standard directed path shape.
+    expect(edge.path.length).toBe(4);
+  });
+
+  it('routes polyline around obstacle rectangles', () => {
+    const edge = new Edge({
+      from: { nodeId: 'a', portId: 'anchor:right:1' },
+      to: { nodeId: 'b', portId: 'anchor:left:1' },
+      type: 'polyline',
+    });
+
+    edge.updateEndpoints(
+      { x: 100, y: 120 },
+      { x: 240, y: 120 },
+      'right',
+      'left',
+      {
+        obstacles: [
+          { x: 150, y: 90, width: 40, height: 60 },
+        ],
+      }
+    );
+
+    expect(edge.path.length).toBeGreaterThan(4);
+    // Route should detour vertically instead of crossing through obstacle band.
+    expect(edge.path.some((p) => p.y < 90 || p.y > 150)).toBe(true);
+  });
+
+  it('routes close orthogonal polyline anchors around outer corner', () => {
+    const edge = new Edge({
+      from: { nodeId: 'a', portId: 'anchor:left:1' },
+      to: { nodeId: 'a', portId: 'anchor:bottom:1' },
+      type: 'polyline',
+    });
+
+    edge.updateEndpoints(
+      { x: 100, y: 120 },
+      { x: 130, y: 150 },
+      'left',
+      'bottom'
+    );
+
+    expect(edge.path.length).toBe(5);
+    const corner = edge.path[2]!;
+    expect(corner.x).toBeLessThan(100);
+    expect(corner.y).toBeGreaterThan(150);
+  });
+
   it('supports custom control points for bezier paths', () => {
     const edge = new Edge({
       from: { nodeId: 'a' },
