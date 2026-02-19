@@ -14,8 +14,8 @@ export interface SvgExportOptions {
   backgroundColor?: string;
   includeBackground?: boolean;
   /**
-   * Global Y-offset for edge labels in SVG export.
-   * Does not use runtime edge.labelOffset unless explicitly passed here.
+   * Global Y-offset override for edge labels in SVG export.
+   * If omitted, exporter uses each edge's runtime labelOffset.
    */
   edgeLabelOffset?: number;
 }
@@ -34,7 +34,7 @@ export class SvgExporter {
     const padding = options.padding ?? 20;
     const includeBackground = options.includeBackground ?? true;
     const backgroundColor = options.backgroundColor ?? '#ffffff';
-    const edgeLabelOffset = options.edgeLabelOffset ?? 0;
+    const edgeLabelOffset = options.edgeLabelOffset;
 
     const bounds = getContentBounds({
       nodes: this.renderer.nodes.values(),
@@ -172,7 +172,7 @@ export class SvgExporter {
     ].join('');
   }
 
-  private renderEdge(edge: Edge, edgeLabelOffset: number): string {
+  private renderEdge(edge: Edge, edgeLabelOffset?: number): string {
     const path = edge.path;
     if (path.length < 2) {
       return '';
@@ -386,11 +386,12 @@ export class SvgExporter {
     return path[0]!;
   }
 
-  private getEdgeLabelPoint(edge: Edge, edgeLabelOffset: number): Point {
+  private getEdgeLabelPoint(edge: Edge, edgeLabelOffset?: number): Point {
     const midpoint = this.getPathMidpoint(edge);
+    const effectiveOffset = edgeLabelOffset ?? edge.labelOffset ?? 0;
     return {
       x: midpoint.x,
-      y: midpoint.y + edgeLabelOffset,
+      y: midpoint.y + effectiveOffset,
     };
   }
 

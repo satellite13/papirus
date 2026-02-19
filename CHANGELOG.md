@@ -7,6 +7,14 @@
 
 ## [Unreleased]
 
+## [0.3.3] - 2026-02-19
+
+### Fixed
+- Исправлен `SVG`-экспорт меток рёбер: при отсутствии `SvgExportOptions.edgeLabelOffset` теперь используется runtime-значение `edge.labelOffset` для каждой связи.
+
+### Added
+- В пример `examples/basic` добавлена настройка `Label Offset` для интерактивной регулировки смещения метки ребра.
+
 ## [0.3.2] - 2026-02-19
 
 ### Fixed
@@ -66,7 +74,8 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.3.2...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.3.3...HEAD
+[0.3.3]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.3
 [0.3.2]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.2
 [0.3.1]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.1
 [0.3.0]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.0

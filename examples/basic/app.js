@@ -465,6 +465,7 @@ function updateEdgePanel(edge) {
   document.getElementById('edgeStrokeColor').value = style.strokeColor || '#666666';
   document.getElementById('edgeStrokeColorText').value = style.strokeColor || '#666666';
   document.getElementById('edgeStrokeWidth').value = style.strokeWidth || 2;
+  document.getElementById('edgeLabelOffset').value = edge.labelOffset ?? 0;
   document.getElementById('edgeStartMarker').value = edge.startMarker?.type || 'none';
   document.getElementById('edgeStartMarkerSize').value = edge.startMarker?.size || 12;
   document.getElementById('edgeEndMarker').value = edge.endMarker?.type || 'open';
@@ -692,6 +693,14 @@ document.getElementById('edgeStrokeWidth').addEventListener('input', (e) => {
   if (selectedEdge) {
     interactions.changeEdgeProperties(selectedEdge.id, (edge) => {
       edge.style = { ...edge.style, strokeWidth: parseFloat(e.target.value) };
+    });
+  }
+});
+
+document.getElementById('edgeLabelOffset').addEventListener('input', (e) => {
+  if (selectedEdge) {
+    interactions.changeEdgeProperties(selectedEdge.id, (edge) => {
+      edge.labelOffset = parseFloat(e.target.value) || 0;
     });
   }
 });
