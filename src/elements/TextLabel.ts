@@ -32,8 +32,8 @@ export class TextLabel {
   private _localStyle: TextStyle;
   private _maxWidth?: number;
   private _autoMaxWidth?: number;
-  private readonly _padding: number;
-  private readonly _margin: number;
+  private _padding: number;
+  private _margin: number;
   private _lines: string[] = [];
   private _measuredWidth = 0;
   private _measuredHeight = 0;
@@ -135,11 +135,31 @@ export class TextLabel {
     return this._padding;
   }
 
+  set padding(value: number) {
+    const next = Number.isFinite(value) ? Math.max(0, value) : this._padding;
+    if (this._padding !== next) {
+      this._padding = next;
+      this._lines = [];
+      this._measureDirty = true;
+      this._onChange?.();
+    }
+  }
+
   /**
    * Label margin
    */
   get margin(): number {
     return this._margin;
+  }
+
+  set margin(value: number) {
+    const next = Number.isFinite(value) ? Math.max(0, value) : this._margin;
+    if (this._margin !== next) {
+      this._margin = next;
+      this._lines = [];
+      this._measureDirty = true;
+      this._onChange?.();
+    }
   }
 
   applyStyleManager(styleManager: StyleManager): void {

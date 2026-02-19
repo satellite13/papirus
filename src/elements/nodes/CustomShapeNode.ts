@@ -4,6 +4,7 @@ import type { Point } from '@/types';
 
 export interface CustomShapeNodeOptions extends NodeOptions {
   path: Path2D | ((width: number, height: number) => Path2D);
+  shapeType?: string;
 }
 
 /**
@@ -11,6 +12,7 @@ export interface CustomShapeNodeOptions extends NodeOptions {
  */
 export class CustomShapeNode extends Node {
   private _pathFactory: (width: number, height: number) => Path2D;
+  private _shapeType?: string;
   private _cachedPath: Path2D | null = null;
   private _cachedWidth = 0;
   private _cachedHeight = 0;
@@ -24,10 +26,22 @@ export class CustomShapeNode extends Node {
     } else {
       this._pathFactory = options.path;
     }
+    this._shapeType = options.shapeType;
   }
 
   get typeName(): string {
     return 'custom';
+  }
+
+  get shapeType(): string | undefined {
+    return this._shapeType;
+  }
+
+  set shapeType(value: string | undefined) {
+    if (this._shapeType !== value) {
+      this._shapeType = value;
+      this.markDirty();
+    }
   }
 
   /**

@@ -27,6 +27,7 @@ export interface NodeOptions {
   ports?: PortOptions[];
   showPortsAlways?: boolean;
   anchorPoints?: AnchorPointsConfig;
+  resizeHandlesEnabled?: boolean;
 }
 
 export type ResizeHandle = 'nw' | 'ne' | 'se' | 'sw';
@@ -65,6 +66,7 @@ export abstract class Node extends Element {
   protected _anchorPoints: Required<AnchorPointsConfig>;
   protected _defaultSize: Size;
   protected _labelPlacement: LabelPlacement;
+  protected _resizeHandlesEnabled: boolean;
 
   protected constructor(options: NodeOptions) {
     super({
@@ -82,6 +84,7 @@ export abstract class Node extends Element {
     this._showPortsAlways = options.showPortsAlways ?? false;
     this._anchorPoints = this.normalizeAnchorPoints(options.anchorPoints);
     this._labelPlacement = options.labelPlacement ?? 'auto';
+    this._resizeHandlesEnabled = options.resizeHandlesEnabled ?? true;
 
     if (options.label !== undefined) {
       if (typeof options.label === 'string') {
@@ -264,6 +267,17 @@ export abstract class Node extends Element {
   set showPortsAlways(value: boolean) {
     if (this._showPortsAlways !== value) {
       this._showPortsAlways = value;
+      this.markDirty();
+    }
+  }
+
+  get resizeHandlesEnabled(): boolean {
+    return this._resizeHandlesEnabled;
+  }
+
+  set resizeHandlesEnabled(value: boolean) {
+    if (this._resizeHandlesEnabled !== value) {
+      this._resizeHandlesEnabled = value;
       this.markDirty();
     }
   }
@@ -496,7 +510,7 @@ export abstract class Node extends Element {
    * Render resize handles when selected
    */
   renderResizeHandles(ctx: CanvasRenderingContext2D): void {
-    if (this._state !== 'selected') {
+    if (this._state !== 'selected' || !this._resizeHandlesEnabled) {
       return;
     }
 
