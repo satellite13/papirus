@@ -445,6 +445,7 @@ function updateNodePanel(node) {
   document.getElementById('nodeLabelPadding').value = node.label?.padding ?? 8;
   document.getElementById('nodeLabelMargin').value = node.label?.margin ?? 0;
   document.getElementById('nodeLabelPlacement').value = node.labelPlacement || 'auto';
+  document.getElementById('nodeLabelAlign').value = node.label?.style?.align || 'center';
   document.getElementById('nodeIconPadding').value = node.icon?.options.padding ?? 8;
   document.getElementById('nodeIconMargin').value = node.icon?.options.margin ?? 0;
   document.getElementById('nodeIconGap').value = node.icon?.options.gap ?? 6;
@@ -567,6 +568,14 @@ document.getElementById('nodeLabelPlacement').addEventListener('change', (e) => 
   if (selectedNode) {
     interactions.changeNodeProperties(selectedNode.id, (node) => {
       node.labelPlacement = e.target.value;
+    });
+  }
+});
+
+document.getElementById('nodeLabelAlign').addEventListener('change', (e) => {
+  if (selectedNode?.label) {
+    interactions.changeNodeProperties(selectedNode.id, (node) => {
+      if (node.label) node.label.style = { ...node.label.style, align: e.target.value };
     });
   }
 });

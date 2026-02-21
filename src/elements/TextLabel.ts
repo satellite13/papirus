@@ -253,12 +253,17 @@ export class TextLabel {
   /**
    * Render the label within bounds
    */
-  render(ctx: CanvasRenderingContext2D, bounds: Bounds): void {
+  render(ctx: CanvasRenderingContext2D, bounds: Bounds, alignOverride?: 'left' | 'center' | 'right'): void {
     if (this._lines.length === 0) {
       this.measure(ctx);
     }
 
     this.applyStyle(ctx);
+
+    const align = alignOverride ?? this._style.align ?? 'center';
+    if (alignOverride) {
+      ctx.textAlign = align;
+    }
 
     const lineHeight = (this._style.fontSize ?? 14) * 1.2;
     const totalHeight = this._lines.length * lineHeight;
@@ -273,7 +278,7 @@ export class TextLabel {
 
     // Calculate starting position based on alignment
     let x: number;
-    switch (this._style.align) {
+    switch (align) {
       case 'left':
         x = innerBounds.x + this._padding;
         break;
