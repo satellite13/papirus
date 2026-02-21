@@ -17,6 +17,7 @@ import type {
 
 export interface LabelSnapshot {
   text: string;
+  editableText?: string;
   style?: TextStyle;
   styleClass?: string;
   maxWidth?: number;
@@ -63,6 +64,7 @@ const snapshotLabel = (label?: TextLabel): LabelSnapshot | undefined => {
   }
   return {
     text: label.text,
+    editableText: label.editableText,
     style: cloneValue(label.style),
     styleClass: label.styleClass,
     maxWidth: label.maxWidth,
@@ -78,6 +80,7 @@ const applyLabelSnapshot = (
   }
   if (current) {
     current.text = snapshot.text;
+    current.editableText = snapshot.editableText;
     current.style = snapshot.style ?? {};
     current.styleClass = snapshot.styleClass;
     current.maxWidth = snapshot.maxWidth;
@@ -85,6 +88,7 @@ const applyLabelSnapshot = (
   }
   return new TextLabel({
     text: snapshot.text,
+    editableText: snapshot.editableText,
     style: snapshot.style,
     styleClass: snapshot.styleClass,
     maxWidth: snapshot.maxWidth,

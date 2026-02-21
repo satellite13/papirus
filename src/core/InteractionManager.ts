@@ -468,7 +468,8 @@ export class InteractionManager {
     }
 
     if ('typeName' in hitElement) {
-      this.startInlineLabelEdit('node', hitElement.id, hitElement.label?.text ?? '', hitElement.getLabelPosition());
+      const editText = hitElement.label?.editableText ?? hitElement.label?.text ?? '';
+      this.startInlineLabelEdit('node', hitElement.id, editText, hitElement.getLabelPosition());
       return;
     }
 
@@ -656,7 +657,14 @@ export class InteractionManager {
           node.label = value;
           return;
         }
-        node.label.text = value;
+        if (node.label.editableText !== undefined) {
+          node.label.editableText = value;
+          // Keep display text in sync so external style panels that read `label.text`
+          // immediately reflect inline edits.
+          node.label.text = value;
+        } else {
+          node.label.text = value;
+        }
       });
       return;
     }

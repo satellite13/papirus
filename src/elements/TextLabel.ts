@@ -4,6 +4,7 @@ import { shallowEqual } from '@/utils/style';
 
 export interface TextLabelOptions {
   text: string;
+  editableText?: string;
   style?: TextStyle;
   maxWidth?: number;
   padding?: number;
@@ -28,6 +29,7 @@ const DEFAULT_STYLE: Required<TextStyle> = {
  */
 export class TextLabel {
   private _text: string;
+  private _editableText?: string;
   private _style: TextStyle;
   private _localStyle: TextStyle;
   private _maxWidth?: number;
@@ -43,6 +45,7 @@ export class TextLabel {
 
   constructor(options: TextLabelOptions) {
     this._text = options.text;
+    this._editableText = options.editableText;
     this._localStyle = { ...options.style };
     this._style = { ...DEFAULT_STYLE, ...options.style };
     this._maxWidth = options.maxWidth;
@@ -64,6 +67,21 @@ export class TextLabel {
       this._text = value;
       this._lines = [];
       this._measureDirty = true;
+      this._onChange?.();
+    }
+  }
+
+  /**
+   * Editable text shown in inline editor instead of display text.
+   * When set, double-click editing will use this value.
+   */
+  get editableText(): string | undefined {
+    return this._editableText;
+  }
+
+  set editableText(value: string | undefined) {
+    if (this._editableText !== value) {
+      this._editableText = value;
       this._onChange?.();
     }
   }
