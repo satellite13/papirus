@@ -1,7 +1,7 @@
 # Papirus
 
 [![npm version](https://img.shields.io/npm/v/%40ngroznykh%2Fpapirus.svg)](https://www.npmjs.com/package/@ngroznykh/papirus)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License: AGPL%20v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
 
 Papirus — библиотека на TypeScript для построения интерактивных 2D‑схем на HTML Canvas. Поддерживает узлы, связи, группы, стили, сериализацию, экспорт и интерактивность.
 
@@ -203,4 +203,12 @@ npm run test:coverage   # Тесты с покрытием
 
 ## Лицензия
 
-MIT — см. [LICENSE](./LICENSE).
+Проект использует dual licensing:
+
+- `AGPL-3.0-or-later` для open-source использования
+- Коммерческая лицензия для проприетарного/закрытого коммерческого использования
+
+См.:
+
+- [LICENSE](./LICENSE) / [LICENSE.ru.md](./LICENSE.ru.md)
+- [LICENSE_COMMERCIAL.md](./LICENSE_COMMERCIAL.md) / [LICENSE_COMMERCIAL.ru.md](./LICENSE_COMMERCIAL.ru.md)

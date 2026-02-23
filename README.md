@@ -1,7 +1,7 @@
 # Papirus
 
 [![npm version](https://img.shields.io/npm/v/%40ngroznykh%2Fpapirus.svg)](https://www.npmjs.com/package/@ngroznykh/papirus)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License: AGPL%20v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
 
 TypeScript library for building interactive 2D diagrams and flowcharts on HTML Canvas. Supports nodes, edges, groups, styling, serialization, export, and interactivity.
 
@@ -202,4 +202,12 @@ Key governance and contribution files:
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
+This project uses dual licensing:
+
+- `AGPL-3.0-or-later` for open-source usage
+- Commercial license for proprietary/closed-source commercial usage
+
+See:
+
+- [LICENSE](./LICENSE)
+- [LICENSE_COMMERCIAL.md](./LICENSE_COMMERCIAL.md)
