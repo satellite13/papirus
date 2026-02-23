@@ -4,7 +4,9 @@ import type { Edge } from '@/elements/Edge';
 import type { Node } from '@/elements/Node';
 import type { Group } from '@/elements/Group';
 import type { ArrowMarkerConfig, TextStyle } from '@/types';
+import type { NodeImageOptions, NodeImagePlacement } from '@/elements/NodeImage';
 import { ARROW_ANGLE } from '@/constants';
+import { EDGE_LABEL_BACKGROUND_PADDING, EDGE_LABEL_BACKGROUND_RADIUS } from '@/constants';
 import { applyStyleManagerToElements } from './applyStyleManager';
 import { getContentBounds } from './contentBounds';
 import { downloadBlob } from './download';
@@ -130,12 +132,17 @@ export class SvgExporter {
     const fill = style.fillColor ?? '#ffffff';
     const stroke = style.strokeColor ?? '#333333';
     const strokeWidth = style.strokeWidth ?? 2;
-    const opacity = style.opacity ?? 1;
+    const baseOpacity = style.opacity ?? 1;
+    const fillOpacity = (style.fillOpacity ?? 1) * baseOpacity;
+    const strokeOpacity = (style.strokeOpacity ?? 1) * baseOpacity;
+    const dash = style.lineDash?.length ? ` stroke-dasharray="${style.lineDash.join(' ')}"` : '';
+    const dashOffset =
+      style.lineDashOffset !== undefined ? ` stroke-dashoffset="${style.lineDashOffset}"` : '';
 
     let shape: string;
     switch (node.typeName) {
       case 'rectangle': {
-        const radius = (style.cornerRadius ?? 0).toString();
+        const radius = this.getNodeCornerRadius(node, bounds);
         shape = `<rect x="${bounds.x}" y="${bounds.y}" width="${bounds.width}" height="${bounds.height}" rx="${radius}" ry="${radius}"`;
         break;
       }
@@ -162,12 +169,12 @@ export class SvgExporter {
       }
     }
 
-    const label = node.label
-      ? this.renderTextLabel(node.label.text, node.getCenter(), node.label.style)
-      : '';
+    const label = this.renderNodeLabel(node, bounds);
+    const icon = this.renderNodeIcon(node, bounds);
 
     return [
-      `${shape} fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}" opacity="${opacity}"/>`,
+      `${shape} fill="${fill}" fill-opacity="${fillOpacity}" stroke="${stroke}" stroke-width="${strokeWidth}" stroke-opacity="${strokeOpacity}"${dash}${dashOffset}/>`,
+      icon,
       label,
     ].join('');
   }
@@ -181,7 +188,9 @@ export class SvgExporter {
     const style = edge.style;
     const stroke = style.strokeColor ?? '#666666';
     const strokeWidth = style.strokeWidth ?? 2;
-    const opacity = style.opacity ?? 1;
+    const strokeOpacity = (style.strokeOpacity ?? 1) * (style.opacity ?? 1);
+    const lineCap = style.lineCap ? ` stroke-linecap="${style.lineCap}"` : '';
+    const lineJoin = style.lineJoin ? ` stroke-linejoin="${style.lineJoin}"` : '';
     const dashValues = style.flowDash ?? style.lineDash;
     const dash = dashValues ? ` stroke-dasharray="${dashValues.join(' ')}"` : '';
     const dashOffset =
@@ -189,12 +198,81 @@ export class SvgExporter {
 
     const d = this.buildPath(edge);
     const markerShapes = this.renderEdgeMarkers(edge, stroke);
+    const label = this.renderEdgeLabel(edge, edgeLabelOffset);
 
-    const label = edge.label
-      ? this.renderTextLabel(edge.label.text, this.getEdgeLabelPoint(edge, edgeLabelOffset), edge.label.style)
-      : '';
+    return `<path d="${d}" fill="none" stroke="${stroke}" stroke-width="${strokeWidth}" stroke-opacity="${strokeOpacity}" color="${stroke}"${lineCap}${lineJoin}${dash}${dashOffset}/>${markerShapes}${label}`;
+  }
 
-    return `<path d="${d}" fill="none" stroke="${stroke}" stroke-width="${strokeWidth}" opacity="${opacity}" color="${stroke}"${dash}${dashOffset}/>${markerShapes}${label}`;
+  private renderEdgeLabel(edge: Edge, edgeLabelOffset?: number): string {
+    if (!edge.label) {
+      return '';
+    }
+
+    const labelPoint = this.getEdgeLabelPoint(edge, edgeLabelOffset);
+    const text = this.renderTextLabel(edge.label.text, labelPoint, edge.label.style);
+    const bg = this.renderEdgeLabelBackground(edge, labelPoint);
+    return `${bg}${text}`;
+  }
+
+  private renderEdgeLabelBackground(edge: Edge, point: Point): string {
+    if (!edge.label) {
+      return '';
+    }
+
+    const metrics = this.measureTextLabel(edge.label.text, edge.label.style, edge.label.padding, edge.label.margin);
+    const bgPadding = edge.labelBackground?.padding ?? EDGE_LABEL_BACKGROUND_PADDING;
+    const bgColor = edge.labelBackground?.color ?? '#ffffff';
+    const bgOpacity = edge.labelBackground?.opacity ?? 1;
+    const bgRadius = edge.labelBackground?.borderRadius ?? EDGE_LABEL_BACKGROUND_RADIUS;
+
+    const x = point.x - metrics.width / 2 - bgPadding;
+    const y = point.y - metrics.height / 2 - bgPadding;
+    const width = metrics.width + bgPadding * 2;
+    const height = metrics.height + bgPadding * 2;
+    const radius = Math.max(0, Math.min(bgRadius, width / 2, height / 2));
+
+    if (radius <= 0) {
+      return `<rect x="${x}" y="${y}" width="${width}" height="${height}" fill="${bgColor}" fill-opacity="${bgOpacity}"/>`;
+    }
+
+    return `<rect x="${x}" y="${y}" width="${width}" height="${height}" rx="${radius}" ry="${radius}" fill="${bgColor}" fill-opacity="${bgOpacity}"/>`;
+  }
+
+  private measureTextLabel(
+    text: string,
+    style: TextStyle = {},
+    padding = 8,
+    margin = 0
+  ): { width: number; height: number } {
+    const fontSize = style.fontSize ?? 14;
+    const fontFamily = style.fontFamily ?? 'sans-serif';
+    const fontWeight = style.fontWeight ?? 'normal';
+    const lineHeight = fontSize * 1.2;
+    const lines = text.split('\n');
+    let maxWidth = 0;
+
+    if (typeof document !== 'undefined') {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
+        for (const line of lines) {
+          maxWidth = Math.max(maxWidth, ctx.measureText(line).width);
+        }
+      }
+    }
+
+    if (maxWidth === 0) {
+      const longestLine = lines.reduce((max, line) => (line.length > max.length ? line : max), '');
+      maxWidth = longestLine.length * fontSize * 0.6;
+    }
+
+    const resolvedPadding = Math.max(0, padding);
+    const resolvedMargin = Math.max(0, margin);
+    return {
+      width: maxWidth + resolvedPadding * 2 + resolvedMargin * 2,
+      height: lines.length * lineHeight + resolvedPadding * 2 + resolvedMargin * 2,
+    };
   }
 
   private resolveMarkerConfig(edge: Edge, side: 'start' | 'end'): ArrowMarkerConfig | null {
@@ -400,6 +478,7 @@ export class SvgExporter {
     const fontSize = style.fontSize ?? 14;
     const fontFamily = style.fontFamily ?? 'sans-serif';
     const fontWeight = style.fontWeight ?? 'normal';
+    const opacity = style.opacity ?? 1;
     const anchor = style.align === 'left' ? 'start' : style.align === 'right' ? 'end' : 'middle';
     const baseline =
       style.baseline === 'top'
@@ -408,9 +487,343 @@ export class SvgExporter {
         ? 'text-after-edge'
         : 'middle';
 
-    return `<text x="${point.x}" y="${point.y}" fill="${fill}" font-size="${fontSize}" font-family="${fontFamily}" font-weight="${fontWeight}" text-anchor="${anchor}" dominant-baseline="${baseline}">${this.escapeText(
-      text
-    )}</text>`;
+    const lines = text.split('\n');
+    if (lines.length <= 1) {
+      return `<text x="${point.x}" y="${point.y}" fill="${fill}" fill-opacity="${opacity}" font-size="${fontSize}" font-family="${fontFamily}" font-weight="${fontWeight}" text-anchor="${anchor}" dominant-baseline="${baseline}">${this.escapeText(
+        text
+      )}</text>`;
+    }
+
+    const lineHeight = fontSize * 1.2;
+    const startY = point.y - ((lines.length - 1) * lineHeight) / 2;
+    const tspans = lines
+      .map((line, index) => `<tspan x="${point.x}" y="${startY + index * lineHeight}">${this.escapeText(line)}</tspan>`)
+      .join('');
+    return `<text x="${point.x}" y="${point.y}" fill="${fill}" fill-opacity="${opacity}" font-size="${fontSize}" font-family="${fontFamily}" font-weight="${fontWeight}" text-anchor="${anchor}" dominant-baseline="${baseline}">${tspans}</text>`;
+  }
+
+  private renderNodeLabel(node: Node, bounds: { x: number; y: number; width: number; height: number }): string {
+    const label = node.label;
+    if (!label) {
+      return '';
+    }
+
+    const style = label.style;
+    const fontSize = style.fontSize ?? 14;
+    const lineHeight = fontSize * 1.2;
+    const lines = label.text.split('\n');
+    const textHeight = Math.max(lineHeight, lines.length * lineHeight);
+    const padding = Math.max(0, label.padding);
+    const margin = Math.max(0, label.margin);
+    const inset = padding + margin;
+    const align = style.align ?? 'center';
+    const placement = node.labelPlacement === 'auto' ? 'center' : node.labelPlacement;
+
+    const inner = {
+      x: bounds.x + margin,
+      y: bounds.y + margin,
+      width: Math.max(0, bounds.width - margin * 2),
+      height: Math.max(0, bounds.height - margin * 2),
+    };
+
+    let x = inner.x + inner.width / 2;
+    if (align === 'left') {
+      x = inner.x + inset;
+    } else if (align === 'right') {
+      x = inner.x + inner.width - inset;
+    }
+
+    let y = inner.y + inner.height / 2;
+    if (placement === 'top') {
+      y = inner.y + inset + textHeight / 2;
+    } else if (placement === 'bottom') {
+      y = inner.y + inner.height - inset - textHeight / 2;
+    } else if (placement === 'left') {
+      x = inner.x + inset;
+    } else if (placement === 'right') {
+      x = inner.x + inner.width - inset;
+    }
+
+    return this.renderTextLabel(label.text, { x, y }, style);
+  }
+
+  private getNodeCornerRadius(node: Node, bounds: { width: number; height: number }): number {
+    const rectangleRadius =
+      'cornerRadius' in node && typeof (node as { cornerRadius?: unknown }).cornerRadius === 'number'
+        ? ((node as { cornerRadius: number }).cornerRadius ?? 0)
+        : node.style.cornerRadius ?? 0;
+    return Math.max(0, Math.min(rectangleRadius, bounds.width / 2, bounds.height / 2));
+  }
+
+  private renderNodeIcon(node: Node, nodeBounds: { x: number; y: number; width: number; height: number }): string {
+    const icon = node.icon;
+    if (!icon) {
+      return '';
+    }
+
+    const opts = icon.options;
+    const iconSize = icon.getSize();
+    if (iconSize.width <= 0 || iconSize.height <= 0) {
+      return '';
+    }
+
+    const iconBoxSize = this.getIconBoxSize(opts, iconSize);
+    const iconBounds = this.getIconBounds(nodeBounds, iconBoxSize, opts.placement ?? 'center');
+    const drawRect = this.getIconDrawRect(iconBounds, opts, iconSize);
+    if (drawRect.width <= 0 || drawRect.height <= 0) {
+      return '';
+    }
+
+    const href = this.resolveIconHref(opts);
+    if (!href) {
+      return '';
+    }
+
+    const opacity = opts.opacity ?? 1;
+    return `<image href="${this.escapeAttribute(href)}" x="${drawRect.x}" y="${drawRect.y}" width="${drawRect.width}" height="${drawRect.height}" opacity="${opacity}" preserveAspectRatio="none"/>`;
+  }
+
+  private getIconBoxSize(
+    opts: NodeImageOptions,
+    imageSize: { width: number; height: number }
+  ): { width: number; height: number } {
+    const padding = opts.padding ?? 8;
+    const margin = Math.max(0, opts.margin ?? 0);
+    return {
+      width: imageSize.width + padding * 2 + margin * 2,
+      height: imageSize.height + padding * 2 + margin * 2,
+    };
+  }
+
+  private getIconBounds(
+    bounds: { x: number; y: number; width: number; height: number },
+    iconBoxSize: { width: number; height: number },
+    placement: NodeImagePlacement
+  ): { x: number; y: number; width: number; height: number } {
+    switch (placement) {
+      case 'top':
+        return { x: bounds.x, y: bounds.y, width: bounds.width, height: iconBoxSize.height };
+      case 'bottom':
+        return {
+          x: bounds.x,
+          y: bounds.y + bounds.height - iconBoxSize.height,
+          width: bounds.width,
+          height: iconBoxSize.height,
+        };
+      case 'left':
+        return { x: bounds.x, y: bounds.y, width: iconBoxSize.width, height: bounds.height };
+      case 'right':
+        return {
+          x: bounds.x + bounds.width - iconBoxSize.width,
+          y: bounds.y,
+          width: iconBoxSize.width,
+          height: bounds.height,
+        };
+      case 'top-left':
+        return { x: bounds.x, y: bounds.y, width: iconBoxSize.width, height: iconBoxSize.height };
+      case 'top-right':
+        return {
+          x: bounds.x + bounds.width - iconBoxSize.width,
+          y: bounds.y,
+          width: iconBoxSize.width,
+          height: iconBoxSize.height,
+        };
+      case 'bottom-left':
+        return {
+          x: bounds.x,
+          y: bounds.y + bounds.height - iconBoxSize.height,
+          width: iconBoxSize.width,
+          height: iconBoxSize.height,
+        };
+      case 'bottom-right':
+        return {
+          x: bounds.x + bounds.width - iconBoxSize.width,
+          y: bounds.y + bounds.height - iconBoxSize.height,
+          width: iconBoxSize.width,
+          height: iconBoxSize.height,
+        };
+      case 'center':
+      default:
+        return bounds;
+    }
+  }
+
+  private getIconDrawRect(
+    bounds: { x: number; y: number; width: number; height: number },
+    opts: NodeImageOptions,
+    imageSize: { width: number; height: number }
+  ): { x: number; y: number; width: number; height: number } {
+    const padding = opts.padding ?? 8;
+    const margin = Math.max(0, opts.margin ?? 0);
+    const fit = opts.fit ?? 'none';
+    const scaleWithBounds = opts.scaleWithBounds ?? false;
+    const align = opts.align ?? 'center';
+    const verticalAlign = opts.verticalAlign ?? 'center';
+    const offsetX = opts.offsetX ?? 0;
+    const offsetY = opts.offsetY ?? 0;
+
+    const innerBounds = {
+      x: bounds.x + margin,
+      y: bounds.y + margin,
+      width: Math.max(0, bounds.width - margin * 2),
+      height: Math.max(0, bounds.height - margin * 2),
+    };
+    const availableWidth = Math.max(0, innerBounds.width - padding * 2);
+    const availableHeight = Math.max(0, innerBounds.height - padding * 2);
+
+    let drawWidth = opts.width ?? imageSize.width;
+    let drawHeight = opts.height ?? imageSize.height;
+
+    if (scaleWithBounds) {
+      if ((fit === 'contain' || fit === 'cover') && imageSize.width > 0 && imageSize.height > 0) {
+        const scaleX = availableWidth / imageSize.width;
+        const scaleY = availableHeight / imageSize.height;
+        const scale = fit === 'contain' ? Math.min(scaleX, scaleY) : Math.max(scaleX, scaleY);
+        drawWidth = imageSize.width * scale;
+        drawHeight = imageSize.height * scale;
+      } else if (fit === 'stretch') {
+        drawWidth = availableWidth;
+        drawHeight = availableHeight;
+      }
+    }
+
+    drawWidth = Math.min(Math.max(0, drawWidth), Math.max(0, availableWidth));
+    drawHeight = Math.min(Math.max(0, drawHeight), Math.max(0, availableHeight));
+
+    let x = innerBounds.x + padding;
+    let y = innerBounds.y + padding;
+
+    if (align === 'center') {
+      x = innerBounds.x + (innerBounds.width - drawWidth) / 2;
+    } else if (align === 'right') {
+      x = innerBounds.x + innerBounds.width - drawWidth - padding;
+    }
+
+    if (verticalAlign === 'center') {
+      y = innerBounds.y + (innerBounds.height - drawHeight) / 2;
+    } else if (verticalAlign === 'bottom') {
+      y = innerBounds.y + innerBounds.height - drawHeight - padding;
+    }
+
+    return {
+      x: x + offsetX,
+      y: y + offsetY,
+      width: drawWidth,
+      height: drawHeight,
+    };
+  }
+
+  private resolveIconHref(opts: NodeImageOptions): string {
+    const source = opts.source;
+    if (source instanceof HTMLImageElement) {
+      return source.src;
+    }
+
+    if (!source) {
+      return '';
+    }
+
+    if (this.isSvgMarkup(source)) {
+      return this.svgToDataUrl(this.tintSvg(source, opts.strokeColor, opts.fillColor));
+    }
+
+    const shouldInlineSvg = source.toLowerCase().endsWith('.svg');
+    if (shouldInlineSvg) {
+      const svgText = this.readSvgFromUrlSync(source);
+      if (svgText) {
+        return this.svgToDataUrl(this.tintSvg(svgText, opts.strokeColor, opts.fillColor));
+      }
+    }
+
+    return source;
+  }
+
+  private readSvgFromUrlSync(url: string): string | null {
+    if (typeof XMLHttpRequest === 'undefined') {
+      return null;
+    }
+
+    try {
+      const xhr = new XMLHttpRequest();
+      xhr.open('GET', url, false);
+      xhr.send();
+      if (xhr.status >= 200 && xhr.status < 300) {
+        return xhr.responseText || null;
+      }
+    } catch {
+      // Ignore and fallback to raw URL source.
+    }
+
+    return null;
+  }
+
+  private isSvgMarkup(value: string): boolean {
+    const trimmed = value.trim().toLowerCase();
+    return trimmed.startsWith('<svg') || trimmed.includes('<svg');
+  }
+
+  private styleSetColor(style: string, key: 'stroke' | 'fill', color: string): string {
+    const hasKey = new RegExp(`${key}\\s*:`).test(style);
+    if (hasKey) {
+      return style.replace(new RegExp(`${key}\\s*:[^;]+`), `${key}:${color}`);
+    }
+    const suffix = style.trim().endsWith(';') || style.trim() === '' ? '' : ';';
+    return `${style}${suffix}${key}:${color};`;
+  }
+
+  private tintSvg(svgText: string, strokeColor?: string, fillColor?: string): string {
+    if (!strokeColor && !fillColor) return svgText;
+
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(svgText, 'image/svg+xml');
+    const root = doc.documentElement;
+    if (!root || root.nodeName.toLowerCase() === 'parsererror') {
+      return svgText;
+    }
+
+    const all = [root, ...Array.from(root.querySelectorAll('*'))] as Element[];
+    for (const el of all) {
+      const stroke = el.getAttribute('stroke');
+      if (strokeColor && stroke !== null && stroke.toLowerCase() !== 'none') {
+        el.setAttribute('stroke', strokeColor);
+      }
+      const fill = el.getAttribute('fill');
+      if (fillColor && fill !== null && fill.toLowerCase() !== 'none') {
+        el.setAttribute('fill', fillColor);
+      }
+      const style = el.getAttribute('style');
+      if (style) {
+        let next = style;
+        if (strokeColor && /stroke\s*:\s*(?!none)/.test(style)) {
+          next = this.styleSetColor(next, 'stroke', strokeColor);
+        }
+        if (fillColor && /fill\s*:\s*(?!none)/.test(style)) {
+          next = this.styleSetColor(next, 'fill', fillColor);
+        }
+        if (next !== style) {
+          el.setAttribute('style', next);
+        }
+      }
+    }
+
+    return new XMLSerializer().serializeToString(root);
+  }
+
+  private svgToDataUrl(svg: string): string {
+    const encoded = encodeURIComponent(svg)
+      .replace(/%0A/g, '')
+      .replace(/%0D/g, '')
+      .replace(/%09/g, ' ')
+      .replace(/%20/g, ' ');
+    return `data:image/svg+xml;utf8,${encoded}`;
+  }
+
+  private escapeAttribute(value: string): string {
+    return value
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
   }
 
   private createEmptySvg(width: number, height: number, backgroundColor: string, includeBackground: boolean): string {
