@@ -1,27 +1,29 @@
 # Security Policy
 
-## Поддерживаемые версии
+Русская версия: `SECURITY.ru.md`
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 0.1.x   | :white_check_mark: |
+## Supported Versions
 
-## Сообщение об уязвимости
+| Version | Supported |
+| ------- | --------- |
+| 0.x     | :white_check_mark: |
 
-Если вы обнаружили уязвимость в безопасности, пожалуйста, сообщите о ней ответственно.
+## Reporting a Vulnerability
 
-**Не создавайте public issue для security problems.**
+If you discover a security vulnerability, please report it responsibly.
 
-Вместо этого:
+**Do not create a public issue for security problems.**
 
-1. Отправьте email на nikolay@groznykh.ru
-2. Опишите проблему подробно
-3. Дайте нам время для исправления перед публичным раскрытием
+Instead:
 
-Мы постараемся ответить в течение 48 часов и выпустить исправление как можно скорее.
+1. Send an email to `nikolay@groznykh.ru`
+2. Describe the issue in detail
+3. Allow time for a fix before public disclosure
 
-## Лучшие практики для пользователей
+We aim to acknowledge reports within 48 hours and ship a fix as soon as possible.
 
-- Всегда используйте последнюю версию библиотеки
-- Проверяйте входные данные перед передачей в диаграмму
-- При работе с user-generated content используйте sanitization
+## Security Best Practices for Users
+
+- Always use the latest stable version
+- Validate input before passing data to diagram objects
+- Sanitize user-generated content in your host application

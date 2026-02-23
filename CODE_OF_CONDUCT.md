@@ -1,35 +1,33 @@
 # Code of Conduct
 
-## Наши стандарты
+Русская версия: `CODE_OF_CONDUCT.ru.md`
 
-Мы стремимся создать открытую и дружелюбную среду для всех участников.
+## Our Commitment
 
-Примеры поведения, которое мы приветствуем:
+We are committed to maintaining a respectful, professional, and safe collaboration environment for all project participants.
 
-- Уважение к разным точкам зрения и опыту
-- Конструктивная критика, принятая с достоинством
-- Фокус на том, что лучше для сообщества
-- Проявление эмпатии к другим участникам
+## Expected Behavior
 
-Неприемлемое поведение:
+- Be respectful and constructive
+- Assume positive intent
+- Accept feedback calmly
+- Focus on what benefits the project and community
 
-- Троллинг, оскорбительные комментарии, персональные атаки
-- Публичное или приватное преследование
-- Публикация чужой личной информации без разрешения
-- Другие поведения, которые можно обоснованно счесть неуместными
+## Unacceptable Behavior
 
-## Обязанности
+- Harassment, trolling, insulting or derogatory comments
+- Public or private abuse
+- Publishing private information without explicit permission
+- Conduct that is inappropriate in a professional setting
 
-Поддерживатели проекта отвечают за разъяснение стандартов приемлемого поведения и принимают соответствующие и справедливые корректирующие действия в ответ на любые случаи неприемлемого поведения.
+## Enforcement
 
-## Область применения
+Project maintainers are responsible for clarifying and enforcing this code and may take appropriate action in response to violations.
 
-Этот Code of Conduct применяется внутри проекта и в публичных пространствах, когда человек представляет проект или его сообщество.
+## Scope
 
-## Применение
+This Code of Conduct applies in project spaces and in public spaces when an individual is representing the project.
 
-О случаях оскорбительного, беспокоящего или иного неприемлемого поведения можно сообщить, связавшись с командой проекта. Все жалобы будут рассмотрены и расследованы.
+## Reporting
 
-## Attribution
-
-Этот Code of Conduct адаптирован из [Contributor Covenant](https://www.contributor-covenant.org), версия 2.1.
+Report unacceptable behavior to project maintainers through a private channel.

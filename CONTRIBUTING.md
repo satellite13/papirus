@@ -1,77 +1,73 @@
 # Contributing to Papirus
 
-Спасибо за интерес к проекту! Мы приветствуем вклад в виде bug reports, feature requests, документации и кода.
+Thanks for your interest in contributing to Papirus.
 
-## Как внести вклад
+Русская версия: `CONTRIBUTING.ru.md`
 
-### Сообщить о проблеме
+## Ways to Contribute
 
-- Используйте [Issues](https://gitverse.ru/ngroznykh/papirus/issues)
-- Опишите шаги для воспроизведения
-- Укажите версию браузера и ОС
-- Приложите минимальный пример кода, если возможно
+### Report a Bug
 
-### Предложить функциональность
+- Use [Issues](https://gitverse.ru/ngroznykh/papirus/issues)
+- Include clear reproduction steps
+- Mention browser and OS versions
+- Provide a minimal code sample when possible
 
-- Создайте issue с префиксом `[Feature Request]`
-- Опишите use case и ожидаемое поведение
+### Propose a Feature
 
-### Pull Requests
+- Open an issue with `[Feature Request]` in the title
+- Describe the use case and expected behavior
 
-1. Форкните репозиторий
-2. Создайте ветку: `git checkout -b feature/my-feature` или `fix/my-fix`
-3. Убедитесь, что код проходит проверки:
+### Submit a Pull Request
+
+1. Fork the repository
+2. Create a branch: `git checkout -b feature/my-feature` or `fix/my-fix`
+3. Run quality checks:
    ```bash
    npm run typecheck
    npm run lint
    npm run test
    ```
-4. Сделайте commit с понятным сообщением
-5. Отправьте PR в `main` ветку
+4. Commit with a clear message
+5. Open a PR against `main`
 
-## Стандарты кода
+## Code Standards
 
-- TypeScript с strict mode
-- Явные типы возвращаемых значений для публичных API
-- Тесты для новой функциональности (colocated: `*.test.ts`)
-- Следуйте существующему стилю кода
+- TypeScript with strict mode
+- Explicit return types for public APIs
+- Tests for new functionality (`*.test.ts` colocated with source)
+- Follow existing code style and architecture patterns
 
-## Структура проекта
+## Project Structure
 
-```
+```text
 src/
-  core/         # Рендерер, менеджеры взаимодействий
-  elements/     # Узлы, рёбра, группы
-  events/       # EventEmitter, InputHandler
-  styles/       # Темы и стили
-  utils/        # Сериализация, экспорт, утилиты
+  core/         # renderer and interaction managers
+  elements/     # nodes, edges, groups
+  events/       # EventEmitter and input handling
+  styles/       # themes and style manager
+  utils/        # serializer, export, layout and helper utilities
 ```
 
-## Локальная разработка
+## Local Development
 
 ```bash
 npm install
-npm run dev        # Vite dev server
-npm run test       # Запуск тестов
-npm run build      # Сборка
+npm run dev
+npm run test
+npm run build
 ```
 
-## Быстрый старт для контрибьютора
+## Commit Messages
 
-1. Форкните репозиторий.
-2. Клонируйте свой форк и установите зависимости: `npm install`.
-3. Создайте ветку: `git checkout -b feature/my-feature` или `fix/my-fix`.
-4. Перед PR запустите: `npm run typecheck && npm run lint && npm run test`.
+[Conventional Commits](https://www.conventionalcommits.org/) is recommended:
 
-## Commit messages
+- `feat:` new functionality
+- `fix:` bug fix
+- `docs:` documentation update
+- `test:` test update
+- `refactor:` behavior-preserving refactor
 
-Рекомендуется формат [Conventional Commits](https://www.conventionalcommits.org/):
-- `feat:` новая функциональность
-- `fix:` исправление ошибки
-- `docs:` изменения документации
-- `test:` изменения тестов
-- `refactor:` рефакторинг без изменения поведения
+## License
 
-## Лицензия
-
-Вклады принимаются под лицензией MIT.
+By contributing, you agree that contributions are provided under the MIT license.

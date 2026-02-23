@@ -65,6 +65,7 @@ renderer.enableInteractions();
 - [Utils](./docs/utils.md)
 - [Changelog](./CHANGELOG.md)
 - [Security Policy](./SECURITY.md)
+- [Open Source Preparation](./docs/OPEN_SOURCE_PREPARATION.md)
 
 ## Features
 
@@ -192,6 +193,12 @@ npm run test:coverage   # Tests with coverage
 ## Contributing
 
 Please read [CONTRIBUTING.md](./CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
+
+Key governance and contribution files:
+
+- [CONTRIBUTING.md](./CONTRIBUTING.md) / [CONTRIBUTING.ru.md](./CONTRIBUTING.ru.md)
+- [SECURITY.md](./SECURITY.md) / [SECURITY.ru.md](./SECURITY.ru.md)
+- [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md) / [CODE_OF_CONDUCT.ru.md](./CODE_OF_CONDUCT.ru.md)
 
 ## License
 

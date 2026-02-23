@@ -65,6 +65,7 @@ renderer.enableInteractions();
 - [Утилиты](./docs/utils.md)
 - [Changelog](./CHANGELOG.md)
 - [Политика безопасности](./SECURITY.md)
+- [Чеклист подготовки к Open Source](./docs/OPEN_SOURCE_PREPARATION.ru.md)
 
 ## Возможности
 
@@ -193,6 +194,12 @@ npm run test:coverage   # Тесты с покрытием
 ## Contributing
 
 См. [CONTRIBUTING.md](./CONTRIBUTING.md).
+
+Ключевые файлы для open-source процесса:
+
+- [CONTRIBUTING.md](./CONTRIBUTING.md) / [CONTRIBUTING.ru.md](./CONTRIBUTING.ru.md)
+- [SECURITY.md](./SECURITY.md) / [SECURITY.ru.md](./SECURITY.ru.md)
+- [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md) / [CODE_OF_CONDUCT.ru.md](./CODE_OF_CONDUCT.ru.md)
 
 ## Лицензия
 
