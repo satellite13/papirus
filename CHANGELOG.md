@@ -7,7 +7,7 @@
 
 ## [Unreleased]
 
-## [0.3.7] - 2026-02-23
+## [0.3.9] - 2026-02-23
 
 ### Fixed
 - Исправлен экспорт узловых иконок в `SVG`: иконки теперь корректно попадают в файл экспорта.
@@ -17,6 +17,7 @@
 - Для узловых меток в `SVG` учтены отступы `padding`/`margin` и выравнивание текста (`left`/`center`/`right`).
 - Для связей в `SVG` учтены параметры стиля линии: `strokeOpacity`, `lineCap`, `lineJoin`.
 - Для меток связей в `SVG` добавлен экспорт фона (`labelBackground`) и улучшено соответствие стилям/позиционированию текста.
+- Исправлен порядок слоёв в `SVG`-экспорте: связи и стрелки рендерятся поверх нод (как в canvas-рендерере).
 
 ## [0.3.4] - 2026-02-19
 
@@ -96,8 +97,8 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.3.7...HEAD
-[0.3.7]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.7
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.3.9...HEAD
+[0.3.9]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.9
 [0.3.4]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.4
 [0.3.3]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.3
 [0.3.2]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.2

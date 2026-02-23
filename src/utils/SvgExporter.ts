@@ -80,13 +80,14 @@ export class SvgExporter {
       }
     }
 
-    parts.push(...renderedEdges);
-
     for (const node of this.renderer.nodes.values()) {
       if (node.visible) {
         parts.push(this.renderNode(node));
       }
     }
+
+    // Keep SVG layering aligned with canvas renderer: edges above nodes.
+    parts.push(...renderedEdges);
 
     parts.push(`</g></svg>`);
     return parts.join('');
