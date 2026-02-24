@@ -50,7 +50,7 @@ export interface EdgeEndpoint {
 /**
  * Edge path type
  */
-export type EdgePathType = 'straight' | 'polyline' | 'bezier';
+export type EdgePathType = 'straight' | 'polyline' | 'bezier' | 'editable-polyline';
 
 /**
  * Arrow type for edges (legacy, use ArrowMarkerType for new code)

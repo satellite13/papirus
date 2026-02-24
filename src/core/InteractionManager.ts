@@ -38,6 +38,7 @@ export interface InteractionManagerOptions {
   edgeFactory?: (data: SerializedEdge) => Edge;
   snapToGrid?: boolean;
   gridSize?: number;
+  alignToNodes?: boolean;
   keymap?: Partial<InteractionKeymap>;
 }
 
@@ -114,6 +115,7 @@ export class InteractionManager {
       selectionManager: this.selectionManager,
       snapToGrid: options.snapToGrid ?? this.renderer.snapToGrid,
       gridSize: options.gridSize ?? 20,
+      alignToNodes: options.alignToNodes ?? true,
     });
     this.resizeManager = new ResizeManager({
       renderer: this.renderer,
@@ -131,6 +133,8 @@ export class InteractionManager {
       createEdge:
         options.createEdge ??
         ((from, to): Edge => new Edge({ from, to, type: 'bezier', arrowType: 'single' })),
+      snapToGrid: options.snapToGrid ?? this.renderer.snapToGrid,
+      gridSize: options.gridSize ?? 20,
       addEdge: (edge): void => {
         this.historyManager.execute({
           execute: (): void => this.renderer.addEdge(edge),
@@ -270,6 +274,7 @@ export class InteractionManager {
   private setupEvents(options: InteractionManagerOptions): void {
     this.overlayCleanup = this.renderer.addOverlayRenderer((ctx) => {
       this.selectionManager.renderSelectionRect(ctx);
+      this.dragManager.renderAlignmentGuides(ctx);
       this.connectionManager.renderPreview(ctx);
       this.connectionManager.renderHoverAnchors(ctx);
       for (const id of this.selectionManager.selectedIds) {
@@ -553,6 +558,10 @@ export class InteractionManager {
       this.resizeManager.handledMouseDown ||
       this.connectionManager.connecting
     ) {
+      return;
+    }
+
+    if (this.connectionManager.handleDoubleClick(event)) {
       return;
     }
 

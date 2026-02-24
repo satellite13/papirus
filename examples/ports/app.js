@@ -195,7 +195,10 @@ const edges = [
   new Edge({
     from: { nodeId: process1.id, portId: process1.ports[3].id },
     to: { nodeId: process2.id, portId: process2.ports[2].id },
-    type: 'polyline',
+    type: 'editable-polyline',
+    controlPoints: [
+      { x: 380, y: 240 },
+    ],
     endMarker: { type: 'diamond', size: 8 },
     style: { strokeColor: '#8b5cf6', lineDash: [4, 2] },
     label: 'feedback',
@@ -249,6 +252,7 @@ document.getElementById('clearAll').addEventListener('click', () => {
 const pathButtons = {
   straight: document.getElementById('pathStraight'),
   polyline: document.getElementById('pathPolyline'),
+  'editable-polyline': document.getElementById('pathEditablePolyline'),
   bezier: document.getElementById('pathBezier'),
 };
 

@@ -38,6 +38,7 @@
         <div class="toolbar-group">
           <button class="btn" id="pathStraight"><span class="material-symbols-outlined">trending_flat</span>Straight</button>
           <button class="btn" id="pathPolyline"><span class="material-symbols-outlined">polyline</span>Polyline</button>
+          <button class="btn" id="pathEditablePolyline"><span class="material-symbols-outlined">route</span>Editable Polyline</button>
           <button class="btn btn-primary" id="pathBezier"><span class="material-symbols-outlined">timeline</span>Bezier</button>
         </div>
         <div class="toolbar-group">
@@ -71,6 +72,7 @@
                 <li><strong>Output nodes</strong> have output ports on the right</li>
                 <li>Drag from an output port to an input port to connect</li>
                 <li>Connections snap to the nearest port</li>
+                <li>Editable polyline: select edge, drag blue points, click + to add more points</li>
                 <li>Double-click any node or edge label to edit it inline</li>
               </ul>
             </div>
@@ -87,6 +89,7 @@
               <select class="form-select" id="defaultPathType">
                 <option value="straight">Straight</option>
                 <option value="polyline">Polyline</option>
+                <option value="editable-polyline">Editable Polyline</option>
                 <option value="bezier" selected>Bezier</option>
               </select>
             </div>

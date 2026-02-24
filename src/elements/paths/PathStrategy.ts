@@ -13,6 +13,7 @@ export interface PathObstacle {
  */
 export interface PathStrategyOptions {
   controlPoints?: Point[];
+  editablePolyline?: boolean;
   selfLoop?: boolean;
   obstacles?: PathObstacle[];
 }

@@ -8,6 +8,7 @@
 const interactions = renderer.enableInteractions({
   snapToGrid: true,
   gridSize: 20,
+  alignToNodes: true,
 });
 ```
 
@@ -25,6 +26,7 @@ const interactions = renderer.enableInteractions({
 - `createEdge` — фабрика для новых рёбер при интерактивном соединении.
 - `nodeFactory`, `edgeFactory` — используются для вставки (`Ctrl/Cmd+V`) и восстановления.
 - `snapToGrid`, `gridSize` — базовая настройка перемещения/ресайза.
+- `alignToNodes` — smart-align при перетаскивании узлов к другим узлам.
 - `keymap` — кастомизация клавиш:
   - `deleteKeys`
   - `copyKey`
@@ -105,7 +107,33 @@ interactions.navigation.resetView();
 
 ```ts
 interactions.drag.setSnapToGrid(true, 20);
+interactions.drag.setAlignmentEnabled(true);
+interactions.resize.setSnapToGrid(true, 20);
+interactions.connection.setSnapToGrid(true, 20);
 ```
+
+### Smart-align и направляющие
+
+При `setAlignmentEnabled(true)` во время drag узел может магнититься к:
+
+- левому/центральному/правому краю других узлов;
+- верху/центру/низу других узлов.
+
+При срабатывании выравнивания отображаются направляющие линии (вертикальная/горизонтальная).
+
+### Редактируемая полилиния (`editable-polyline`)
+
+Для ребра с `type: 'editable-polyline'` доступны интерактивные точки перелома:
+
+- drag синей точки — перемещение перелома;
+- click по маленькому `+` на сегменте — добавить новый перелом;
+- double-click по синей точке — удалить перелом.
+
+Дополнительно:
+
+- при включённом `snapToGrid` точки перелома привязываются к сетке;
+- при drag точки работают осевые магниты (к вертикали/горизонтали соседних сегментов);
+- при drag узла ближайшая ортогональная точка перелома может сопровождать движение для сохранения геометрии.
 
 ## События менеджеров
 

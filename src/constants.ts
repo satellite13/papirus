@@ -4,6 +4,8 @@
 
 // Edge rendering
 export const EDGE_HANDLE_RADIUS = 6;
+export const EDGE_CONTROL_POINT_RADIUS = 6;
+export const EDGE_ADD_CONTROL_RADIUS = 4;
 export const ARROW_SIZE = 10;
 export const ARROW_ANGLE = Math.PI / 6; // 30 degrees
 

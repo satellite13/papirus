@@ -76,10 +76,12 @@ renderer.enableInteractions();
 - drag/select/connect/undo/redo/copy/paste
 - Панорамирование по пустому месту канваса
 - Zoom колесом, pinch‑to‑zoom, two‑finger pan
+- Smart-align к другим фигурам при перетаскивании (с направляющими)
 
 ```ts
 const interactions = renderer.enableInteractions({ gridSize: 20, snapToGrid: true });
 interactions.navigation.fitToView();
+interactions.drag.setAlignmentEnabled(true);
 ```
 
 Создание связи по умолчанию: перетягивание от одной точки (anchor) узла к другой, без модификаторов.
@@ -89,6 +91,12 @@ interactions.navigation.fitToView();
 - `Ctrl/Cmd + C` / `Ctrl/Cmd + V` — копировать/вставить
 - `Ctrl/Cmd + Z` — отмена
 - `Ctrl/Cmd + Y` или `Ctrl/Cmd + Shift + Z` — повтор
+
+Для редактируемой полилинии:
+- `type: 'editable-polyline'` поддерживает draggable точки перелома.
+- На серединах сегментов доступны маленькие `+` для добавления новых точек.
+- Двойной клик по точке перелома удаляет её.
+- Для точек перелома работают snap к сетке и осевые магниты при перетаскивании.
 
 ### Элементы и группы
 

@@ -75,10 +75,12 @@ Built-in `InteractionManager` includes:
 - drag/select/connect/undo/redo/copy/paste
 - Pan on empty canvas area
 - Zoom with mouse wheel, pinch-to-zoom, two-finger pan
+- Smart alignment to other nodes while dragging (with guide lines)
 
 ```ts
 const interactions = renderer.enableInteractions({ gridSize: 20, snapToGrid: true });
 interactions.navigation.fitToView();
+interactions.drag.setAlignmentEnabled(true);
 ```
 
 Default edge creation: drag from one node anchor point to another (no modifier key required).
@@ -88,6 +90,12 @@ Default keyboard shortcuts:
 - `Ctrl/Cmd + C` / `Ctrl/Cmd + V` — copy/paste
 - `Ctrl/Cmd + Z` — undo
 - `Ctrl/Cmd + Y` or `Ctrl/Cmd + Shift + Z` — redo
+
+Editable polyline edges:
+- `type: 'editable-polyline'` supports draggable bend points.
+- Mid-segment `+` controls add new bend points.
+- Double-click a bend point to remove it.
+- Bend points support grid snapping and axis magnet behavior while dragging.
 
 ### Elements & Groups
 

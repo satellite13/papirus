@@ -11,6 +11,7 @@ import {
   Serializer,
   GridOverlay,
   MiniMap,
+  RulersOverlay,
   Group,
   SearchManager,
 } from '../../dist/papirus.js';
@@ -133,8 +134,10 @@ renderer.setStyleManager(styles);
 // Overlays
 const gridOverlay = new GridOverlay({ gridSize: 20, color: '#e5e5e5' });
 const miniMap = new MiniMap({ width: 140, height: 100, padding: 16 });
+const rulersOverlay = new RulersOverlay({ thickness: 20 });
 renderer.use(gridOverlay);
 renderer.use(miniMap);
+renderer.use(rulersOverlay);
 
 // Interactions
 const interactions = renderer.enableInteractions({
@@ -817,12 +820,18 @@ document.getElementById('resetView').addEventListener('click', () => {
 const gridButton = document.getElementById('toggleGrid');
 const miniMapButton = document.getElementById('toggleMiniMap');
 const snapButton = document.getElementById('toggleSnap');
+const alignButton = document.getElementById('toggleAlign');
+const rulersButton = document.getElementById('toggleRulers');
 const gridButtonLabel = document.getElementById('toggleGridLabel');
 const miniMapButtonLabel = document.getElementById('toggleMiniMapLabel');
 const snapButtonLabel = document.getElementById('toggleSnapLabel');
+const alignButtonLabel = document.getElementById('toggleAlignLabel');
+const rulersButtonLabel = document.getElementById('toggleRulersLabel');
 let gridVisible = true;
 let miniMapVisible = true;
 let snapEnabled = false;
+let alignEnabled = true;
+let rulersEnabled = true;
 
 function updateToggleLabels() {
   gridButtonLabel.textContent = gridVisible ? 'Grid ON' : 'Grid OFF';
@@ -830,6 +839,10 @@ function updateToggleLabels() {
   miniMapButton.classList.toggle('btn-primary', miniMapVisible);
   snapButtonLabel.textContent = snapEnabled ? 'Snap ON' : 'Snap OFF';
   snapButton.classList.toggle('btn-primary', snapEnabled);
+  alignButtonLabel.textContent = alignEnabled ? 'Align ON' : 'Align OFF';
+  alignButton.classList.toggle('btn-primary', alignEnabled);
+  rulersButtonLabel.textContent = rulersEnabled ? 'Rulers ON' : 'Rulers OFF';
+  rulersButton.classList.toggle('btn-primary', rulersEnabled);
 }
 
 gridButton.addEventListener('click', () => {
@@ -849,6 +862,21 @@ miniMapButton.addEventListener('click', () => {
 snapButton.addEventListener('click', () => {
   snapEnabled = !snapEnabled;
   interactions.drag.setSnapToGrid(snapEnabled);
+  interactions.resize.setSnapToGrid(snapEnabled);
+  interactions.connection.setSnapToGrid(snapEnabled);
+  updateToggleLabels();
+});
+
+alignButton.addEventListener('click', () => {
+  alignEnabled = !alignEnabled;
+  interactions.drag.setAlignmentEnabled(alignEnabled);
+  updateToggleLabels();
+});
+
+rulersButton.addEventListener('click', () => {
+  rulersEnabled = !rulersEnabled;
+  rulersOverlay.setEnabled(rulersEnabled);
+  renderer.markDirty();
   updateToggleLabels();
 });
 

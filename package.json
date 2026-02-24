@@ -1,6 +1,6 @@
 {
   "name": "@ngroznykh/papirus",
-  "version": "0.3.11",
+  "version": "0.3.12",
   "description": "TypeScript library for building interactive 2D diagrams and flowcharts on HTML Canvas",
   "type": "module",
   "engines": {

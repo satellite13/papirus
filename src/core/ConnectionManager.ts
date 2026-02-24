@@ -4,7 +4,18 @@ import type { InputEvent } from '@/events/InputHandler';
 import type { AnchorId, Node } from '@/elements/Node';
 import type { Edge } from '@/elements/Edge';
 import type { EdgeEndpoint, Point } from '@/types';
-import { ANCHOR_PORT_PREFIX, EDGE_HANDLE_RADIUS, ANCHOR_POINT_RADIUS, ANCHOR_POINT_HOVER_RADIUS, ANCHOR_POINT_HITBOX_RADIUS, BEZIER_MAX_OFFSET } from '@/constants';
+import {
+  ANCHOR_PORT_PREFIX,
+  EDGE_HANDLE_RADIUS,
+  EDGE_CONTROL_POINT_RADIUS,
+  EDGE_ADD_CONTROL_RADIUS,
+  ANCHOR_POINT_RADIUS,
+  ANCHOR_POINT_HOVER_RADIUS,
+  ANCHOR_POINT_HITBOX_RADIUS,
+  BEZIER_MAX_OFFSET,
+} from '@/constants';
+
+const EDGE_AXIS_MAGNET_SCREEN_TOLERANCE = 10;
 
 /**
  * Connection events
@@ -24,6 +35,8 @@ export interface ConnectionManagerOptions {
   renderer: DiagramRenderer;
   createEdge: (from: EdgeEndpoint, to: EdgeEndpoint) => Edge;
   addEdge?: (edge: Edge) => void;
+  snapToGrid?: boolean;
+  gridSize?: number;
 }
 
 /**
@@ -51,12 +64,27 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
   private reconnectingEdge: Edge | null = null;
   private reconnectingEndpoint: 'start' | 'end' | null = null;
   private originalEdgeEndpoint: EdgeEndpoint | null = null;
+  private activeControlPointDrag: { edge: Edge; index: number } | null = null;
+  private snapToGrid: boolean;
+  private gridSize: number;
 
   constructor(options: ConnectionManagerOptions) {
     super();
     this.renderer = options.renderer;
     this.createEdge = options.createEdge;
     this.addEdge = options.addEdge ?? ((edge): void => this.renderer.addEdge(edge));
+    this.snapToGrid = options.snapToGrid ?? false;
+    this.gridSize = options.gridSize ?? 20;
+  }
+
+  /**
+   * Enable/disable snap to grid for editable polyline control points.
+   */
+  setSnapToGrid(enabled: boolean, gridSize?: number): void {
+    this.snapToGrid = enabled;
+    if (gridSize !== undefined) {
+      this.gridSize = gridSize;
+    }
   }
 
   /**
@@ -179,6 +207,10 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
    * Try to start edge reconnection from handle
    */
   tryStartReconnection(event: InputEvent): boolean {
+    if (this.tryStartEditableControlInteraction(event)) {
+      return true;
+    }
+
     const point = { x: event.worldX, y: event.worldY };
     const handleRadius = EDGE_HANDLE_RADIUS / Math.max(this.renderer.zoom, 0.0001);
 
@@ -267,6 +299,24 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
    * Handle mouse move during connection
    */
   handleMouseMove(event: InputEvent): boolean {
+    if (this.activeControlPointDrag) {
+      const controlPoints = this.activeControlPointDrag.edge.controlPoints
+        ? [...this.activeControlPointDrag.edge.controlPoints]
+        : this.activeControlPointDrag.edge.getEditableControlPoints();
+      if (this.activeControlPointDrag.index < controlPoints.length) {
+        const rawPoint = this.snapPoint({ x: event.worldX, y: event.worldY });
+        const magnetized = this.applyAxisMagnet(
+          this.activeControlPointDrag.edge,
+          controlPoints,
+          this.activeControlPointDrag.index,
+          rawPoint
+        );
+        controlPoints[this.activeControlPointDrag.index] = magnetized;
+        this.activeControlPointDrag.edge.controlPoints = controlPoints;
+      }
+      return true;
+    }
+
     // Handle edge reconnection
     if (this.isReconnecting && this.reconnectingEdge) {
       const point = { x: event.worldX, y: event.worldY };
@@ -322,9 +372,58 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
   }
 
   /**
+   * Remove editable polyline bend by double click.
+   */
+  handleDoubleClick(event: InputEvent): boolean {
+    const point = { x: event.worldX, y: event.worldY };
+    const radius = EDGE_CONTROL_POINT_RADIUS / Math.max(this.renderer.zoom, 0.0001);
+    const radiusSq = radius * radius;
+    const edges = Array.from(this.renderer.edges.values()).reverse();
+
+    for (const edge of edges) {
+      if (edge.state !== 'selected' || !edge.isEditablePolyline()) {
+        continue;
+      }
+      if (!edge.controlPoints || edge.controlPoints.length === 0) {
+        continue;
+      }
+
+      for (let i = 0; i < edge.controlPoints.length; i++) {
+        const controlPoint = edge.controlPoints[i]!;
+        const dx = point.x - controlPoint.x;
+        const dy = point.y - controlPoint.y;
+        if (dx * dx + dy * dy > radiusSq) {
+          continue;
+        }
+
+        const next = [...edge.controlPoints];
+        next.splice(i, 1);
+        edge.controlPoints = next.length > 0 ? next : undefined;
+        if (
+          this.activeControlPointDrag &&
+          this.activeControlPointDrag.edge.id === edge.id &&
+          this.activeControlPointDrag.index === i
+        ) {
+          this.activeControlPointDrag = null;
+        }
+        this.renderer.markDirty();
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
    * Handle mouse up to complete or cancel connection
    */
   handleMouseUp(event: InputEvent): boolean {
+    if (this.activeControlPointDrag) {
+      this.activeControlPointDrag = null;
+      this.renderer.markDirty();
+      return true;
+    }
+
     // Handle edge reconnection completion
     if (this.isReconnecting && this.reconnectingEdge) {
       const point = { x: event.worldX, y: event.worldY };
@@ -567,6 +666,9 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     if (this.isConnecting || this.isReconnecting) {
       return;
     }
+
+    this.renderEditablePolylineControls(ctx);
+
     if (!this.hoverNodeId) {
       return;
     }
@@ -601,6 +703,174 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     }
 
     ctx.restore();
+  }
+
+  private tryStartEditableControlInteraction(event: InputEvent): boolean {
+    const point = { x: event.worldX, y: event.worldY };
+    const pointRadius = EDGE_CONTROL_POINT_RADIUS / Math.max(this.renderer.zoom, 0.0001);
+    const addRadius = EDGE_ADD_CONTROL_RADIUS / Math.max(this.renderer.zoom, 0.0001);
+    const pointRadiusSq = pointRadius * pointRadius;
+    const addRadiusSq = addRadius * addRadius;
+    const edges = Array.from(this.renderer.edges.values()).reverse();
+
+    for (const edge of edges) {
+      if (edge.state !== 'selected' || !edge.isEditablePolyline()) {
+        continue;
+      }
+
+      const controlPoints = edge.getEditableControlPoints();
+      for (let i = 0; i < controlPoints.length; i++) {
+        const dx = point.x - controlPoints[i]!.x;
+        const dy = point.y - controlPoints[i]!.y;
+        if (dx * dx + dy * dy > pointRadiusSq) {
+          continue;
+        }
+
+        if (!edge.controlPoints || edge.controlPoints.length === 0) {
+          edge.controlPoints = controlPoints;
+        }
+        this.activeControlPointDrag = { edge, index: i };
+        this.renderer.markDirty();
+        return true;
+      }
+
+      const insertControls = this.getInsertControls(edge, controlPoints);
+      for (const insertControl of insertControls) {
+        const dx = point.x - insertControl.point.x;
+        const dy = point.y - insertControl.point.y;
+        if (dx * dx + dy * dy > addRadiusSq) {
+          continue;
+        }
+
+        const materialized = edge.controlPoints ? [...edge.controlPoints] : [...controlPoints];
+        materialized.splice(insertControl.index, 0, this.snapPoint(insertControl.point));
+        edge.controlPoints = materialized;
+        this.activeControlPointDrag = { edge, index: insertControl.index };
+        this.renderer.markDirty();
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  private renderEditablePolylineControls(ctx: CanvasRenderingContext2D): void {
+    const pointRadius = EDGE_CONTROL_POINT_RADIUS / Math.max(this.renderer.zoom, 0.0001);
+    const addRadius = EDGE_ADD_CONTROL_RADIUS / Math.max(this.renderer.zoom, 0.0001);
+
+    ctx.save();
+    ctx.setLineDash([]);
+
+    for (const edge of this.renderer.edges.values()) {
+      if (edge.state !== 'selected' || !edge.isEditablePolyline()) {
+        continue;
+      }
+
+      const controlPoints = edge.getEditableControlPoints();
+      const insertControls = this.getInsertControls(edge, controlPoints);
+      for (const insertControl of insertControls) {
+        this.drawAddControl(ctx, insertControl.point, addRadius);
+      }
+
+      for (const point of controlPoints) {
+        this.drawControlPoint(ctx, point, pointRadius);
+      }
+    }
+
+    ctx.restore();
+  }
+
+  private getInsertControls(edge: Edge, controlPoints: Point[]): { point: Point; index: number }[] {
+    const vertices = [edge.startPoint, ...controlPoints, edge.endPoint];
+    const controls: { point: Point; index: number }[] = [];
+    for (let i = 0; i < vertices.length - 1; i++) {
+      const start = vertices[i]!;
+      const end = vertices[i + 1]!;
+      controls.push({
+        point: {
+          x: (start.x + end.x) / 2,
+          y: (start.y + end.y) / 2,
+        },
+        index: i,
+      });
+    }
+    return controls;
+  }
+
+  private drawControlPoint(ctx: CanvasRenderingContext2D, point: Point, radius: number): void {
+    ctx.beginPath();
+    ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
+    ctx.fillStyle = '#3b82f6';
+    ctx.fill();
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2 / Math.max(this.renderer.zoom, 0.0001);
+    ctx.stroke();
+  }
+
+  private drawAddControl(ctx: CanvasRenderingContext2D, point: Point, radius: number): void {
+    ctx.beginPath();
+    ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+    ctx.strokeStyle = '#3b82f6';
+    ctx.lineWidth = 1.5 / Math.max(this.renderer.zoom, 0.0001);
+    ctx.stroke();
+
+    const plusSize = radius * 0.7;
+    ctx.beginPath();
+    ctx.moveTo(point.x - plusSize, point.y);
+    ctx.lineTo(point.x + plusSize, point.y);
+    ctx.moveTo(point.x, point.y - plusSize);
+    ctx.lineTo(point.x, point.y + plusSize);
+    ctx.strokeStyle = '#3b82f6';
+    ctx.lineWidth = 1.5 / Math.max(this.renderer.zoom, 0.0001);
+    ctx.stroke();
+  }
+
+  private snapPoint(point: Point): Point {
+    if (!this.snapToGrid) {
+      return point;
+    }
+    return {
+      x: Math.round(point.x / this.gridSize) * this.gridSize,
+      y: Math.round(point.y / this.gridSize) * this.gridSize,
+    };
+  }
+
+  private applyAxisMagnet(edge: Edge, controlPoints: Point[], index: number, point: Point): Point {
+    const vertices = [edge.startPoint, ...controlPoints, edge.endPoint];
+    const prev = vertices[index];
+    const next = vertices[index + 2];
+    if (!prev || !next) {
+      return point;
+    }
+
+    const tolerance = EDGE_AXIS_MAGNET_SCREEN_TOLERANCE / Math.max(this.renderer.zoom, 0.0001);
+    let x = point.x;
+    let y = point.y;
+
+    const xCandidates = [prev.x, next.x];
+    const yCandidates = [prev.y, next.y];
+
+    let closestXDist = Infinity;
+    for (const candidate of xCandidates) {
+      const dist = Math.abs(point.x - candidate);
+      if (dist <= tolerance && dist < closestXDist) {
+        closestXDist = dist;
+        x = candidate;
+      }
+    }
+
+    let closestYDist = Infinity;
+    for (const candidate of yCandidates) {
+      const dist = Math.abs(point.y - candidate);
+      if (dist <= tolerance && dist < closestYDist) {
+        closestYDist = dist;
+        y = candidate;
+      }
+    }
+
+    return { x, y };
   }
 
   private drawPlus(radius: number, ctx: CanvasRenderingContext2D, anchor: { id: AnchorId; point: Point }): void {

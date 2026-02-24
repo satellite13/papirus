@@ -185,6 +185,41 @@ describe('Edge', () => {
     expect(edge.path[edge.path.length - 1]).toEqual({ x: 60, y: 0 });
   });
 
+  it('uses a midpoint handle for editable-polyline by default', () => {
+    const edge = new Edge({
+      from: { nodeId: 'a' },
+      to: { nodeId: 'b' },
+      type: 'editable-polyline',
+    });
+
+    edge.updateEndpoints({ x: 0, y: 0 }, { x: 100, y: 20 });
+    expect(edge.path).toEqual([
+      { x: 0, y: 0 },
+      { x: 50, y: 10 },
+      { x: 100, y: 20 },
+    ]);
+  });
+
+  it('uses explicit control points for editable-polyline', () => {
+    const edge = new Edge({
+      from: { nodeId: 'a' },
+      to: { nodeId: 'b' },
+      type: 'editable-polyline',
+      controlPoints: [
+        { x: 40, y: 0 },
+        { x: 60, y: 30 },
+      ],
+    });
+
+    edge.updateEndpoints({ x: 0, y: 0 }, { x: 100, y: 20 });
+    expect(edge.path).toEqual([
+      { x: 0, y: 0 },
+      { x: 40, y: 0 },
+      { x: 60, y: 30 },
+      { x: 100, y: 20 },
+    ]);
+  });
+
   describe('markers', () => {
     it('supports start and end marker configuration', () => {
       const edge = new Edge({

@@ -3,7 +3,16 @@ import type { DiagramRenderer } from './DiagramRenderer';
 import type { SelectionManager } from './SelectionManager';
 import type { InputEvent } from '@/events/InputHandler';
 import type { Node } from '@/elements/Node';
-import type { Point } from '@/types';
+import type { Bounds, Point } from '@/types';
+
+const ALIGNMENT_SCREEN_TOLERANCE = 8;
+
+interface AlignmentGuide {
+  orientation: 'vertical' | 'horizontal';
+  position: number;
+  from: number;
+  to: number;
+}
 
 /**
  * Drag events
@@ -19,6 +28,7 @@ export interface DragManagerOptions {
   selectionManager: SelectionManager;
   snapToGrid?: boolean;
   gridSize?: number;
+  alignToNodes?: boolean;
 }
 
 /**
@@ -29,12 +39,18 @@ export class DragManager extends EventEmitter<DragEvents> {
   private selectionManager: SelectionManager;
   private snapToGrid: boolean;
   private gridSize: number;
+  private alignToNodes: boolean;
 
   private isDragging = false;
   private draggedNodes: Node[] = [];
   private dragStartPoint: Point | null = null;
   private lastDragPoint: Point | null = null;
   private initialPositions = new Map<string, Point>();
+  private editableBendFollow = new Map<
+    string,
+    Array<{ edgeId: string; controlPointIndex: number; axis: 'vertical' | 'horizontal' }>
+  >();
+  private alignmentGuides: AlignmentGuide[] = [];
   private _handledMouseDown = false;
   private draggedGroupSelection = false;
 
@@ -44,6 +60,7 @@ export class DragManager extends EventEmitter<DragEvents> {
     this.selectionManager = options.selectionManager;
     this.snapToGrid = options.snapToGrid ?? false;
     this.gridSize = options.gridSize ?? 20;
+    this.alignToNodes = options.alignToNodes ?? true;
   }
 
   /**
@@ -60,6 +77,32 @@ export class DragManager extends EventEmitter<DragEvents> {
     return this._handledMouseDown;
   }
 
+  renderAlignmentGuides(ctx: CanvasRenderingContext2D): void {
+    if (!this.alignToNodes || !this.isDragging || this.alignmentGuides.length === 0) {
+      return;
+    }
+
+    const zoom = Math.max(this.renderer.zoom, 0.0001);
+    ctx.save();
+    ctx.setLineDash([6 / zoom, 4 / zoom]);
+    ctx.strokeStyle = '#6366f1';
+    ctx.lineWidth = 1.5 / zoom;
+
+    for (const guide of this.alignmentGuides) {
+      ctx.beginPath();
+      if (guide.orientation === 'vertical') {
+        ctx.moveTo(guide.position, guide.from);
+        ctx.lineTo(guide.position, guide.to);
+      } else {
+        ctx.moveTo(guide.from, guide.position);
+        ctx.lineTo(guide.to, guide.position);
+      }
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+
   /**
    * Enable/disable snap to grid
    */
@@ -67,6 +110,17 @@ export class DragManager extends EventEmitter<DragEvents> {
     this.snapToGrid = enabled;
     if (gridSize !== undefined) {
       this.gridSize = gridSize;
+    }
+  }
+
+  /**
+   * Enable/disable smart alignment to other nodes while dragging.
+   */
+  setAlignmentEnabled(enabled: boolean): void {
+    this.alignToNodes = enabled;
+    if (!enabled && this.alignmentGuides.length > 0) {
+      this.alignmentGuides = [];
+      this.renderer.markDirty();
     }
   }
 
@@ -189,6 +243,8 @@ export class DragManager extends EventEmitter<DragEvents> {
       // Start dragging
       this.isDragging = true;
       this._handledMouseDown = true; // Mark as handled now that drag started
+      this.buildEditableBendFollowBindings();
+      this.alignmentGuides = [];
       for (const node of this.draggedNodes) {
         node.state = 'dragging';
       }
@@ -211,13 +267,17 @@ export class DragManager extends EventEmitter<DragEvents> {
       y: point.y - this.lastDragPoint!.y,
     };
 
+    const alignedDelta = this.resolveAlignmentDelta(totalDelta);
+
     // Move nodes using initial position + total offset
     for (const node of this.draggedNodes) {
       const initial = this.initialPositions.get(node.id);
       if (initial === undefined) continue;
+      const prevX = node.x;
+      const prevY = node.y;
 
-      let newX = initial.x + totalDelta.x;
-      let newY = initial.y + totalDelta.y;
+      let newX = initial.x + alignedDelta.x;
+      let newY = initial.y + alignedDelta.y;
 
       if (this.snapToGrid) {
         newX = Math.round(newX / this.gridSize) * this.gridSize;
@@ -226,6 +286,7 @@ export class DragManager extends EventEmitter<DragEvents> {
 
       node.x = newX;
       node.y = newY;
+      this.followNearestEditableBend(node.id, newX - prevX, newY - prevY);
     }
 
     this.lastDragPoint = point;
@@ -306,8 +367,265 @@ export class DragManager extends EventEmitter<DragEvents> {
     this.dragStartPoint = null;
     this.lastDragPoint = null;
     this.initialPositions.clear();
+    this.editableBendFollow.clear();
+    this.alignmentGuides = [];
     this.draggedGroupSelection = false;
     // Note: _handledMouseDown is reset at the start of next handleMouseDown
     // to prevent click handler from firing after mouseup
+  }
+
+  private buildEditableBendFollowBindings(): void {
+    this.editableBendFollow.clear();
+    const draggedIds = new Set(this.draggedNodes.map((node) => node.id));
+    const ORTHOGONAL_TOLERANCE = 6;
+
+    for (const node of this.draggedNodes) {
+      const bindings: Array<{ edgeId: string; controlPointIndex: number; axis: 'vertical' | 'horizontal' }> = [];
+
+      for (const edge of this.renderer.edges.values()) {
+        if (!edge.isEditablePolyline() || !edge.controlPoints || edge.controlPoints.length === 0) {
+          continue;
+        }
+
+        const isFrom = edge.from.nodeId === node.id;
+        const isTo = edge.to.nodeId === node.id;
+        if (!isFrom && !isTo) {
+          continue;
+        }
+
+        const oppositeNodeId = isFrom ? edge.to.nodeId : edge.from.nodeId;
+        if (draggedIds.has(oppositeNodeId)) {
+          continue;
+        }
+
+        const endpoint = isFrom ? edge.startPoint : edge.endPoint;
+        let nearestIndex = -1;
+        let nearestDistanceSq = Infinity;
+
+        for (let i = 0; i < edge.controlPoints.length; i++) {
+          const point = edge.controlPoints[i]!;
+          const dx = point.x - endpoint.x;
+          const dy = point.y - endpoint.y;
+          const distSq = dx * dx + dy * dy;
+          if (distSq < nearestDistanceSq) {
+            nearestDistanceSq = distSq;
+            nearestIndex = i;
+          }
+        }
+
+        if (nearestIndex < 0) {
+          continue;
+        }
+
+        const nearestPoint = edge.controlPoints[nearestIndex]!;
+        const deltaX = Math.abs(nearestPoint.x - endpoint.x);
+        const deltaY = Math.abs(nearestPoint.y - endpoint.y);
+
+        if (deltaX <= ORTHOGONAL_TOLERANCE && deltaY <= ORTHOGONAL_TOLERANCE) {
+          continue;
+        }
+
+        let axis: 'vertical' | 'horizontal' | null = null;
+        if (deltaX <= ORTHOGONAL_TOLERANCE || deltaX <= deltaY) {
+          axis = 'vertical';
+        } else if (deltaY <= ORTHOGONAL_TOLERANCE || deltaY < deltaX) {
+          axis = 'horizontal';
+        }
+
+        if (!axis) {
+          continue;
+        }
+
+        bindings.push({
+          edgeId: edge.id,
+          controlPointIndex: nearestIndex,
+          axis,
+        });
+      }
+
+      if (bindings.length > 0) {
+        this.editableBendFollow.set(node.id, bindings);
+      }
+    }
+  }
+
+  private followNearestEditableBend(nodeId: string, deltaX: number, deltaY: number): void {
+    const bindings = this.editableBendFollow.get(nodeId);
+    if (!bindings || bindings.length === 0) {
+      return;
+    }
+
+    for (const binding of bindings) {
+      const edge = this.renderer.getEdge(binding.edgeId);
+      if (!edge?.controlPoints) {
+        continue;
+      }
+      if (binding.controlPointIndex < 0 || binding.controlPointIndex >= edge.controlPoints.length) {
+        continue;
+      }
+
+      const nextControlPoints = [...edge.controlPoints];
+      const point = { ...nextControlPoints[binding.controlPointIndex]! };
+      if (binding.axis === 'vertical' && deltaX !== 0) {
+        point.x += deltaX;
+      } else if (binding.axis === 'horizontal' && deltaY !== 0) {
+        point.y += deltaY;
+      } else {
+        continue;
+      }
+      nextControlPoints[binding.controlPointIndex] = point;
+      edge.controlPoints = nextControlPoints;
+    }
+  }
+
+  private resolveAlignmentDelta(totalDelta: Point): Point {
+    this.alignmentGuides = [];
+    if (!this.alignToNodes) {
+      return totalDelta;
+    }
+    if (this.draggedNodes.length === 0) {
+      return totalDelta;
+    }
+
+    const draggedBounds = this.getDraggedBounds(totalDelta);
+    if (!draggedBounds) {
+      return totalDelta;
+    }
+
+    const tolerance = ALIGNMENT_SCREEN_TOLERANCE / Math.max(this.renderer.zoom, 0.0001);
+    const draggedIds = new Set(this.draggedNodes.map((node) => node.id));
+
+    const movingXLines = [
+      { key: 'start', value: draggedBounds.x },
+      { key: 'center', value: draggedBounds.x + draggedBounds.width / 2 },
+      { key: 'end', value: draggedBounds.x + draggedBounds.width },
+    ];
+    const movingYLines = [
+      { key: 'start', value: draggedBounds.y },
+      { key: 'center', value: draggedBounds.y + draggedBounds.height / 2 },
+      { key: 'end', value: draggedBounds.y + draggedBounds.height },
+    ];
+
+    let bestVertical:
+      | { offset: number; x: number; fromY: number; toY: number; distance: number }
+      | null = null;
+    let bestHorizontal:
+      | { offset: number; y: number; fromX: number; toX: number; distance: number }
+      | null = null;
+
+    for (const node of this.renderer.nodes.values()) {
+      if (!node.visible || draggedIds.has(node.id)) {
+        continue;
+      }
+
+      const bounds = node.getBounds();
+      const targetXLines = [
+        { key: 'start', value: bounds.x },
+        { key: 'center', value: bounds.x + bounds.width / 2 },
+        { key: 'end', value: bounds.x + bounds.width },
+      ];
+      const targetYLines = [
+        { key: 'start', value: bounds.y },
+        { key: 'center', value: bounds.y + bounds.height / 2 },
+        { key: 'end', value: bounds.y + bounds.height },
+      ];
+
+      for (const moving of movingXLines) {
+        for (const target of targetXLines) {
+          if (moving.key !== target.key) {
+            continue;
+          }
+          const dist = Math.abs(moving.value - target.value);
+          if (dist > tolerance) {
+            continue;
+          }
+          if (!bestVertical || dist < bestVertical.distance) {
+            bestVertical = {
+              offset: target.value - moving.value,
+              x: target.value,
+              fromY: Math.min(draggedBounds.y, bounds.y),
+              toY: Math.max(draggedBounds.y + draggedBounds.height, bounds.y + bounds.height),
+              distance: dist,
+            };
+          }
+        }
+      }
+
+      for (const moving of movingYLines) {
+        for (const target of targetYLines) {
+          if (moving.key !== target.key) {
+            continue;
+          }
+          const dist = Math.abs(moving.value - target.value);
+          if (dist > tolerance) {
+            continue;
+          }
+          if (!bestHorizontal || dist < bestHorizontal.distance) {
+            bestHorizontal = {
+              offset: target.value - moving.value,
+              y: target.value,
+              fromX: Math.min(draggedBounds.x, bounds.x),
+              toX: Math.max(draggedBounds.x + draggedBounds.width, bounds.x + bounds.width),
+              distance: dist,
+            };
+          }
+        }
+      }
+    }
+
+    const result = { ...totalDelta };
+    if (bestVertical) {
+      result.x += bestVertical.offset;
+      this.alignmentGuides.push({
+        orientation: 'vertical',
+        position: bestVertical.x,
+        from: bestVertical.fromY,
+        to: bestVertical.toY,
+      });
+    }
+    if (bestHorizontal) {
+      result.y += bestHorizontal.offset;
+      this.alignmentGuides.push({
+        orientation: 'horizontal',
+        position: bestHorizontal.y,
+        from: bestHorizontal.fromX,
+        to: bestHorizontal.toX,
+      });
+    }
+
+    return result;
+  }
+
+  private getDraggedBounds(delta: Point): Bounds | null {
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    let hasBounds = false;
+
+    for (const node of this.draggedNodes) {
+      const initial = this.initialPositions.get(node.id);
+      if (!initial) {
+        continue;
+      }
+      const x = initial.x + delta.x;
+      const y = initial.y + delta.y;
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x + node.width);
+      maxY = Math.max(maxY, y + node.height);
+      hasBounds = true;
+    }
+
+    if (!hasBounds) {
+      return null;
+    }
+
+    return {
+      x: minX,
+      y: minY,
+      width: maxX - minX,
+      height: maxY - minY,
+    };
   }
 }

@@ -7,6 +7,19 @@
 
 ## [Unreleased]
 
+## [0.3.12] - 2026-02-24
+
+### Added
+- Добавлен новый тип пути связи `editable-polyline` с интерактивными точками перелома.
+- Для `editable-polyline` добавлены: центральная точка по умолчанию, кнопки `+` на сегментах для вставки новых переломов, удаление точки по двойному клику.
+- Добавлены осевые магниты и snap к сетке для редактирования точек перелома.
+- Добавлен smart-align узлов при перетаскивании с визуальными направляющими.
+- Добавлена настройка `alignToNodes` в `enableInteractions` и runtime-переключатель `interactions.drag.setAlignmentEnabled(...)`.
+
+### Changed
+- Обновлены примеры (`basic`, `ports`): добавлена демонстрация `editable-polyline`, переключатели `Align ON/OFF` и `Rulers ON/OFF`, расширено управление snap.
+- Обновлена документация (`README.md`, `README.ru.md`, `docs/interactions.md`) с описанием новых интерактивных возможностей.
+
 ## [0.3.11] - 2026-02-24
 
 ### Fixed
@@ -110,7 +123,8 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.3.11...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.3.12...HEAD
+[0.3.12]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.12
 [0.3.11]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.11
 [0.3.10]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.10
 [0.3.9]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.9

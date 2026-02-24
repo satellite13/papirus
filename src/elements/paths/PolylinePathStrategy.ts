@@ -309,6 +309,14 @@ export class PolylinePathStrategy implements PathStrategy {
     toDir?: string,
     _options?: PathStrategyOptions
   ): Point[] {
+    const controlPoints = _options?.controlPoints;
+    if (_options?.editablePolyline) {
+      if (controlPoints && controlPoints.length > 0) {
+        return [from, ...controlPoints, to];
+      }
+      return [from, { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 }, to];
+    }
+
     const dx = to.x - from.x;
     const dy = to.y - from.y;
     const distance = Math.sqrt(dx * dx + dy * dy);

@@ -219,8 +219,9 @@ export class Edge extends Element {
   }
 
   /**
-   * Control points for custom bezier paths.
-   * Format: [cp1, cp2, end, cp1, cp2, end, ...]
+   * Control points for custom paths.
+   * For bezier format: [cp1, cp2, end, cp1, cp2, end, ...]
+   * For editable-polyline: [point1, point2, ...]
    */
   get controlPoints(): Point[] | undefined {
     return this._controlPoints;
@@ -229,6 +230,30 @@ export class Edge extends Element {
   set controlPoints(value: Point[] | undefined) {
     this._controlPoints = value;
     this.recalculatePath();
+  }
+
+  /**
+   * Whether this edge uses editable polyline controls.
+   */
+  isEditablePolyline(): boolean {
+    return this._type === 'editable-polyline';
+  }
+
+  /**
+   * Returns current editable control points.
+   * For a fresh editable-polyline edge, exposes a virtual midpoint handle.
+   */
+  getEditableControlPoints(): Point[] {
+    if (!this.isEditablePolyline()) {
+      return [];
+    }
+    if (this._controlPoints && this._controlPoints.length > 0) {
+      return this._controlPoints.map((point) => ({ ...point }));
+    }
+    return [{
+      x: (this._fromPoint.x + this._toPoint.x) / 2,
+      y: (this._fromPoint.y + this._toPoint.y) / 2,
+    }];
   }
 
   /**
@@ -380,6 +405,7 @@ export class Edge extends Element {
       {
         ...this._pathOptions,
         controlPoints: this._controlPoints,
+        editablePolyline: this.isEditablePolyline(),
         selfLoop: this._from.nodeId === this._to.nodeId,
       }
     );
@@ -973,6 +999,8 @@ export class Edge extends Element {
       case 'straight':
         return new StraightPathStrategy();
       case 'polyline':
+        return new PolylinePathStrategy();
+      case 'editable-polyline':
         return new PolylinePathStrategy();
       case 'bezier':
         return new BezierPathStrategy();
