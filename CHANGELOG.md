@@ -7,6 +7,12 @@
 
 ## [Unreleased]
 
+## [0.3.13] - 2026-02-24
+
+### Fixed
+- Исправлена отрисовка миникарты: рамка миникарты и рамка viewport больше не наследуют пунктир от ранее отрисованных пунктирных рёбер.
+- В `MiniMap` добавлен явный сброс `lineDash`/`lineDashOffset` перед отрисовкой рамок, чтобы состояние canvas не «протекало» между элементами.
+
 ## [0.3.12] - 2026-02-24
 
 ### Added
@@ -123,7 +129,8 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.3.12...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.3.13...HEAD
+[0.3.13]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.13
 [0.3.12]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.12
 [0.3.11]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.11
 [0.3.10]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.10

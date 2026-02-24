@@ -59,6 +59,9 @@ export class MiniMap implements DiagramPlugin {
 
       ctx.save();
       ctx.setTransform(renderer.pixelRatio, 0, 0, renderer.pixelRatio, 0, 0);
+      // MiniMap frame must remain solid even if main canvas rendered dashed edges before.
+      ctx.setLineDash([]);
+      ctx.lineDashOffset = 0;
 
       ctx.fillStyle = this.options.backgroundColor;
       ctx.fillRect(x, y, width, height);
@@ -70,6 +73,8 @@ export class MiniMap implements DiagramPlugin {
       ctx.translate(mapOffsetX, mapOffsetY);
       ctx.scale(scale, scale);
       ctx.translate(-bounds.x, -bounds.y);
+      ctx.setLineDash([]);
+      ctx.lineDashOffset = 0;
 
       ctx.strokeStyle = '#94a3b8';
       ctx.lineWidth = 1 / scale;
@@ -102,6 +107,8 @@ export class MiniMap implements DiagramPlugin {
 
       ctx.strokeStyle = this.options.viewportColor;
       ctx.lineWidth = 1.5;
+      ctx.setLineDash([]);
+      ctx.lineDashOffset = 0;
       ctx.strokeRect(viewRect.x, viewRect.y, viewRect.width, viewRect.height);
 
       ctx.restore();
