@@ -7,6 +7,13 @@
 
 ## [Unreleased]
 
+## [0.3.10] - 2026-02-24
+
+### Fixed
+- Исправлено залипание перетаскивания scrollbars/minimap: если кнопка мыши отпущена вне canvas, drag-сессия принудительно завершается при возврате курсора.
+- Отключен горизонтальный pan от wheel/trackpad-жестов: прокрутка колесом теперь используется только для zoom.
+- Обновлён пример `basic`: удалена устаревшая подсказка про `Shift + wheel` для горизонтального pan.
+
 ## [0.3.9] - 2026-02-23
 
 ### Fixed
@@ -97,7 +104,8 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.3.9...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.3.10...HEAD
+[0.3.10]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.10
 [0.3.9]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.9
 [0.3.4]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.4
 [0.3.3]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.3

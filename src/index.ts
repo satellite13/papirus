@@ -144,6 +144,7 @@ export type {
   EdgeStyle,
   TextStyle,
   DiagramOptions,
+  ScrollbarOptions,
   AnimationOptions,
   ViewportState,
   DiagramData,

@@ -3,10 +3,12 @@ import { DiagramRenderer } from './DiagramRenderer';
 import { InteractionManager } from './InteractionManager';
 import { RectangleNode } from '../elements/nodes/RectangleNode';
 import { Edge } from '../elements/Edge';
+import { MiniMap } from './overlays/MiniMap';
 import { stubCanvasContext, stubAnimationFrame } from '../test/testUtils';
 
 describe('InteractionManager', () => {
   beforeEach(() => {
+    document.body.innerHTML = '';
     stubCanvasContext();
     stubAnimationFrame();
   });
@@ -169,5 +171,213 @@ describe('InteractionManager', () => {
     }
 
     expect(editor.value).toBe('Retry');
+  });
+
+  it('drags horizontal scrollbar thumb to pan viewport', () => {
+    const canvas = document.createElement('canvas');
+    vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 200,
+      height: 120,
+      right: 200,
+      bottom: 120,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+    const renderer = new DiagramRenderer(canvas, { width: 200, height: 120, retina: false });
+    new InteractionManager({ renderer });
+
+    const distantNode = new RectangleNode({ x: 420, y: 20, width: 80, height: 40 });
+    renderer.addNode(distantNode);
+
+    expect(renderer.offsetX).toBe(0);
+
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', { clientX: 10, clientY: 112, button: 0, bubbles: true })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mousemove', { clientX: 170, clientY: 112, button: 0, buttons: 1, bubbles: true })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mouseup', { clientX: 170, clientY: 112, button: 0, bubbles: true })
+    );
+
+    expect(renderer.offsetX).toBeLessThan(0);
+  });
+
+  it('stops scrollbar drag when mouse button is released outside canvas', () => {
+    const canvas = document.createElement('canvas');
+    vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 200,
+      height: 120,
+      right: 200,
+      bottom: 120,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+    const renderer = new DiagramRenderer(canvas, { width: 200, height: 120, retina: false });
+    new InteractionManager({ renderer });
+
+    renderer.addNode(new RectangleNode({ x: 420, y: 20, width: 80, height: 40 }));
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', { clientX: 10, clientY: 112, button: 0, buttons: 1, bubbles: true })
+    );
+
+    const offsetBeforeReenter = renderer.offsetX;
+    canvas.dispatchEvent(
+      new MouseEvent('mousemove', { clientX: 170, clientY: 112, button: 0, buttons: 0, bubbles: true })
+    );
+
+    expect(renderer.offsetX).toBe(offsetBeforeReenter);
+  });
+
+  it('handles PageDown viewport scrolling', () => {
+    const canvas = document.createElement('canvas');
+    canvas.tabIndex = 0;
+    vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 240,
+      height: 140,
+      right: 240,
+      bottom: 140,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+    const renderer = new DiagramRenderer(canvas, { width: 240, height: 140, retina: false });
+    new InteractionManager({ renderer });
+    renderer.addNode(new RectangleNode({ x: 20, y: 600, width: 120, height: 80 }));
+    canvas.focus();
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'PageDown' }));
+    expect(renderer.offsetY).toBeLessThan(0);
+  });
+
+  it('keeps zoom behavior when wheel has minor horizontal noise', () => {
+    const canvas = document.createElement('canvas');
+    vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 240,
+      height: 140,
+      right: 240,
+      bottom: 140,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+    const renderer = new DiagramRenderer(canvas, { width: 240, height: 140, retina: false });
+    new InteractionManager({ renderer });
+
+    expect(renderer.zoom).toBe(1);
+    canvas.dispatchEvent(
+      new WheelEvent('wheel', {
+        clientX: 120,
+        clientY: 70,
+        deltaX: 0.3,
+        deltaY: -80,
+        bubbles: true,
+      })
+    );
+
+    expect(renderer.zoom).not.toBe(1);
+  });
+
+  it('ignores pure horizontal wheel scroll for viewport pan', () => {
+    const canvas = document.createElement('canvas');
+    vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 240,
+      height: 140,
+      right: 240,
+      bottom: 140,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+    const renderer = new DiagramRenderer(canvas, { width: 240, height: 140, retina: false });
+    new InteractionManager({ renderer });
+
+    const initialOffsetX = renderer.offsetX;
+    const initialZoom = renderer.zoom;
+    canvas.dispatchEvent(
+      new WheelEvent('wheel', {
+        clientX: 120,
+        clientY: 70,
+        deltaX: 80,
+        deltaY: 0,
+        bubbles: true,
+      })
+    );
+
+    expect(renderer.offsetX).toBe(initialOffsetX);
+    expect(renderer.zoom).toBe(initialZoom);
+  });
+
+  it('drags minimap viewport to pan diagram', () => {
+    const canvas = document.createElement('canvas');
+    vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 400,
+      height: 220,
+      right: 400,
+      bottom: 220,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+
+    const renderer = new DiagramRenderer(canvas, { width: 400, height: 220, retina: false });
+    renderer.use(new MiniMap({ width: 160, height: 96, padding: 10 }));
+    new InteractionManager({ renderer });
+    renderer.addNode(new RectangleNode({ x: 900, y: 40, width: 120, height: 80 }));
+
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', { clientX: 250, clientY: 156, button: 0, bubbles: true })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mousemove', { clientX: 330, clientY: 156, button: 0, buttons: 1, bubbles: true })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mouseup', { clientX: 330, clientY: 156, button: 0, bubbles: true })
+    );
+
+    expect(renderer.offsetX).toBeLessThan(0);
+  });
+
+  it('ends active minimap drag session on destroy', () => {
+    const canvas = document.createElement('canvas');
+    vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 400,
+      height: 220,
+      right: 400,
+      bottom: 220,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+
+    const renderer = new DiagramRenderer(canvas, { width: 400, height: 220, retina: false });
+    renderer.use(new MiniMap({ width: 160, height: 96, padding: 10 }));
+    const interaction = new InteractionManager({ renderer });
+    renderer.addNode(new RectangleNode({ x: 900, y: 40, width: 120, height: 80 }));
+
+    const endOverlayDragSpy = vi.spyOn(renderer, 'endOverlayDrag');
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', { clientX: 250, clientY: 156, button: 0, bubbles: true })
+    );
+
+    interaction.destroy();
+    expect(endOverlayDragSpy).toHaveBeenCalledTimes(1);
   });
 });

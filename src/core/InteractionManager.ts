@@ -1,6 +1,6 @@
 import { InputHandler } from '@/events/InputHandler';
 import type { InputEvent, WheelInputEvent, PanInputEvent, PinchInputEvent } from '@/events/InputHandler';
-import type { DiagramRenderer } from './DiagramRenderer';
+import type { DiagramRenderer, OverlayDragSession } from './DiagramRenderer';
 import { SelectionManager } from './SelectionManager';
 import { DragManager } from './DragManager';
 import { ResizeManager } from './ResizeManager';
@@ -95,6 +95,11 @@ export class InteractionManager {
     textarea: HTMLTextAreaElement;
     cleanup: () => void;
   } | null = null;
+  private scrollbarDragState: { axis: 'horizontal' | 'vertical'; pointerOffset: number } | null =
+    null;
+  private handledScrollbarMouseDown = false;
+  private overlayDragSession: OverlayDragSession | null = null;
+  private handledOverlayMouseDown = false;
 
   constructor(options: InteractionManagerOptions) {
     this.renderer = options.renderer;
@@ -248,6 +253,15 @@ export class InteractionManager {
 
   destroy(): void {
     this.finishInlineLabelEdit(false);
+    if (this.overlayDragSession) {
+      this.renderer.endOverlayDrag(this.overlayDragSession);
+      this.overlayDragSession = null;
+    }
+    if (this.scrollbarDragState) {
+      this.renderer.setScrollbarActiveAxis(null);
+      this.scrollbarDragState = null;
+    }
+    this.renderer.clearScrollbarHover();
     this.inputHandler.destroy();
     this.overlayCleanup?.();
     this.overlayCleanup = null;
@@ -356,6 +370,9 @@ export class InteractionManager {
   }
 
   private handleMouseDown(event: InputEvent): void {
+    this.handledScrollbarMouseDown = false;
+    this.handledOverlayMouseDown = false;
+
     if (this.resizeManager.handleMouseDown(event)) {
       return;
     }
@@ -363,6 +380,27 @@ export class InteractionManager {
       return;
     }
     if (this.connectionManager.tryStartConnectionAtPoint(event)) {
+      return;
+    }
+
+    const overlayDrag = this.renderer.beginOverlayDrag(event.screenX, event.screenY);
+    if (overlayDrag) {
+      this.overlayDragSession = overlayDrag;
+      this.handledOverlayMouseDown = true;
+      return;
+    }
+
+    const scrollbarHit = this.renderer.hitTestScrollbarThumb(event.screenX, event.screenY);
+    if (scrollbarHit) {
+      this.scrollbarDragState = scrollbarHit;
+      this.handledScrollbarMouseDown = true;
+      this.renderer.setScrollbarActiveAxis(scrollbarHit.axis);
+      this.renderer.notifyScrollbarInteraction();
+      return;
+    }
+
+    if (this.renderer.clickScrollbarTrack(event.screenX, event.screenY)) {
+      this.handledScrollbarMouseDown = true;
       return;
     }
 
@@ -391,6 +429,46 @@ export class InteractionManager {
   }
 
   private handleMouseMove(event: InputEvent): void {
+    if (event.originalEvent instanceof MouseEvent && event.originalEvent.buttons === 0) {
+      if (this.overlayDragSession) {
+        this.renderer.endOverlayDrag(this.overlayDragSession);
+        this.overlayDragSession = null;
+      }
+      if (this.scrollbarDragState) {
+        this.renderer.setScrollbarActiveAxis(null);
+        this.scrollbarDragState = null;
+      }
+    }
+
+    const overScrollbar = this.renderer.updateScrollbarHover(event.screenX, event.screenY);
+
+    if (this.overlayDragSession) {
+      const moved = this.renderer.updateOverlayDrag(this.overlayDragSession, event.screenX, event.screenY);
+      if (moved) {
+        return;
+      }
+      this.renderer.endOverlayDrag(this.overlayDragSession);
+      this.overlayDragSession = null;
+    }
+
+    if (this.scrollbarDragState) {
+      const moved = this.renderer.dragScrollbarThumb(
+        this.scrollbarDragState.axis,
+        event.screenX,
+        event.screenY,
+        this.scrollbarDragState.pointerOffset
+      );
+      if (moved) {
+        return;
+      }
+      this.renderer.setScrollbarActiveAxis(null);
+      this.scrollbarDragState = null;
+    }
+
+    if (overScrollbar) {
+      return;
+    }
+
     if (this.resizeManager.handleMouseMove(event)) {
       return;
     }
@@ -412,6 +490,18 @@ export class InteractionManager {
   }
 
   private handleMouseUp(event: InputEvent): void {
+    if (this.overlayDragSession) {
+      this.renderer.endOverlayDrag(this.overlayDragSession);
+      this.overlayDragSession = null;
+      return;
+    }
+
+    if (this.scrollbarDragState) {
+      this.scrollbarDragState = null;
+      this.renderer.setScrollbarActiveAxis(null);
+      return;
+    }
+
     if (this.resizeManager.handleMouseUp()) {
       return;
     }
@@ -433,6 +523,16 @@ export class InteractionManager {
   }
 
   private handleClick(event: InputEvent): void {
+    if (this.handledOverlayMouseDown) {
+      this.handledOverlayMouseDown = false;
+      return;
+    }
+
+    if (this.handledScrollbarMouseDown) {
+      this.handledScrollbarMouseDown = false;
+      return;
+    }
+
     if (
       this.dragManager.handledMouseDown ||
       this.resizeManager.handledMouseDown ||
@@ -537,6 +637,10 @@ export class InteractionManager {
 
     this.navigationManager.handleKeyDown(event);
 
+    if (this.handleViewportNavigationKey(event)) {
+      return;
+    }
+
     if (this.keymap.deleteKeys.includes(event.key)) {
       event.preventDefault();
       this.deleteSelection();
@@ -558,6 +662,29 @@ export class InteractionManager {
 
   private handleKeyUp(event: KeyboardEvent): void {
     this.navigationManager.handleKeyUp(event);
+  }
+
+  private handleViewportNavigationKey(event: KeyboardEvent): boolean {
+    switch (event.key) {
+      case 'PageDown':
+        event.preventDefault();
+        this.renderer.scrollViewportBy(0, this.renderer.height * 0.8);
+        return true;
+      case 'PageUp':
+        event.preventDefault();
+        this.renderer.scrollViewportBy(0, -this.renderer.height * 0.8);
+        return true;
+      case 'Home':
+        event.preventDefault();
+        this.renderer.scrollViewportToStart();
+        return true;
+      case 'End':
+        event.preventDefault();
+        this.renderer.scrollViewportToEnd();
+        return true;
+      default:
+        return false;
+    }
   }
 
   private startInlineLabelEdit(kind: 'node' | 'edge', id: string, text: string, worldPosition: Point): void {

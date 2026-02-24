@@ -149,8 +149,31 @@ export interface DiagramOptions {
   maxZoom?: number;
   initialZoom?: number;
   snapToGrid?: boolean;
+  /**
+   * @deprecated Use `scrollbar.enabled` instead.
+   */
   scrollbarOverlay?: boolean;
+  scrollbar?: boolean | Partial<ScrollbarOptions>;
   animations?: AnimationOptions;
+}
+
+/**
+ * Scrollbar overlay configuration
+ */
+export interface ScrollbarOptions {
+  enabled: boolean;
+  autoHide: boolean;
+  autoHideDelay: number;
+  fadeDuration: number;
+  thickness: number;
+  hoverThickness: number;
+  minThumbLength: number;
+  hitAreaPadding: number;
+  pageScrollRatio: number;
+  trackColor: string;
+  thumbColor: string;
+  thumbHoverColor: string;
+  thumbActiveColor: string;
 }
 
 /**
