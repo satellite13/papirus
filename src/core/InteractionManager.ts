@@ -438,6 +438,9 @@ export class InteractionManager {
         this.renderer.setScrollbarActiveAxis(null);
         this.scrollbarDragState = null;
       }
+      if (this.navigationManager.panning) {
+        this.navigationManager.handleMouseUp(event);
+      }
     }
 
     const overScrollbar = this.renderer.updateScrollbarHover(event.screenX, event.screenY);

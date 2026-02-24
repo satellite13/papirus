@@ -236,6 +236,36 @@ describe('InteractionManager', () => {
     expect(renderer.offsetX).toBe(offsetBeforeReenter);
   });
 
+  it('stops canvas pan when mouse button is released outside canvas', () => {
+    const canvas = document.createElement('canvas');
+    vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 300,
+      height: 180,
+      right: 300,
+      bottom: 180,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+    const renderer = new DiagramRenderer(canvas, { width: 300, height: 180, retina: false });
+    new InteractionManager({ renderer });
+
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', { clientX: 40, clientY: 40, button: 0, buttons: 1, bubbles: true })
+    );
+
+    const offsetBeforeReenterX = renderer.offsetX;
+    const offsetBeforeReenterY = renderer.offsetY;
+    canvas.dispatchEvent(
+      new MouseEvent('mousemove', { clientX: 120, clientY: 120, button: 0, buttons: 0, bubbles: true })
+    );
+
+    expect(renderer.offsetX).toBe(offsetBeforeReenterX);
+    expect(renderer.offsetY).toBe(offsetBeforeReenterY);
+  });
+
   it('handles PageDown viewport scrolling', () => {
     const canvas = document.createElement('canvas');
     canvas.tabIndex = 0;

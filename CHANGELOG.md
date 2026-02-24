@@ -7,6 +7,12 @@
 
 ## [Unreleased]
 
+## [0.3.11] - 2026-02-24
+
+### Fixed
+- Исправлено залипание панорамирования canvas при отпускании кнопки мыши вне области canvas: при повторном входе курсора pan-сессия корректно завершается.
+- В тестах `InteractionManager` добавлен сценарий для проверки завершения pan после потери `mouseup`.
+
 ## [0.3.10] - 2026-02-24
 
 ### Fixed
@@ -104,7 +110,8 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.3.10...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.3.11...HEAD
+[0.3.11]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.11
 [0.3.10]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.10
 [0.3.9]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.9
 [0.3.4]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.4
