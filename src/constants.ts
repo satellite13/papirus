@@ -37,6 +37,9 @@ export const ANCHOR_PORT_PREFIX = 'anchor:';
 // Bezier curve calculation
 export const BEZIER_MAX_OFFSET = 100;
 
+/** Screen distance (px) within which edge endpoint snaps to shape outline when attachToOutline */
+export const OUTLINE_SNAP_SCREEN_TOLERANCE = 40;
+
 // Selection
 export const SELECTION_RECT_MIN_SIZE = 1;
 export const DEFAULT_SELECTION_COLOR = '#3b82f6';

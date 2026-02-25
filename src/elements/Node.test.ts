@@ -159,4 +159,72 @@ describe('Node', () => {
     expect(diamond.width).toBeGreaterThan(circle.width);
     expect(diamond.height).toBeGreaterThan(120);
   });
+
+  it('getConnectionPointAtOutlineParam and getClosestPointOnOutline work for rectangle', () => {
+    const node = new RectangleNode({ x: 10, y: 20, width: 100, height: 60 });
+    const P = 2 * (100 + 60);
+
+    // param 0 = top-left corner
+    const p0 = node.getConnectionPointAtOutlineParam(0);
+    expect(p0.x).toBeCloseTo(10);
+    expect(p0.y).toBeCloseTo(20);
+
+    // param 0.25 = roughly right of top edge (top is w/P of perimeter)
+    const p025 = node.getConnectionPointAtOutlineParam(0.25);
+    expect(p025.y).toBeCloseTo(20);
+
+    const { point, param } = node.getClosestPointOnOutline({ x: 60, y: 15 });
+    expect(point.y).toBeCloseTo(20);
+    expect(param).toBeGreaterThanOrEqual(0);
+    expect(param).toBeLessThanOrEqual(1);
+
+    // round-trip: param -> point -> closest -> param should be close
+    const testParam = 0.37;
+    const pt = node.getConnectionPointAtOutlineParam(testParam);
+    const { param: backParam } = node.getClosestPointOnOutline(pt);
+    expect(Math.abs((backParam % 1) - (testParam % 1))).toBeLessThan(0.01);
+  });
+
+  it('getConnectionPointAtOutlineParam and getClosestPointOnOutline work for circle', () => {
+    const node = new CircleNode({ x: 0, y: 0, width: 100, height: 60 });
+    const center = { x: 50, y: 30 };
+    const rx = 50;
+    const ry = 30;
+
+    const p0 = node.getConnectionPointAtOutlineParam(0);
+    expect(p0.x).toBeCloseTo(center.x);
+    expect(p0.y).toBeCloseTo(center.y - ry);
+
+    const { point, param } = node.getClosestPointOnOutline({ x: 80, y: 30 });
+    expect(point.x).toBeGreaterThan(center.x);
+    expect(point.y).toBeCloseTo(center.y);
+    expect(param).toBeGreaterThanOrEqual(0);
+    expect(param).toBeLessThanOrEqual(1);
+
+    const testParam = 0.5;
+    const pt = node.getConnectionPointAtOutlineParam(testParam);
+    const { param: backParam } = node.getClosestPointOnOutline(pt);
+    expect(Math.abs((backParam % 1) - (testParam % 1))).toBeLessThan(0.01);
+  });
+
+  it('getConnectionPointAtOutlineParam and getClosestPointOnOutline work for diamond', () => {
+    const node = new DiamondNode({ x: 0, y: 0, width: 100, height: 60 });
+    const center = { x: 50, y: 30 };
+    const hw = 50;
+    const hh = 30;
+
+    const p0 = node.getConnectionPointAtOutlineParam(0);
+    expect(p0.x).toBeCloseTo(center.x);
+    expect(p0.y).toBeCloseTo(center.y - hh);
+
+    const { point, param } = node.getClosestPointOnOutline({ x: 80, y: 30 });
+    expect(point.x).toBeGreaterThan(center.x);
+    expect(param).toBeGreaterThanOrEqual(0);
+    expect(param).toBeLessThanOrEqual(1);
+
+    const testParam = 0.25;
+    const pt = node.getConnectionPointAtOutlineParam(testParam);
+    const { param: backParam } = node.getClosestPointOnOutline(pt);
+    expect(Math.abs((backParam % 1) - (testParam % 1))).toBeLessThan(0.01);
+  });
 });

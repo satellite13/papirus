@@ -67,6 +67,7 @@ export abstract class Node extends Element {
   protected _defaultSize: Size;
   protected _labelPlacement: LabelPlacement;
   protected _resizeHandlesEnabled: boolean;
+  private _attachToOutlineGetter?: () => boolean;
 
   protected constructor(options: NodeOptions) {
     super({
@@ -316,9 +317,19 @@ export abstract class Node extends Element {
   }
 
   /**
+   * Set getter for attachToOutline (called by DiagramRenderer when node is added)
+   */
+  setAttachToOutlineGetter(getter: (() => boolean) | undefined): void {
+    this._attachToOutlineGetter = getter;
+  }
+
+  /**
    * Render ports
    */
   protected renderPorts(ctx: CanvasRenderingContext2D): void {
+    if (this._attachToOutlineGetter?.()) {
+      return;
+    }
     // Show ports when hovered, selected, dragging, or if showPortsAlways is set
     const shouldShow =
       this._showPortsAlways ||
@@ -678,6 +689,65 @@ export abstract class Node extends Element {
    * Get the type name of this node
    */
   abstract get typeName(): string;
+
+  /**
+   * Get point on outline at normalized param (0-1 along perimeter).
+   * Base implementation uses rectangular outline. Override for non-rectangular shapes.
+   */
+  getConnectionPointAtOutlineParam(param: number): Point {
+    const bounds = this.getBounds();
+    const { x, y, width: w, height: h } = bounds;
+    const perimeter = 2 * (w + h);
+    let s = ((param % 1) + 1) % 1 * perimeter;
+
+    if (s < w) return { x: x + s, y };
+    s -= w;
+    if (s < h) return { x: x + w, y: y + s };
+    s -= h;
+    if (s < w) return { x: x + w - s, y: y + h };
+    s -= w;
+    return { x, y: y + h - s };
+  }
+
+  /**
+   * Get closest point on outline and its param (0-1).
+   * Base implementation uses rectangular outline. Override for non-rectangular shapes.
+   */
+  getClosestPointOnOutline(target: Point): { point: Point; param: number } {
+    const bounds = this.getBounds();
+    const { x, y, width: w, height: h } = bounds;
+    const P = 2 * (w + h);
+
+    const projectSegment = (
+      ax: number,
+      ay: number,
+      bx: number,
+      by: number,
+      segLen: number,
+      segStartParam: number
+    ): { point: Point; param: number; distSq: number } => {
+      const dx = bx - ax;
+      const dy = by - ay;
+      const lenSq = dx * dx + dy * dy;
+      let t = lenSq > 0 ? ((target.x - ax) * dx + (target.y - ay) * dy) / lenSq : 0;
+      t = Math.max(0, Math.min(1, t));
+      const px = ax + t * dx;
+      const py = ay + t * dy;
+      const distSq = (target.x - px) ** 2 + (target.y - py) ** 2;
+      const param = segStartParam + (t * segLen) / P;
+      return { point: { x: px, y: py }, param, distSq };
+    };
+
+    let best = projectSegment(x, y, x + w, y, w, 0);
+    let r = projectSegment(x + w, y, x + w, y + h, h, w / P);
+    if (r.distSq < best.distSq) best = r;
+    r = projectSegment(x + w, y + h, x, y + h, w, (w + h) / P);
+    if (r.distSq < best.distSq) best = r;
+    r = projectSegment(x, y + h, x, y, h, (2 * w + h) / P);
+    if (r.distSq < best.distSq) best = r;
+
+    return { point: best.point, param: best.param };
+  }
 
   /**
    * Get intersection point on the shape outline toward the target.

@@ -27,6 +27,7 @@ const interactions = renderer.enableInteractions({
 - `nodeFactory`, `edgeFactory` — используются для вставки (`Ctrl/Cmd+V`) и восстановления.
 - `snapToGrid`, `gridSize` — базовая настройка перемещения/ресайза.
 - `alignToNodes` — smart-align при перетаскивании узлов к другим узлам.
+- `attachToOutline` — при `true` стрелки можно привязывать в любой точке контура фигуры (не только к портам); позиция сохраняется в `outlineParam`. <kbd>Shift</kbd>+клик по узлу — начать связь с контура.
 - `keymap` — кастомизация клавиш:
   - `deleteKeys`
   - `copyKey`
@@ -110,6 +111,7 @@ interactions.drag.setSnapToGrid(true, 20);
 interactions.drag.setAlignmentEnabled(true);
 interactions.resize.setSnapToGrid(true, 20);
 interactions.connection.setSnapToGrid(true, 20);
+interactions.connection.setAttachToOutline(true);  // привязка стрелок по контуру фигуры
 ```
 
 ### Smart-align и направляющие

@@ -134,6 +134,19 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
   private _nodes = new Map<string, Node>();
   private _edges = new Map<string, Edge>();
   private _groups = new Map<string, Group>();
+  private _attachToOutline = false;
+
+  /** When true, ports and anchor points are hidden (attach anywhere on outline) */
+  get attachToOutline(): boolean {
+    return this._attachToOutline;
+  }
+
+  set attachToOutline(value: boolean) {
+    if (this._attachToOutline !== value) {
+      this._attachToOutline = value;
+      this.markDirty();
+    }
+  }
 
   constructor(canvas: HTMLCanvasElement | string, options: DiagramOptions = {}) {
     super();
@@ -422,6 +435,7 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
    */
   addNode(node: Node): void {
     node.setDirtyListener(() => this.markDirty());
+    node.setAttachToOutlineGetter(() => this._attachToOutline);
     this._nodes.set(node.id, node);
     this.animationManager.registerEnter(node.id);
     this.markDirty();
@@ -520,6 +534,7 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
 
     this._nodes.delete(nodeId);
     node.setDirtyListener(undefined);
+    node.setAttachToOutlineGetter(undefined);
     this.markDirty();
     this.emit('nodeRemove', node);
     return true;
@@ -839,13 +854,15 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
         continue;
       }
 
-      if (edge.lockAnchors) {
+      if (edge.lockAnchors && edge.from.outlineParam === undefined) {
         if (!edge.from.portId) {
           const anchor = fromNode.getNearestAnchor(toNode.getCenter());
           if (anchor) {
             edge.from = { ...edge.from, portId: `${ANCHOR_PORT_PREFIX}${anchor.id}` };
           }
         }
+      }
+      if (edge.lockAnchors && edge.to.outlineParam === undefined) {
         if (!edge.to.portId) {
           const anchor = toNode.getNearestAnchor(fromNode.getCenter());
           if (anchor) {
@@ -859,22 +876,26 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
       let fromDir: string | undefined;
       let toDir: string | undefined;
 
-      if (edge.lockAnchors && edge.from.portId?.startsWith(ANCHOR_PORT_PREFIX)) {
+      if (edge.from.outlineParam !== undefined) {
+        fromPoint = fromNode.getConnectionPointAtOutlineParam(edge.from.outlineParam);
+        fromDir = this.getDirectionFromOutlineParam(edge.from.outlineParam);
+      } else if (edge.lockAnchors && edge.from.portId?.startsWith(ANCHOR_PORT_PREFIX)) {
         const anchorId = edge.from.portId.slice(ANCHOR_PORT_PREFIX.length);
         const anchorPoint = fromNode.getAnchorPointById(anchorId);
         if (anchorPoint) {
           fromPoint = anchorPoint;
-          // Extract direction from anchor ID (format: "side:index")
           fromDir = anchorId.split(':')[0];
         }
       }
 
-      if (edge.lockAnchors && edge.to.portId?.startsWith(ANCHOR_PORT_PREFIX)) {
+      if (edge.to.outlineParam !== undefined) {
+        toPoint = toNode.getConnectionPointAtOutlineParam(edge.to.outlineParam);
+        toDir = this.getDirectionFromOutlineParam(edge.to.outlineParam);
+      } else if (edge.lockAnchors && edge.to.portId?.startsWith(ANCHOR_PORT_PREFIX)) {
         const anchorId = edge.to.portId.slice(ANCHOR_PORT_PREFIX.length);
         const anchorPoint = toNode.getAnchorPointById(anchorId);
         if (anchorPoint) {
           toPoint = anchorPoint;
-          // Extract direction from anchor ID (format: "side:index")
           toDir = anchorId.split(':')[0];
         }
       }
@@ -894,6 +915,14 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
 
       edge.updateEndpoints(fromPoint, toPoint, fromDir, toDir, { obstacles });
     }
+  }
+
+  private getDirectionFromOutlineParam(param: number): string {
+    const p = ((param % 1) + 1) % 1;
+    if (p < 0.25) return 'top';
+    if (p < 0.5) return 'right';
+    if (p < 0.75) return 'bottom';
+    return 'left';
   }
 
   private renderScrollbars(ctx: CanvasRenderingContext2D): void {

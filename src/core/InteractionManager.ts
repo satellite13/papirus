@@ -39,6 +39,8 @@ export interface InteractionManagerOptions {
   snapToGrid?: boolean;
   gridSize?: number;
   alignToNodes?: boolean;
+  /** When true, edges can be attached anywhere on the shape outline (not just ports) */
+  attachToOutline?: boolean;
   keymap?: Partial<InteractionKeymap>;
 }
 
@@ -128,6 +130,8 @@ export class InteractionManager {
 
     this.keymap = { ...DEFAULT_KEYMAP, ...options.keymap };
 
+    const attachToOutline = options.attachToOutline ?? false;
+    this.renderer.attachToOutline = attachToOutline;
     this.connectionManager = new ConnectionManager({
       renderer: this.renderer,
       createEdge:
@@ -135,6 +139,7 @@ export class InteractionManager {
         ((from, to): Edge => new Edge({ from, to, type: 'bezier', arrowType: 'single' })),
       snapToGrid: options.snapToGrid ?? this.renderer.snapToGrid,
       gridSize: options.gridSize ?? 20,
+      attachToOutline,
       addEdge: (edge): void => {
         this.historyManager.execute({
           execute: (): void => this.renderer.addEdge(edge),
@@ -1109,7 +1114,13 @@ export class InteractionManager {
   }
 
   private endpointsEqual(a: EdgeEndpoint, b: EdgeEndpoint): boolean {
-    return a.nodeId === b.nodeId && (a.portId ?? null) === (b.portId ?? null);
+    if (a.nodeId !== b.nodeId) return false;
+    if ((a.portId ?? null) !== (b.portId ?? null)) return false;
+    const aParam = a.outlineParam;
+    const bParam = b.outlineParam;
+    if (aParam === undefined && bParam === undefined) return true;
+    if (aParam === undefined || bParam === undefined) return false;
+    return Math.abs((aParam % 1) - (bParam % 1)) < 1e-9;
   }
 
   private getSelectionBounds(): Bounds | null {

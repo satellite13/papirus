@@ -82,7 +82,9 @@ let defaultArrow = 'open';
 let defaultColor = '#3b82f6';
 
 // Interactions
+let attachToOutlineEnabled = false;
 const interactions = renderer.enableInteractions({
+  attachToOutline: false,
   createEdge: (from, to) => {
     const edge = new Edge({
       from,
@@ -279,6 +281,11 @@ document.getElementById('defaultArrow').addEventListener('change', (e) => {
 
 document.getElementById('defaultColor').addEventListener('input', (e) => {
   defaultColor = e.target.value;
+});
+
+document.getElementById('attachToOutline').addEventListener('change', (e) => {
+  attachToOutlineEnabled = e.target.checked;
+  interactions.connection.setAttachToOutline(attachToOutlineEnabled);
 });
 
 // Initial state

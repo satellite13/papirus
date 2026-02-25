@@ -40,6 +40,32 @@ export class CircleNode extends Node {
     return (dx * dx) / (rx * rx) + (dy * dy) / (ry * ry) <= 1;
   }
 
+  override getConnectionPointAtOutlineParam(param: number): Point {
+    const center = this.getCenter();
+    const rx = this._width / 2;
+    const ry = this._height / 2;
+    const t = ((param % 1) + 1) % 1 * Math.PI * 2;
+    const angle = Math.PI * 1.5 - t;
+    return {
+      x: center.x + rx * Math.cos(angle),
+      y: center.y + ry * Math.sin(angle),
+    };
+  }
+
+  override getClosestPointOnOutline(target: Point): { point: Point; param: number } {
+    const point = this.getOutlinePointToward(target);
+    const center = this.getCenter();
+    const rx = this._width / 2;
+    const ry = this._height / 2;
+    const t = Math.atan2(
+      (point.y - center.y) / ry,
+      (point.x - center.x) / rx
+    );
+    const param = (Math.PI * 1.5 - t) / (Math.PI * 2);
+    const normalizedParam = ((param % 1) + 1) % 1;
+    return { point, param: normalizedParam };
+  }
+
   protected override getOutlinePointToward(target: Point): Point {
     const center = this.getCenter();
     const rx = this._width / 2;

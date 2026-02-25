@@ -822,16 +822,19 @@ const miniMapButton = document.getElementById('toggleMiniMap');
 const snapButton = document.getElementById('toggleSnap');
 const alignButton = document.getElementById('toggleAlign');
 const rulersButton = document.getElementById('toggleRulers');
+const attachOutlineButton = document.getElementById('toggleAttachOutline');
 const gridButtonLabel = document.getElementById('toggleGridLabel');
 const miniMapButtonLabel = document.getElementById('toggleMiniMapLabel');
 const snapButtonLabel = document.getElementById('toggleSnapLabel');
 const alignButtonLabel = document.getElementById('toggleAlignLabel');
 const rulersButtonLabel = document.getElementById('toggleRulersLabel');
+const attachOutlineButtonLabel = document.getElementById('toggleAttachOutlineLabel');
 let gridVisible = true;
 let miniMapVisible = true;
 let snapEnabled = false;
 let alignEnabled = true;
 let rulersEnabled = true;
+let attachToOutlineEnabled = false;
 
 function updateToggleLabels() {
   gridButtonLabel.textContent = gridVisible ? 'Grid ON' : 'Grid OFF';
@@ -843,6 +846,8 @@ function updateToggleLabels() {
   alignButton.classList.toggle('btn-primary', alignEnabled);
   rulersButtonLabel.textContent = rulersEnabled ? 'Rulers ON' : 'Rulers OFF';
   rulersButton.classList.toggle('btn-primary', rulersEnabled);
+  attachOutlineButtonLabel.textContent = attachToOutlineEnabled ? 'Outline ON' : 'Outline OFF';
+  attachOutlineButton.classList.toggle('btn-primary', attachToOutlineEnabled);
 }
 
 gridButton.addEventListener('click', () => {
@@ -877,6 +882,12 @@ rulersButton.addEventListener('click', () => {
   rulersEnabled = !rulersEnabled;
   rulersOverlay.setEnabled(rulersEnabled);
   renderer.markDirty();
+  updateToggleLabels();
+});
+
+attachOutlineButton.addEventListener('click', () => {
+  attachToOutlineEnabled = !attachToOutlineEnabled;
+  interactions.connection.setAttachToOutline(attachToOutlineEnabled);
   updateToggleLabels();
 });
 

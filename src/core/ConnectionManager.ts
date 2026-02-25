@@ -13,6 +13,7 @@ import {
   ANCHOR_POINT_HOVER_RADIUS,
   ANCHOR_POINT_HITBOX_RADIUS,
   BEZIER_MAX_OFFSET,
+  OUTLINE_SNAP_SCREEN_TOLERANCE,
 } from '@/constants';
 
 const EDGE_AXIS_MAGNET_SCREEN_TOLERANCE = 10;
@@ -37,6 +38,8 @@ export interface ConnectionManagerOptions {
   addEdge?: (edge: Edge) => void;
   snapToGrid?: boolean;
   gridSize?: number;
+  /** When true, edges can be attached anywhere on the shape outline (not just ports) */
+  attachToOutline?: boolean;
 }
 
 /**
@@ -58,15 +61,21 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
   private hoverDisabled = false;
   private reconnectPoint: Point | null = null;
   private previewTargetAnchorId: string | null = null;
+  private sourceOutlineParam: number | null = null;
+  private previewTargetOutlineParam: number | null = null;
+  private previewTargetNodeId: string | null = null;
 
   // Edge reconnection state
   private isReconnecting = false;
   private reconnectingEdge: Edge | null = null;
   private reconnectingEndpoint: 'start' | 'end' | null = null;
   private originalEdgeEndpoint: EdgeEndpoint | null = null;
+  private reconnectingOutlineParam: number | null = null;
+  private reconnectingTargetNodeId: string | null = null;
   private activeControlPointDrag: { edge: Edge; index: number } | null = null;
   private snapToGrid: boolean;
   private gridSize: number;
+  private attachToOutline: boolean;
 
   constructor(options: ConnectionManagerOptions) {
     super();
@@ -75,6 +84,15 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     this.addEdge = options.addEdge ?? ((edge): void => this.renderer.addEdge(edge));
     this.snapToGrid = options.snapToGrid ?? false;
     this.gridSize = options.gridSize ?? 20;
+    this.attachToOutline = options.attachToOutline ?? false;
+  }
+
+  /**
+   * Enable/disable attach-to-outline mode (edges attach anywhere on shape contour)
+   */
+  setAttachToOutline(enabled: boolean): void {
+    this.attachToOutline = enabled;
+    (this.renderer as { attachToOutline?: boolean }).attachToOutline = enabled;
   }
 
   /**
@@ -149,9 +167,18 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     this.sourceNode = node;
     this.isConnecting = true;
     const target = { x: event.worldX, y: event.worldY };
-    const anchor = node.getNearestAnchor(target);
-    this.sourceAnchorId = anchor?.id ?? null;
-    this.sourcePoint = anchor?.point ?? node.getConnectionPoint(target);
+
+    if (this.attachToOutline) {
+      const { point, param } = node.getClosestPointOnOutline(target);
+      this.sourceOutlineParam = param;
+      this.sourceAnchorId = null;
+      this.sourcePoint = point;
+    } else {
+      const anchor = node.getNearestAnchor(target);
+      this.sourceOutlineParam = null;
+      this.sourceAnchorId = anchor?.id ?? null;
+      this.sourcePoint = anchor?.point ?? node.getConnectionPoint(target);
+    }
     this.previewEndpoint = target;
 
     this.emit('connectionStart', node);
@@ -178,13 +205,28 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
   }
 
   /**
-   * Try to start connection from a hovered anchor point
+   * Try to start connection from a hovered anchor point.
+   * When attachToOutline + Shift: start from anywhere on node outline.
+   * Otherwise: requires clicking on an anchor so that node drag still works.
    */
   tryStartConnectionAtPoint(event: InputEvent): boolean {
     const point = { x: event.worldX, y: event.worldY };
     const node = this.getNodeAtPoint(point, false);
     if (!node) {
       return false;
+    }
+
+    if (this.attachToOutline && event.shiftKey) {
+      const { point: outlinePoint, param } = node.getClosestPointOnOutline(point);
+      this.sourceNode = node;
+      this.isConnecting = true;
+      this.sourceAnchorId = null;
+      this.sourcePoint = outlinePoint;
+      this.sourceOutlineParam = param;
+      this.previewEndpoint = point;
+      this.emit('connectionStart', node);
+      this.renderer.markDirty();
+      return true;
     }
 
     const hover = this.getAnchorAtPoint(node, point);
@@ -197,6 +239,12 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     this.sourceAnchorId = hover.id;
     this.sourcePoint = hover.point;
     this.previewEndpoint = point;
+    if (this.attachToOutline) {
+      const { param } = node.getClosestPointOnOutline(point);
+      this.sourceOutlineParam = param;
+    } else {
+      this.sourceOutlineParam = null;
+    }
 
     this.emit('connectionStart', node);
     this.renderer.markDirty();
@@ -258,41 +306,146 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     const fromNode = this.renderer.getNode(edge.from.nodeId);
     const toNode = this.renderer.getNode(edge.to.nodeId);
 
-    // Try to snap to nearest anchor point on target node
     let snappedPoint = point;
     let snappedDir: string | undefined;
-    const targetNode = this.getNodeAtPoint(point, true);
-    if (targetNode) {
+    let targetNode = this.getNodeAtPoint(point, true);
+
+    if (this.attachToOutline) {
+      const tolerance = OUTLINE_SNAP_SCREEN_TOLERANCE / Math.max(this.renderer.zoom, 0.0001);
+      const toleranceSq = tolerance * tolerance;
+      let bestDistSq = Infinity;
+      let bestResult: { node: Node; point: Point; param: number } | null = null;
+
+      for (const node of this.renderer.nodes.values()) {
+        if (!node.visible) continue;
+        const { point: outlinePoint, param } = node.getClosestPointOnOutline(point);
+        const dx = point.x - outlinePoint.x;
+        const dy = point.y - outlinePoint.y;
+        const distSq = dx * dx + dy * dy;
+        if (distSq <= toleranceSq && distSq < bestDistSq) {
+          bestDistSq = distSq;
+          bestResult = { node, point: outlinePoint, param };
+        }
+      }
+
+      if (bestResult) {
+        targetNode = bestResult.node;
+        snappedPoint = bestResult.point;
+        this.reconnectingOutlineParam = bestResult.param;
+        this.reconnectingTargetNodeId = bestResult.node.id;
+        snappedDir = this.getDirectionFromOutlineParam(bestResult.param, bestResult.node);
+
+        const otherNode = this.reconnectingEndpoint === 'start' ? toNode : fromNode;
+        if (otherNode) {
+          const alignRef = edge.isEditablePolyline()
+            ? this.getNearestBendPointForAxisAlignment(edge, this.reconnectingEndpoint!)
+            : (this.reconnectingEndpoint === 'start'
+              ? this.getTargetPointForReconnect(edge, toNode!, 'to', snappedPoint)
+              : this.getTargetPointForReconnect(edge, fromNode!, 'from', snappedPoint));
+          snappedPoint = this.applyAxisAlignmentToPoint(snappedPoint, alignRef);
+          const reprojected = targetNode.getClosestPointOnOutline(snappedPoint);
+          snappedPoint = reprojected.point;
+          this.reconnectingOutlineParam = reprojected.param;
+          snappedDir = this.getDirectionFromOutlineParam(reprojected.param, targetNode);
+        }
+      } else {
+        this.reconnectingOutlineParam = null;
+        this.reconnectingTargetNodeId = null;
+      }
+    } else if (targetNode) {
       const nearestAnchor = targetNode.getNearestAnchor(point);
       if (nearestAnchor) {
         snappedPoint = nearestAnchor.point;
         snappedDir = nearestAnchor.id.split(':')[0];
       }
+      this.reconnectingOutlineParam = null;
+      this.reconnectingTargetNodeId = null;
+    } else {
+      this.reconnectingOutlineParam = null;
+      this.reconnectingTargetNodeId = null;
     }
 
     this.reconnectPoint = snappedPoint;
 
     if (this.reconnectingEndpoint === 'start') {
       if (toNode) {
-        const toAnchorId = edge.to.portId?.replace(ANCHOR_PORT_PREFIX, '');
-        const target = toAnchorId
-          ? toNode.getAnchorPointById(toAnchorId) ?? toNode.getConnectionPoint(snappedPoint)
-          : toNode.getConnectionPoint(snappedPoint);
-        const toDir = toAnchorId?.split(':')[0];
+        const target = this.getTargetPointForReconnect(edge, toNode, 'to', snappedPoint);
+        const toDir = this.getTargetDirForReconnect(edge, toNode, 'to');
         edge.updateEndpoints(snappedPoint, target, snappedDir, toDir);
       }
     } else {
       if (fromNode) {
-        const fromAnchorId = edge.from.portId?.replace(ANCHOR_PORT_PREFIX, '');
-        const start = fromAnchorId
-          ? fromNode.getAnchorPointById(fromAnchorId) ?? fromNode.getConnectionPoint(snappedPoint)
-          : fromNode.getConnectionPoint(snappedPoint);
-        const fromDir = fromAnchorId?.split(':')[0];
+        const start = this.getTargetPointForReconnect(edge, fromNode, 'from', snappedPoint);
+        const fromDir = this.getTargetDirForReconnect(edge, fromNode, 'from');
         edge.updateEndpoints(start, snappedPoint, fromDir, snappedDir);
       }
     }
 
     this.renderer.markDirty();
+  }
+
+  private getTargetPointForReconnect(
+    edge: Edge,
+    node: Node,
+    endpoint: 'from' | 'to',
+    fallbackPoint: Point
+  ): Point {
+    const ep = endpoint === 'from' ? edge.from : edge.to;
+    if (this.attachToOutline && ep.outlineParam !== undefined) {
+      return node.getConnectionPointAtOutlineParam(ep.outlineParam);
+    }
+    const anchorId = ep.portId?.replace(ANCHOR_PORT_PREFIX, '');
+    if (anchorId) {
+      return node.getAnchorPointById(anchorId) ?? node.getConnectionPoint(fallbackPoint);
+    }
+    return node.getConnectionPoint(fallbackPoint);
+  }
+
+  private getTargetDirForReconnect(edge: Edge, node: Node, endpoint: 'from' | 'to'): string | undefined {
+    const ep = endpoint === 'from' ? edge.from : edge.to;
+    if (this.attachToOutline && ep.outlineParam !== undefined) {
+      return this.getDirectionFromOutlineParam(ep.outlineParam, node);
+    }
+    const anchorId = ep.portId?.replace(ANCHOR_PORT_PREFIX, '');
+    return anchorId?.split(':')[0];
+  }
+
+  private getDirectionFromOutlineParam(param: number, _node: Node): string {
+    const p = ((param % 1) + 1) % 1;
+    if (p < 0.25) return 'top';
+    if (p < 0.5) return 'right';
+    if (p < 0.75) return 'bottom';
+    return 'left';
+  }
+
+  /**
+   * For editable polyline: return the nearest bend point for axis alignment.
+   * When reconnecting 'end', use last control point (or start). When reconnecting 'start', use first control point (or end).
+   */
+  private getNearestBendPointForAxisAlignment(edge: Edge, endpoint: 'start' | 'end'): Point {
+    const cps = edge.isEditablePolyline()
+      ? (edge.controlPoints ?? edge.getEditableControlPoints())
+      : [];
+    if (endpoint === 'end') {
+      return cps.length > 0 ? cps[cps.length - 1]! : edge.startPoint;
+    }
+    return cps.length > 0 ? cps[0]! : edge.endPoint;
+  }
+
+  /**
+   * When attachToOutline: snap moving point to horizontal/vertical alignment with fixed point.
+   */
+  private applyAxisAlignmentToPoint(moving: Point, fixed: Point): Point {
+    const tolerance = EDGE_AXIS_MAGNET_SCREEN_TOLERANCE / Math.max(this.renderer.zoom, 0.0001);
+    let x = moving.x;
+    let y = moving.y;
+    if (Math.abs(moving.x - fixed.x) <= tolerance) {
+      x = fixed.x;
+    }
+    if (Math.abs(moving.y - fixed.y) <= tolerance) {
+      y = fixed.y;
+    }
+    return { x, y };
   }
 
   /**
@@ -334,31 +487,72 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
 
     const cursorPoint = { x: event.worldX, y: event.worldY };
 
-    // Try to snap to nearest anchor point on target node
     let snappedPoint = cursorPoint;
     this.previewTargetAnchorId = null;
-    const targetNode = this.getNodeAtPoint(cursorPoint, false);
-    if (targetNode && this.isCompatibleTarget(targetNode)) {
+    this.previewTargetOutlineParam = null;
+    this.previewTargetNodeId = null;
+    let targetNode = this.getNodeAtPoint(cursorPoint, false);
+
+    if (this.attachToOutline) {
+      const tolerance = OUTLINE_SNAP_SCREEN_TOLERANCE / Math.max(this.renderer.zoom, 0.0001);
+      const toleranceSq = tolerance * tolerance;
+      let bestDistSq = Infinity;
+      let bestResult: { node: Node; point: Point; param: number } | null = null;
+
+      for (const node of this.renderer.nodes.values()) {
+        if (!node.visible || !this.isCompatibleTarget(node)) continue;
+        const forbidden = this._connectionValidator && this.sourceNode &&
+          !this._connectionValidator(this.sourceNode.id, node.id);
+        if (forbidden) continue;
+
+        const { point: outlinePoint, param } = node.getClosestPointOnOutline(cursorPoint);
+        const dx = cursorPoint.x - outlinePoint.x;
+        const dy = cursorPoint.y - outlinePoint.y;
+        const distSq = dx * dx + dy * dy;
+        if (distSq <= toleranceSq && distSq < bestDistSq) {
+          bestDistSq = distSq;
+          bestResult = { node, point: outlinePoint, param };
+        }
+      }
+
+      if (bestResult) {
+        targetNode = bestResult.node;
+        snappedPoint = bestResult.point;
+        this.previewTargetOutlineParam = bestResult.param;
+        this.previewTargetNodeId = bestResult.node.id;
+
+        if (this.sourcePoint) {
+          snappedPoint = this.applyAxisAlignmentToPoint(snappedPoint, this.sourcePoint);
+          const reprojected = bestResult.node.getClosestPointOnOutline(snappedPoint);
+          snappedPoint = reprojected.point;
+          this.previewTargetOutlineParam = reprojected.param;
+        }
+      }
+    } else if (targetNode && this.isCompatibleTarget(targetNode)) {
       const forbidden = this._connectionValidator && this.sourceNode &&
         !this._connectionValidator(this.sourceNode.id, targetNode.id);
-      if (forbidden) {
-        this.setCursor('not-allowed');
-      } else {
-        this.setCursor('crosshair');
+      if (!forbidden) {
         const nearestAnchor = targetNode.getNearestAnchor(cursorPoint);
         if (nearestAnchor) {
           snappedPoint = nearestAnchor.point;
           this.previewTargetAnchorId = nearestAnchor.id;
         }
       }
+    }
+
+    if (targetNode) {
+      const forbidden = this._connectionValidator && this.sourceNode &&
+        !this._connectionValidator(this.sourceNode.id, targetNode.id);
+      this.setCursor(forbidden ? 'not-allowed' : 'crosshair');
     } else {
       this.setCursor('crosshair');
     }
 
     this.previewEndpoint = snappedPoint;
-    // Only update source point if we didn't start from a specific anchor
-    if (this.sourceNode && !this.sourceAnchorId) {
+    if (this.sourceNode && !this.sourceAnchorId && !this.sourceOutlineParam) {
       this.sourcePoint = this.sourceNode.getConnectionPoint(this.previewEndpoint);
+    } else if (this.sourceNode && this.sourceOutlineParam !== null) {
+      this.sourcePoint = this.sourceNode.getConnectionPointAtOutlineParam(this.sourceOutlineParam);
     }
 
     this.emit(
@@ -429,39 +623,43 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
       const point = { x: event.worldX, y: event.worldY };
       let reconnected = false;
 
-      const node = this.getNodeAtPoint(point, true);
+      let node = this.getNodeAtPoint(point, true);
+      if (!node && this.attachToOutline && this.reconnectingTargetNodeId) {
+        node = this.renderer.getNode(this.reconnectingTargetNodeId) ?? null;
+      }
       if (node) {
-        const anchor = node.getNearestAnchor(point);
-        // Update the edge endpoint
-        if (this.reconnectingEndpoint === 'start') {
-          this.reconnectingEdge.from = {
+        if (this.attachToOutline && this.reconnectingOutlineParam !== null) {
+          const endpoint: EdgeEndpoint = {
             nodeId: node.id,
-            portId:
-              this.reconnectingEdge.lockAnchors && anchor
-                ? `${ANCHOR_PORT_PREFIX}${anchor.id}`
-                : undefined,
+            outlineParam: this.reconnectingOutlineParam,
           };
+          if (this.reconnectingEndpoint === 'start') {
+            this.reconnectingEdge.from = endpoint;
+          } else {
+            this.reconnectingEdge.to = endpoint;
+          }
         } else {
-          this.reconnectingEdge.to = {
-            nodeId: node.id,
-            portId:
-              this.reconnectingEdge.lockAnchors && anchor
-                ? `${ANCHOR_PORT_PREFIX}${anchor.id}`
-                : undefined,
-          };
+          const anchor = node.getNearestAnchor(point);
+          const portId =
+            this.reconnectingEdge.lockAnchors && anchor
+              ? `${ANCHOR_PORT_PREFIX}${anchor.id}`
+              : undefined;
+          if (this.reconnectingEndpoint === 'start') {
+            this.reconnectingEdge.from = { nodeId: node.id, portId };
+          } else {
+            this.reconnectingEdge.to = { nodeId: node.id, portId };
+          }
         }
         reconnected = true;
         this.emit('edgeReconnect', this.reconnectingEdge, this.reconnectingEndpoint!);
       }
 
-      // If not dropped on valid port, restore original endpoint
       if (!reconnected && this.originalEdgeEndpoint) {
         if (this.reconnectingEndpoint === 'start') {
           this.reconnectingEdge.from = this.originalEdgeEndpoint;
         } else {
           this.reconnectingEdge.to = this.originalEdgeEndpoint;
         }
-        // Emit to trigger updateEdgePaths and restore original position
         this.emit('edgeReconnect', this.reconnectingEdge, this.reconnectingEndpoint!);
       }
 
@@ -477,25 +675,37 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     const point = { x: event.worldX, y: event.worldY };
     let createdEdge: Edge | null = null;
 
-    // Check if we're over a valid target node
-    const targetNode = this.getNodeAtPoint(point, false);
+    let targetNode = this.getNodeAtPoint(point, false);
+    if (!targetNode && this.attachToOutline && this.previewTargetNodeId) {
+      targetNode = this.renderer.getNode(this.previewTargetNodeId) ?? null;
+    }
     if (targetNode) {
-      // Check validator if set
       const allowed = !this._connectionValidator ||
         this._connectionValidator(this.sourceNode!.id, targetNode.id);
       if (allowed) {
-        // Create the edge
-        const nearestTargetAnchor = targetNode.getNearestAnchor(point);
-        const sourceAnchorId = this.sourceAnchorId;
-        const from: EdgeEndpoint = {
-          nodeId: this.sourceNode!.id,
-          portId: sourceAnchorId ? `${ANCHOR_PORT_PREFIX}${sourceAnchorId}` : undefined,
-        };
-        const to: EdgeEndpoint = {
-          nodeId: targetNode.id,
-          portId: nearestTargetAnchor ? `${ANCHOR_PORT_PREFIX}${nearestTargetAnchor.id}` : undefined,
-        };
-
+        let from: EdgeEndpoint;
+        let to: EdgeEndpoint;
+        if (this.attachToOutline) {
+          const targetOutline = targetNode.getClosestPointOnOutline(point);
+          from = {
+            nodeId: this.sourceNode!.id,
+            outlineParam: this.sourceOutlineParam ?? undefined,
+          };
+          to = {
+            nodeId: targetNode.id,
+            outlineParam: targetOutline.param,
+          };
+        } else {
+          const nearestTargetAnchor = targetNode.getNearestAnchor(point);
+          from = {
+            nodeId: this.sourceNode!.id,
+            portId: this.sourceAnchorId ? `${ANCHOR_PORT_PREFIX}${this.sourceAnchorId}` : undefined,
+          };
+          to = {
+            nodeId: targetNode.id,
+            portId: nearestTargetAnchor ? `${ANCHOR_PORT_PREFIX}${nearestTargetAnchor.id}` : undefined,
+          };
+        }
         createdEdge = this.createEdge(from, to);
         this.addEdge(createdEdge);
         this.emit('connect', createdEdge);
@@ -528,7 +738,9 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
   renderPreview(ctx: CanvasRenderingContext2D): void {
     // For reconnection, the actual edge follows the cursor, no separate preview needed
     if (this.isReconnecting && this.reconnectPoint) {
-      this.renderAnchorHighlights(ctx, this.reconnectPoint, true);
+      if (!this.attachToOutline) {
+        this.renderAnchorHighlights(ctx, this.reconnectPoint, true);
+      }
       return;
     }
 
@@ -539,9 +751,12 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     const start = this.sourcePoint!;
     const end = this.previewEndpoint;
 
-    // Extract directions from anchor IDs
-    const fromDir = this.sourceAnchorId?.split(':')[0];
-    const toDir = this.previewTargetAnchorId?.split(':')[0];
+    const fromDir = this.sourceOutlineParam !== null
+      ? this.getDirectionFromOutlineParam(this.sourceOutlineParam, this.sourceNode!)
+      : this.sourceAnchorId?.split(':')[0];
+    const toDir = this.previewTargetOutlineParam !== null
+      ? this.getDirectionFromOutlineParam(this.previewTargetOutlineParam, this.sourceNode!)
+      : this.previewTargetAnchorId?.split(':')[0];
 
     ctx.strokeStyle = '#3b82f6';
     ctx.lineWidth = 2;
@@ -552,7 +767,9 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
 
     ctx.setLineDash([]);
 
-    this.renderAnchorHighlights(ctx, end, false);
+    if (!this.attachToOutline) {
+      this.renderAnchorHighlights(ctx, end, false);
+    }
   }
 
   /**
@@ -644,6 +861,9 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     this.sourcePoint = null;
     this.previewEndpoint = null;
     this.sourceAnchorId = null;
+    this.sourceOutlineParam = null;
+    this.previewTargetOutlineParam = null;
+    this.previewTargetNodeId = null;
     this.setCursor('');
   }
 
@@ -655,6 +875,8 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     this.reconnectingEdge = null;
     this.reconnectingEndpoint = null;
     this.originalEdgeEndpoint = null;
+    this.reconnectingOutlineParam = null;
+    this.reconnectingTargetNodeId = null;
     this.reconnectPoint = null;
     this.setCursor('');
   }
@@ -668,6 +890,10 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     }
 
     this.renderEditablePolylineControls(ctx);
+
+    if (this.attachToOutline) {
+      return;
+    }
 
     if (!this.hoverNodeId) {
       return;

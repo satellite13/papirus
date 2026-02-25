@@ -73,6 +73,7 @@
                 <li>Drag from an output port to an input port to connect</li>
                 <li>Connections snap to the nearest port</li>
                 <li>Editable polyline: select edge, drag blue points, click + to add more points</li>
+                <li><strong>Attach to Outline</strong>: when ON, edges attach anywhere on shape contour; <kbd>Shift</kbd>+click on node to start connection</li>
                 <li>Double-click any node or edge label to edit it inline</li>
               </ul>
             </div>
@@ -105,6 +106,10 @@
             <div class="form-row">
               <label class="form-label">Color</label>
               <input type="color" class="form-color" id="defaultColor" value="#3b82f6">
+            </div>
+            <div class="form-row">
+              <label class="form-label">Attach to Outline</label>
+              <input type="checkbox" id="attachToOutline" title="Attach edges anywhere on shape contour">
             </div>
           </div>
         </div>

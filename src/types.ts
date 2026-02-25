@@ -40,11 +40,15 @@ export type PortPosition = 'top' | 'bottom' | 'left' | 'right';
 export type PortType = 'input' | 'output';
 
 /**
- * Edge connection endpoint
+ * Edge connection endpoint.
+ * When attachToOutline is enabled, outlineParam (0-1 along shape perimeter) can be used
+ * instead of portId to attach the edge anywhere on the shape outline.
  */
 export interface EdgeEndpoint {
   nodeId: string;
   portId?: string;
+  /** Position along shape outline (0-1), used when attachToOutline mode is on */
+  outlineParam?: number;
 }
 
 /**
