@@ -95,13 +95,20 @@ export class CustomShapeNode extends Node {
   }
 
   render(ctx: CanvasRenderingContext2D): void {
+    const style = this.style;
+    const baseOpacity = style.opacity ?? 1;
+    const fillOpacity = style.fillOpacity ?? 1;
+    const strokeOpacity = style.strokeOpacity ?? 1;
+
     this.applyStyle(ctx);
 
     ctx.save();
     ctx.translate(this._x, this._y);
 
     const path = this.getPath();
+    ctx.globalAlpha = baseOpacity * fillOpacity;
     ctx.fill(path);
+    ctx.globalAlpha = baseOpacity * strokeOpacity;
     ctx.stroke(path);
 
     ctx.restore();

@@ -130,6 +130,10 @@ export class DiamondNode extends Node {
     const center = this.getCenter();
     const hw = this._width / 2;
     const hh = this._height / 2;
+    const style = this.style;
+    const baseOpacity = style.opacity ?? 1;
+    const fillOpacity = style.fillOpacity ?? 1;
+    const strokeOpacity = style.strokeOpacity ?? 1;
 
     this.applyStyle(ctx);
 
@@ -139,7 +143,9 @@ export class DiamondNode extends Node {
     ctx.lineTo(center.x, center.y + hh); // Bottom
     ctx.lineTo(center.x - hw, center.y); // Left
     ctx.closePath();
+    ctx.globalAlpha = baseOpacity * fillOpacity;
     ctx.fill();
+    ctx.globalAlpha = baseOpacity * strokeOpacity;
     ctx.stroke();
 
     ctx.globalAlpha = 1;
