@@ -1,6 +1,6 @@
 # Оверлеи
 
-Оверлеи подключаются через `renderer.use(...)` и рисуются поверх/под диаграммой.
+Оверлеи подключаются через `renderer.use(...)` и рисуются поверх/под диаграммой. Все оверлеи поддерживают опцию `enabled` (по умолчанию `true`).
 
 ## GridOverlay
 
@@ -14,11 +14,14 @@ renderer.use(new GridOverlay({ gridSize: 20, color: '#e0e0e0' }));
 ## MiniMap
 
 ```ts
-renderer.use(new MiniMap({ width: 180, height: 120, padding: 12 }));
+renderer.use(new MiniMap({ width: 180, height: 120, padding: 12, contentMargin: 200 }));
 ```
 
 - `width`, `height` — размеры миникарты.
 - `padding` — отступы от края канваса.
+- `contentMargin` — отступ (в мировых координатах) вокруг контента; расширяет область, в пределах которой можно перемещать view при перетаскивании рамки.
+- `anchor` — позиция: `'bottom-right' | 'bottom-left' | 'top-right' | 'top-left'` (по умолчанию `'bottom-right'`).
+- `enabled` — включён ли оверлей (по умолчанию `true`).
 - `backgroundColor`, `borderColor`, `viewportColor` — цвета оформления.
 
 ## RulersOverlay

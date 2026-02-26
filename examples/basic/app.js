@@ -133,7 +133,7 @@ renderer.setStyleManager(styles);
 
 // Overlays
 const gridOverlay = new GridOverlay({ gridSize: 20, color: '#e5e5e5' });
-const miniMap = new MiniMap({ width: 140, height: 100, padding: 16 });
+const miniMap = new MiniMap({ width: 140, height: 100, padding: 16, contentMargin: 200 });
 const rulersOverlay = new RulersOverlay({ thickness: 20 });
 renderer.use(gridOverlay);
 renderer.use(miniMap);

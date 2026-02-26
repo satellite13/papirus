@@ -19,7 +19,7 @@ const renderer = new DiagramRenderer('#canvas', {
   maxZoom: 5,
   initialZoom: 1,
   snapToGrid: false,
-  scrollbarOverlay: true,
+  scrollbar: true,
   animations: {
     enabled: true,
     enterDuration: 220,
@@ -92,7 +92,7 @@ const screen = renderer.worldToScreen(world.x, world.y);
 
 ```ts
 renderer.use(new GridOverlay({ gridSize: 20 }));
-renderer.use(new MiniMap({ width: 160, height: 100 }));
+renderer.use(new MiniMap({ width: 160, height: 100, contentMargin: 200 }));
 ```
 
 ### Ручные underlay/overlay-слои

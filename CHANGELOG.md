@@ -7,6 +7,14 @@
 
 ## [Unreleased]
 
+## [0.3.15] - 2026-02-26
+
+### Added
+- Опция `contentMargin` в `MiniMap`: отступ (в мировых координатах) вокруг контента, расширяет область перемещения view при перетаскивании рамки в миникарте.
+
+### Changed
+- Обновлена документация: `contentMargin` в примерах и docs; `overlays.md` — опции `anchor`, `enabled`; `renderer.md` — `scrollbar` вместо deprecated `scrollbarOverlay`; `elements.md` — тип `editable-polyline` для рёбер.
+
 ## [0.3.14] - 2026-02-25
 
 ### Added
@@ -140,7 +148,9 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.3.13...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.3.15...HEAD
+[0.3.15]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.15
+[0.3.14]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.14
 [0.3.13]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.13
 [0.3.12]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.12
 [0.3.11]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.11

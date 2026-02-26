@@ -9,6 +9,8 @@ export interface MiniMapOptions {
   width?: number;
   height?: number;
   padding?: number;
+  /** Отступ (в мировых координатах) вокруг контента — расширяет область, в пределах которой можно перемещать view. По умолчанию 0. */
+  contentMargin?: number;
   backgroundColor?: string;
   borderColor?: string;
   viewportColor?: string;
@@ -43,6 +45,7 @@ export class MiniMap implements DiagramPlugin {
       width: options.width ?? 180,
       height: options.height ?? 120,
       padding: options.padding ?? 12,
+      contentMargin: options.contentMargin ?? 0,
       backgroundColor: options.backgroundColor ?? 'rgba(24, 24, 27, 0.5)',
       borderColor: options.borderColor ?? '#52525b',
       viewportColor: options.viewportColor ?? '#22c55e',
@@ -222,6 +225,14 @@ export class MiniMap implements DiagramPlugin {
       return null;
     }
 
+    const margin = this.options.contentMargin;
+    const expandedContentBounds = {
+      x: rawBounds.x - margin,
+      y: rawBounds.y - margin,
+      width: rawBounds.width + 2 * margin,
+      height: rawBounds.height + 2 * margin,
+    };
+
     const { width, height, padding, anchor } = this.options;
     const x =
       anchor === 'bottom-left' || anchor === 'top-left' ? padding : renderer.width - width - padding;
@@ -229,10 +240,16 @@ export class MiniMap implements DiagramPlugin {
       anchor === 'top-left' || anchor === 'top-right' ? padding : renderer.height - height - padding;
 
     const viewportBounds = this.getViewportBounds(renderer);
-    const unionMinX = Math.min(rawBounds.x, viewportBounds.x);
-    const unionMinY = Math.min(rawBounds.y, viewportBounds.y);
-    const unionMaxX = Math.max(rawBounds.x + rawBounds.width, viewportBounds.x + viewportBounds.width);
-    const unionMaxY = Math.max(rawBounds.y + rawBounds.height, viewportBounds.y + viewportBounds.height);
+    const unionMinX = Math.min(expandedContentBounds.x, viewportBounds.x);
+    const unionMinY = Math.min(expandedContentBounds.y, viewportBounds.y);
+    const unionMaxX = Math.max(
+      expandedContentBounds.x + expandedContentBounds.width,
+      viewportBounds.x + viewportBounds.width
+    );
+    const unionMaxY = Math.max(
+      expandedContentBounds.y + expandedContentBounds.height,
+      viewportBounds.y + viewportBounds.height
+    );
     const bounds = {
       x: unionMinX,
       y: unionMinY,

@@ -57,7 +57,7 @@ const node = new RectangleNode({
 
 `Edge` соединяет узлы и поддерживает:
 
-- тип пути (`type`: `straight | polyline | bezier`)
+- тип пути (`type`: `straight | polyline | bezier | editable-polyline`)
 - стрелки (`arrowType`, `startMarker`, `endMarker`)
 - подпись (`label`) и фон подписи (`labelBackground`)
 - кастомные контрольные точки (`controlPoints`) для кривых

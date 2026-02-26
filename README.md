@@ -160,7 +160,7 @@ await svgExporter.download('diagram.svg');
 import { GridOverlay, MiniMap } from '@ngroznykh/papirus';
 
 renderer.use(new GridOverlay({ gridSize: 20 }));
-renderer.use(new MiniMap({ width: 180, height: 120, padding: 12 }));
+renderer.use(new MiniMap({ width: 180, height: 120, padding: 12, contentMargin: 200 }));
 ```
 
 Also available: `RulersOverlay`, `GuidesOverlay`, `AutoLayout`, `AutoRouting`, `alignNodes`, `distributeNodes`.
