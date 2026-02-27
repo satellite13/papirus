@@ -63,7 +63,7 @@ renderer.enableInteractions();
 - [Интерактивность](./docs/interactions.md)
 - [Оверлеи](./docs/overlays.md)
 - [Утилиты](./docs/utils.md)
-- [Changelog](./CHANGELOG.md)
+- [Changelog](./CHANGELOG.ru.md)
 - [Политика безопасности](./SECURITY.md)
 - [Чеклист подготовки к Open Source](./docs/OPEN_SOURCE_PREPARATION.ru.md)
 
@@ -179,7 +179,7 @@ Papirus не привязан к конкретному фреймворку и 
 Papirus следует [Semantic Versioning](https://semver.org/lang/ru/).  
 Текущая мажорная версия `0.x`, поэтому между минорными релизами возможны изменения API.
 
-Все важные изменения фиксируются в [CHANGELOG.md](./CHANGELOG.md).
+Все важные изменения фиксируются в [CHANGELOG.ru.md](./CHANGELOG.ru.md).
 
 ## Разработка
 

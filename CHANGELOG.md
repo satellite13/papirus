@@ -1,200 +1,195 @@
 # Changelog
 
-Все значимые изменения в проекте будут документироваться в этом файле.
+All notable changes to this project will be documented in this file.
 
-Формат основан на [Keep a Changelog](https://keepachangelog.com/ru/1.0.0/),
-и проект следует [Semantic Versioning](https://semver.org/lang/ru/).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+[Русская версия](./CHANGELOG.ru.md)
 
 ## [Unreleased]
 
 ## [0.3.21] - 2025-02-27
 
 ### Fixed
-- Горячие клавиши (Ctrl+Z/Y/C/V) работают при любой раскладке: используется `event.code` вместо `event.key` для буквенных клавиш.
+- Keyboard shortcuts (Ctrl+Z/Y/C/V) work with any keyboard layout: uses `event.code` instead of `event.key` for letter keys.
 
 ## [0.3.20] - 2026-02-27
 
 ### Fixed
-- Инвалидация кэша `_canvasRect` каждый кадр: `screenToWorld`/`worldToScreen` корректно учитывают изменения layout (например, изменение размера панелей вокруг canvas без изменения размеров самого canvas).
+- `_canvasRect` cache invalidation every frame: `screenToWorld`/`worldToScreen` correctly account for layout changes (e.g., panel resizing around canvas without canvas size change).
 
 ## [0.3.19] - 2026-02-27
 
 ### Fixed
-- При смене типа связи с `editable-polyline` на `bezier`/`straight`/`polyline` точки перелома теперь удаляются.
-- Убран type casting для `attachToOutline` в ConnectionManager.
+- When switching edge type from `editable-polyline` to `bezier`/`straight`/`polyline`, control points are now removed.
+- Removed type casting for `attachToOutline` in ConnectionManager.
 
 ### Changed
-- Рефакторинг: `mergeBounds`, `clonePoints` в geometry; константы для tolerance; `hasEditableControlPoints`, `getPathVertices` в Edge.
-- Оптимизация `resolveAlignmentDelta`: проверка только узлов в области перетаскивания.
-- Оптимизация итерации edges в ConnectionManager (обратный цикл вместо `reverse()`).
+- Refactoring: `mergeBounds`, `clonePoints` in geometry; tolerance constants; `hasEditableControlPoints`, `getPathVertices` in Edge.
+- Optimized `resolveAlignmentDelta`: only checks nodes in drag area.
+- Optimized edge iteration in ConnectionManager (reverse loop instead of `reverse()`).
 
 ### Added
-- Тесты для ConnectionManager: создание связи (attachToOutline), reconnect.
-- Снижены пороги coverage (lines/statements 48%, branches/functions 39%).
+- ConnectionManager tests: create connection (attachToOutline), reconnect.
+- Lowered coverage thresholds (lines/statements 48%, branches/functions 39%).
 
 ## [0.3.18] - 2026-02-27
 
 ### Fixed
-- При `attachToOutline` стрелка для `CustomShapeNode` следует контуру фигуры (Path2D), а не описанному прямоугольнику.
+- With `attachToOutline`, edge endpoint for `CustomShapeNode` follows the shape contour (Path2D), not the bounding rectangle.
 
 ## [0.3.17] - 2026-02-27
 
 ### Added
-- `CustomShapeNodeOptions.svgPath` — опция для корректного SVG-экспорта custom shapes. Path2D нельзя конвертировать в SVG, поэтому `svgPath` задаётся отдельно (строка или фабрика `(w, h) => string`).
-- `ShapeFactories.svg` — готовые SVG path для hexagon, parallelogram, cylinder, document, chamfered.
-- `CustomShapeNode.getSvgPath()`, `setSvgPath()` — доступ к SVG path для экспорта.
-- `TextLabel.getWrappedLines(ctx, maxWidth)` — получение текста, перенесённого по словам, для SVG-экспорта.
-- `Node.getLabelBoundsForExport(ctx)` — bounds и строки метки для SVG-экспорта (с учётом иконки и placement).
+- `CustomShapeNodeOptions.svgPath` — option for correct SVG export of custom shapes. Path2D cannot be converted to SVG, so `svgPath` is set separately (string or factory `(w, h) => string`).
+- `ShapeFactories.svg` — ready SVG paths for hexagon, parallelogram, cylinder, document, chamfered.
+- `CustomShapeNode.getSvgPath()`, `setSvgPath()` — access to SVG path for export.
+- `TextLabel.getWrappedLines(ctx, maxWidth)` — get word-wrapped text for SVG export.
+- `Node.getLabelBoundsForExport(ctx)` — bounds and label lines for SVG export (with icon and placement).
 
 ### Fixed
-- SVG-экспорт меток узлов: текст теперь переносится по словам (как на canvas), а не выводится в одну строку.
-- SVG-экспорт меток: расположение текста (с учётом иконки, labelPlacement, getLabelContainerBounds) совпадает с отрисовкой на canvas.
+- SVG export of node labels: text now wraps by words (as on canvas), not rendered in a single line.
+- SVG export of labels: text positioning (with icon, labelPlacement, getLabelContainerBounds) matches canvas rendering.
 
 ## [0.3.16] - 2026-02-26
 
 ### Fixed
-- Учёт `fillOpacity` и `strokeOpacity` при отрисовке `CustomShapeNode` и `DiamondNode` (ранее применялись только в SVG-экспорте).
+- `fillOpacity` and `strokeOpacity` now applied when rendering `CustomShapeNode` and `DiamondNode` (previously only in SVG export).
 
 ## [0.3.15] - 2026-02-26
 
 ### Added
-- Опция `contentMargin` в `MiniMap`: отступ (в мировых координатах) вокруг контента, расширяет область перемещения view при перетаскивании рамки в миникарте.
+- `contentMargin` option in `MiniMap`: margin (in world coordinates) around content, extends view drag area when dragging minimap frame.
 
 ### Changed
-- Обновлена документация: `contentMargin` в примерах и docs; `overlays.md` — опции `anchor`, `enabled`; `renderer.md` — `scrollbar` вместо deprecated `scrollbarOverlay`; `elements.md` — тип `editable-polyline` для рёбер.
+- Updated docs: `contentMargin` in examples and docs; `overlays.md` — `anchor`, `enabled` options; `renderer.md` — `scrollbar` instead of deprecated `scrollbarOverlay`; `elements.md` — `editable-polyline` edge type.
 
 ## [0.3.14] - 2026-02-25
 
 ### Added
-- Опция `attachToOutline` в `enableInteractions`: при включении стрелки можно перемещать не только по портам, но по любому месту контура фигуры; позиция привязки сохраняется в `EdgeEndpoint.outlineParam`.
-- При `attachToOutline` порты и якоря скрыты; прилипание к контуру с магнитным snap; выравнивание по горизонтали/вертикали с другим концом стрелки или с ближайшей точкой перелома (для editable polyline).
-- Shift+клик по узлу начинает связь с ближайшей точки контура.
+- `attachToOutline` option in `enableInteractions`: when enabled, edges can attach anywhere on the shape outline, not just ports; attachment position stored in `EdgeEndpoint.outlineParam`.
+- With `attachToOutline`: ports and anchors hidden; outline snapping with magnetic snap; horizontal/vertical alignment with other edge end or nearest polyline breakpoint.
+- Shift+click on node starts connection from nearest point on outline.
 
 ### Fixed
-- При Outline ON для editable polyline примагничивание к горизонтали/вертикали использует ближайшую точку перелома, а не противоположный конец стрелки.
-- При перетаскивании по контуру фигуры CircleNode и DiamondNode конец стрелки следует реальному контуру (эллипс/ромб), а не bounding box.
+- With Outline ON for editable polyline, horizontal/vertical snap uses nearest breakpoint, not opposite edge end.
+- When dragging on CircleNode and DiamondNode outline, edge end follows actual contour (ellipse/diamond), not bounding box.
 
 ## [0.3.13] - 2026-02-24
 
 ### Fixed
-- Исправлена отрисовка миникарты: рамка миникарты и рамка viewport больше не наследуют пунктир от ранее отрисованных пунктирных рёбер.
-- В `MiniMap` добавлен явный сброс `lineDash`/`lineDashOffset` перед отрисовкой рамок, чтобы состояние canvas не «протекало» между элементами.
+- Fixed minimap rendering: minimap frame and viewport frame no longer inherit dash from previously rendered dashed edges.
+- Added explicit `lineDash`/`lineDashOffset` reset in `MiniMap` before drawing frames so canvas state does not leak between elements.
 
 ## [0.3.12] - 2026-02-24
 
 ### Added
-- Добавлен новый тип пути связи `editable-polyline` с интерактивными точками перелома.
-- Для `editable-polyline` добавлены: центральная точка по умолчанию, кнопки `+` на сегментах для вставки новых переломов, удаление точки по двойному клику.
-- Добавлены осевые магниты и snap к сетке для редактирования точек перелома.
-- Добавлен smart-align узлов при перетаскивании с визуальными направляющими.
-- Добавлена настройка `alignToNodes` в `enableInteractions` и runtime-переключатель `interactions.drag.setAlignmentEnabled(...)`.
+- New edge path type `editable-polyline` with interactive breakpoints.
+- For `editable-polyline`: default center point, `+` buttons on segments to insert breakpoints, double-click to remove point.
+- Axis magnets and grid snap for editing breakpoints.
+- Smart-align nodes when dragging with visual guides.
+- `alignToNodes` setting in `enableInteractions` and runtime toggle `interactions.drag.setAlignmentEnabled(...)`.
 
 ### Changed
-- Обновлены примеры (`basic`, `ports`): добавлена демонстрация `editable-polyline`, переключатели `Align ON/OFF` и `Rulers ON/OFF`, расширено управление snap.
-- Обновлена документация (`README.md`, `README.ru.md`, `docs/interactions.md`) с описанием новых интерактивных возможностей.
+- Updated examples (`basic`, `ports`): added `editable-polyline` demo, Align ON/OFF and Rulers ON/OFF toggles, expanded snap controls.
+- Updated docs (`README.md`, `README.ru.md`, `docs/interactions.md`) with new interactive features.
 
 ## [0.3.11] - 2026-02-24
 
 ### Fixed
-- Исправлено залипание панорамирования canvas при отпускании кнопки мыши вне области canvas: при повторном входе курсора pan-сессия корректно завершается.
-- В тестах `InteractionManager` добавлен сценарий для проверки завершения pan после потери `mouseup`.
+- Fixed canvas pan sticking when releasing mouse outside canvas: on cursor re-entry, pan session correctly ends.
+- Added InteractionManager test for pan completion after `mouseup` loss.
 
 ## [0.3.10] - 2026-02-24
 
 ### Fixed
-- Исправлено залипание перетаскивания scrollbars/minimap: если кнопка мыши отпущена вне canvas, drag-сессия принудительно завершается при возврате курсора.
-- Отключен горизонтальный pan от wheel/trackpad-жестов: прокрутка колесом теперь используется только для zoom.
-- Обновлён пример `basic`: удалена устаревшая подсказка про `Shift + wheel` для горизонтального pan.
+- Fixed scrollbars/minimap drag sticking: if mouse released outside canvas, drag session forcibly ends on cursor return.
+- Disabled horizontal pan from wheel/trackpad: wheel scroll now used for zoom only.
+- Updated `basic` example: removed deprecated Shift+wheel horizontal pan hint.
 
 ## [0.3.9] - 2026-02-23
 
 ### Fixed
-- Исправлен экспорт узловых иконок в `SVG`: иконки теперь корректно попадают в файл экспорта.
-- Исправлен `SVG`-экспорт скругления прямоугольников: учитывается runtime-значение `RectangleNode.cornerRadius` (как в canvas-рендере).
-- В `SVG`-экспорте узлов учтены дополнительные визуальные параметры: `fillOpacity`, `strokeOpacity`, `lineDash`, `lineDashOffset`.
-- Для текстовых меток в `SVG` учтена прозрачность (`TextStyle.opacity`) и позиция метки узла через `getLabelPosition()`.
-- Для узловых меток в `SVG` учтены отступы `padding`/`margin` и выравнивание текста (`left`/`center`/`right`).
-- Для связей в `SVG` учтены параметры стиля линии: `strokeOpacity`, `lineCap`, `lineJoin`.
-- Для меток связей в `SVG` добавлен экспорт фона (`labelBackground`) и улучшено соответствие стилям/позиционированию текста.
-- Исправлен порядок слоёв в `SVG`-экспорте: связи и стрелки рендерятся поверх нод (как в canvas-рендерере).
+- Fixed node icon export to SVG: icons now correctly included in export file.
+- Fixed SVG export of rounded rectangles: runtime `RectangleNode.cornerRadius` now used (as in canvas render).
+- SVG export of nodes: added `fillOpacity`, `strokeOpacity`, `lineDash`, `lineDashOffset`.
+- SVG text labels: `TextStyle.opacity` and node label position via `getLabelPosition()`.
+- SVG node labels: `padding`/`margin` and text alignment (`left`/`center`/`right`).
+- SVG edges: `strokeOpacity`, `lineCap`, `lineJoin`.
+- SVG edge labels: added `labelBackground` export, improved style/position matching.
+- Fixed layer order in SVG export: edges and arrows render above nodes (as in canvas).
 
 ## [0.3.4] - 2026-02-19
 
 ### Added
-- Разрешено создавать self-loop связи (из ноды в саму себя) через `ConnectionManager`.
-- Для `polyline` добавлен obstacle-aware ортогональный роутинг с обходом фигур: используется расширение препятствий (`margin = 12`), штраф за повороты и приоритет горизонтального первого шага.
-- Для `bezier` добавлены правила self-loop/углового обхода, чтобы путь не проходил под фигурой в коротких локальных связях.
+- Self-loop edges (node to itself) allowed via ConnectionManager.
+- For `polyline`: obstacle-aware orthogonal routing with shape avoidance; obstacle margin 12, turn penalty, horizontal-first priority.
+- For `bezier`: self-loop/corner avoidance rules so path does not pass under shape in short local edges.
 
 ### Changed
-- Порядок отрисовки в `DiagramRenderer` обновлён: рёбра теперь рендерятся поверх фигур (nodes), а handles рёбер остаются верхним слоем.
-- Специальные правила обхода для `bezier` и `polyline` ограничены self-loop сценариями там, где это требуется.
+- DiagramRenderer draw order: edges now render above nodes; edge handles remain top layer.
+- Bezier and polyline avoidance rules limited to self-loop cases where needed.
 
 ## [0.3.3] - 2026-02-19
 
 ### Fixed
-- Исправлен `SVG`-экспорт меток рёбер: при отсутствии `SvgExportOptions.edgeLabelOffset` теперь используется runtime-значение `edge.labelOffset` для каждой связи.
+- Fixed SVG export of edge labels: when `SvgExportOptions.edgeLabelOffset` absent, runtime `edge.labelOffset` now used per edge.
 
 ### Added
-- В пример `examples/basic` добавлена настройка `Label Offset` для интерактивной регулировки смещения метки ребра.
+- `basic` example: Label Offset setting for interactive edge label offset adjustment.
 
 ## [0.3.2] - 2026-02-19
 
 ### Fixed
-- Исправлен рендер наконечников при экспорте в `SVG` для схем с разными типами маркеров: наконечники теперь выводятся как геометрия (`path`/`circle`), что устраняет проблемы совместимости SVG-viewer'ов с `marker-start/marker-end`.
+- Fixed marker rendering in SVG export for diagrams with different marker types: markers now output as geometry (`path`/`circle`), fixing SVG viewer compatibility with `marker-start`/`marker-end`.
 
 ## [0.3.1] - 2026-02-19
 
 ### Fixed
-- Исправлен экспорт в `SVG` для новых маркеров рёбер (`startMarker`/`endMarker`): теперь корректно выгружаются наконечники типов `arrow`, `open`, `diamond`, `circle`.
-- Добавлен fallback на legacy `arrowType` при экспорте в `SVG`, чтобы поведение совпадало с canvas-рендером.
+- Fixed SVG export for new edge markers (`startMarker`/`endMarker`): arrow, open, diamond, circle types now export correctly.
+- Added fallback to legacy `arrowType` in SVG export to match canvas render behavior.
 
 ### Changed
-- Изменено поведение подписи рёбер в `SVG`-экспорте: по умолчанию метка рендерится без смещения; для явного смещения добавлена опция `SvgExportOptions.edgeLabelOffset`.
+- SVG export edge label behavior: label renders without offset by default; `SvgExportOptions.edgeLabelOffset` for explicit offset.
 
 ## [0.3.0] - 2026-02-19
 
 ### Added
-- Публичный API для отключения resize-handles у узлов: `NodeOptions.resizeHandlesEnabled` и свойство `node.resizeHandlesEnabled`
-- Публичный API для управления custom-формой: `CustomShapeNodeOptions.shapeType` и свойство `customShapeNode.shapeType`
-- Публичные сеттеры `TextLabel.padding` и `TextLabel.margin` для runtime-настройки отступов
+- Public API to disable node resize handles: `NodeOptions.resizeHandlesEnabled` and `node.resizeHandlesEnabled`
+- Public API for custom shape: `CustomShapeNodeOptions.shapeType` and `customShapeNode.shapeType`
+- Public setters `TextLabel.padding` and `TextLabel.margin` for runtime padding/margin
 
 ### Changed
-- Улучшена интеграция с внешними редакторами диаграмм: меньше необходимости обращаться к внутренним полям и `any`-кастам
+- Improved integration with external diagram editors: less need for internal field access and `any` casts
 
 ## [0.2.0] - 2026-02-18
 
 ### Added
-- Inline-редактирование меток по двойному клику для узлов и рёбер (`InteractionManager`)
-- Новые справочные страницы документации: `renderer.md`, `input.md`, `search.md`
-- Настройки `Label Pad/Margin` и `Icon Pad/Margin/Gap` в панели `Node Style` примера `basic`
+- Inline label editing on double-click for nodes and edges (InteractionManager)
+- New docs: `renderer.md`, `input.md`, `search.md`
+- Label Pad/Margin and Icon Pad/Margin/Gap settings in Node Style panel of `basic` example
 
 ### Changed
-- Улучшен layout текста в узлах:
-  - перенос по словам учитывает доступную область текста при наличии иконки
-  - для круга и ромба используется область вписанного прямоугольника
-  - расширение узла происходит только если перенос не решает переполнение
-- Обновлены примеры (`basic`, `ports`, `custom-shapes`):
-  - улучшены тулбары и иконки
-  - добавлены подсказки по inline-редактированию
-  - упрощено поведение темы
-  - улучшено управление размером canvas после отрисовки страницы
-- Расширена документация по интерактивности, оверлеям и элементам
+- Improved node text layout: word wrap considers available text area with icon; circle/diamond use inscribed rect; node expansion only if wrap does not fix overflow
+- Updated examples (`basic`, `ports`, `custom-shapes`): improved toolbars and icons, inline edit hints, simplified theme, better canvas size handling
+- Expanded docs on interactivity, overlays, and elements
 
 ## [0.1.0] - 2026-02-18
 
 ### Added
-- Первый публичный релиз
-- `DiagramRenderer` — центральный рендерер с системой координат, масштабированием и панорамированием
-- Элементы: `RectangleNode`, `CircleNode`, `DiamondNode`, `CustomShapeNode`, `Edge`, `Group`
-- `InteractionManager` с поддержкой drag/select/connect/undo/redo/copy/paste
-- `StyleManager` с темами (default, dark) и пользовательскими классами стилей
-- `Serializer` для сохранения/загрузки диаграмм в JSON
-- `ImageExporter` и `SvgExporter` для экспорта диаграмм
-- Оверлеи: `GridOverlay`, `MiniMap`, `RulersOverlay`, `GuidesOverlay`
-- Утилиты: `AutoLayout`, `AutoRouting`, `alignNodes`, `distributeNodes`
-- Поддержка портов (`Port`) и иконок в узлах (`NodeImage`)
-- Анимации для рёбер (flow effect)
-- Контекстное меню и поиск/фильтрация
+- First public release
+- `DiagramRenderer` — main renderer with coordinate system, zoom, and panning
+- Elements: `RectangleNode`, `CircleNode`, `DiamondNode`, `CustomShapeNode`, `Edge`, `Group`
+- `InteractionManager` with drag/select/connect/undo/redo/copy/paste
+- `StyleManager` with themes (default, dark) and custom style classes
+- `Serializer` for JSON save/load
+- `ImageExporter` and `SvgExporter`
+- Overlays: `GridOverlay`, `MiniMap`, `RulersOverlay`, `GuidesOverlay`
+- Utilities: `AutoLayout`, `AutoRouting`, `alignNodes`, `distributeNodes`
+- Port (`Port`) and node icon (`NodeImage`) support
+- Edge animations (flow effect)
+- Context menu and search/filter
 
 [Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.3.21...HEAD
 [0.3.21]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.21
