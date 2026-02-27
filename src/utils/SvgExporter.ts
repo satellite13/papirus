@@ -165,6 +165,18 @@ export class SvgExporter {
         shape = `<polygon points="${points}"`;
         break;
       }
+      case 'custom': {
+        const svgPath =
+          'getSvgPath' in node && typeof node.getSvgPath === 'function'
+            ? (node as { getSvgPath: () => string | null }).getSvgPath()
+            : null;
+        if (svgPath) {
+          shape = `<path d="${this.escapeAttribute(svgPath)}" transform="translate(${bounds.x}, ${bounds.y})"`;
+        } else {
+          shape = `<rect x="${bounds.x}" y="${bounds.y}" width="${bounds.width}" height="${bounds.height}"`;
+        }
+        break;
+      }
       default: {
         shape = `<rect x="${bounds.x}" y="${bounds.y}" width="${bounds.width}" height="${bounds.height}"`;
       }
@@ -503,22 +515,42 @@ export class SvgExporter {
     return `<text x="${point.x}" y="${point.y}" fill="${fill}" fill-opacity="${opacity}" font-size="${fontSize}" font-family="${fontFamily}" font-weight="${fontWeight}" text-anchor="${anchor}" dominant-baseline="${baseline}">${tspans}</text>`;
   }
 
-  private renderNodeLabel(node: Node, bounds: { x: number; y: number; width: number; height: number }): string {
+  private getMeasurementContext(): CanvasRenderingContext2D | null {
+    if (typeof document === 'undefined') {
+      return null;
+    }
+    const canvas = document.createElement('canvas');
+    return canvas.getContext('2d');
+  }
+
+  private renderNodeLabel(node: Node, nodeBounds: { x: number; y: number; width: number; height: number }): string {
     const label = node.label;
     if (!label) {
       return '';
     }
 
     const style = label.style;
-    const fontSize = style.fontSize ?? 14;
-    const lineHeight = fontSize * 1.2;
-    const lines = label.text.split('\n');
-    const textHeight = Math.max(lineHeight, lines.length * lineHeight);
     const padding = Math.max(0, label.padding);
     const margin = Math.max(0, label.margin);
-    const inset = padding + margin;
     const align = style.align ?? 'center';
-    const placement = node.labelPlacement === 'auto' ? 'center' : node.labelPlacement;
+
+    const ctx = this.getMeasurementContext();
+    let bounds: { x: number; y: number; width: number; height: number };
+    let lines: string[];
+
+    if (ctx !== null) {
+      const result = node.getLabelBoundsForExport(ctx);
+      if (result) {
+        bounds = result.bounds;
+        lines = result.lines;
+      } else {
+        bounds = nodeBounds;
+        lines = label.text.split('\n');
+      }
+    } else {
+      bounds = nodeBounds;
+      lines = label.text.split('\n');
+    }
 
     const inner = {
       x: bounds.x + margin,
@@ -529,23 +561,14 @@ export class SvgExporter {
 
     let x = inner.x + inner.width / 2;
     if (align === 'left') {
-      x = inner.x + inset;
+      x = inner.x + padding;
     } else if (align === 'right') {
-      x = inner.x + inner.width - inset;
+      x = inner.x + inner.width - padding;
     }
 
-    let y = inner.y + inner.height / 2;
-    if (placement === 'top') {
-      y = inner.y + inset + textHeight / 2;
-    } else if (placement === 'bottom') {
-      y = inner.y + inner.height - inset - textHeight / 2;
-    } else if (placement === 'left') {
-      x = inner.x + inset;
-    } else if (placement === 'right') {
-      x = inner.x + inner.width - inset;
-    }
+    const y = inner.y + inner.height / 2;
 
-    return this.renderTextLabel(label.text, { x, y }, style);
+    return this.renderTextLabel(lines.join('\n'), { x, y }, style);
   }
 
   private getNodeCornerRadius(node: Node, bounds: { width: number; height: number }): number {

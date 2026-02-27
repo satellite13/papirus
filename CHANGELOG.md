@@ -7,6 +7,19 @@
 
 ## [Unreleased]
 
+## [0.3.17] - 2026-02-27
+
+### Added
+- `CustomShapeNodeOptions.svgPath` — опция для корректного SVG-экспорта custom shapes. Path2D нельзя конвертировать в SVG, поэтому `svgPath` задаётся отдельно (строка или фабрика `(w, h) => string`).
+- `ShapeFactories.svg` — готовые SVG path для hexagon, parallelogram, cylinder, document, chamfered.
+- `CustomShapeNode.getSvgPath()`, `setSvgPath()` — доступ к SVG path для экспорта.
+- `TextLabel.getWrappedLines(ctx, maxWidth)` — получение текста, перенесённого по словам, для SVG-экспорта.
+- `Node.getLabelBoundsForExport(ctx)` — bounds и строки метки для SVG-экспорта (с учётом иконки и placement).
+
+### Fixed
+- SVG-экспорт меток узлов: текст теперь переносится по словам (как на canvas), а не выводится в одну строку.
+- SVG-экспорт меток: расположение текста (с учётом иконки, labelPlacement, getLabelContainerBounds) совпадает с отрисовкой на canvas.
+
 ## [0.3.16] - 2026-02-26
 
 ### Fixed
@@ -153,7 +166,8 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.3.16...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.3.17...HEAD
+[0.3.17]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.17
 [0.3.16]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.16
 [0.3.15]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.15
 [0.3.14]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.14

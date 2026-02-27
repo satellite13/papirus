@@ -16,6 +16,31 @@
 - `DiamondNode`
 - `CustomShapeNode` (произвольный `Path2D`)
 
+### CustomShapeNode
+
+Узел с произвольной формой на основе `Path2D`. Для корректного SVG-экспорта необходимо указать `svgPath` — строку SVG path в локальных координатах (0,0 — верхний левый угол, width×height — размеры узла).
+
+Опции:
+
+- `path` — `Path2D` или фабрика `(width, height) => Path2D` для отрисовки на canvas.
+- `svgPath` — строка или фабрика `(width, height) => string` для SVG-экспорта. Если не указано, экспорт использует прямоугольник.
+- `shapeType` — произвольный идентификатор типа формы (для UI, сериализации).
+
+Готовые SVG path: `ShapeFactories.svg.hexagon`, `ShapeFactories.svg.parallelogram`, `ShapeFactories.svg.cylinder`, `ShapeFactories.svg.document`, `ShapeFactories.svg.chamfered`.
+
+```ts
+import { CustomShapeNode, ShapeFactories } from '@ngroznykh/papirus';
+
+const node = new CustomShapeNode({
+  x: 100, y: 100,
+  width: 120, height: 80,
+  path: ShapeFactories.hexagon,
+  svgPath: ShapeFactories.svg.hexagon,
+  labelPlacement: 'center',
+  label: 'Hexagon',
+});
+```
+
 ### Опции узлов (общие)
 
 - `label` — текстовая метка (`string` или `TextLabelOptions`).

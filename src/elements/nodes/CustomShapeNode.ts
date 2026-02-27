@@ -4,6 +4,12 @@ import type { Point } from '@/types';
 
 export interface CustomShapeNodeOptions extends NodeOptions {
   path: Path2D | ((width: number, height: number) => Path2D);
+  /**
+   * SVG path string for export. Required for correct SVG export of custom shapes.
+   * Path coordinates are in local space (0,0 = top-left, width×height = node bounds).
+   * If omitted, SVG export falls back to a rectangle.
+   */
+  svgPath?: string | ((width: number, height: number) => string);
   shapeType?: string;
 }
 
@@ -12,6 +18,7 @@ export interface CustomShapeNodeOptions extends NodeOptions {
  */
 export class CustomShapeNode extends Node {
   private _pathFactory: (width: number, height: number) => Path2D;
+  private _svgPathFactory: ((width: number, height: number) => string) | null = null;
   private _shapeType?: string;
   private _cachedPath: Path2D | null = null;
   private _cachedWidth = 0;
@@ -26,6 +33,16 @@ export class CustomShapeNode extends Node {
     } else {
       this._pathFactory = options.path;
     }
+
+    if (options.svgPath !== undefined) {
+      if (typeof options.svgPath === 'string') {
+        const staticSvg = options.svgPath;
+        this._svgPathFactory = (): string => staticSvg;
+      } else {
+        this._svgPathFactory = options.svgPath;
+      }
+    }
+
     this._shapeType = options.shapeType;
   }
 
@@ -67,6 +84,30 @@ export class CustomShapeNode extends Node {
       this._cachedHeight = this._height;
     }
     return this._cachedPath;
+  }
+
+  /**
+   * Get SVG path string for export. Returns null if svgPath was not provided.
+   */
+  getSvgPath(): string | null {
+    if (this._svgPathFactory === null) {
+      return null;
+    }
+    return this._svgPathFactory(this._width, this._height);
+  }
+
+  /**
+   * Set SVG path for export. Call when shape changes.
+   */
+  setSvgPath(value: string | ((width: number, height: number) => string) | undefined): void {
+    if (value === undefined) {
+      this._svgPathFactory = null;
+    } else if (typeof value === 'string') {
+      this._svgPathFactory = (): string => value;
+    } else {
+      this._svgPathFactory = value;
+    }
+    this.markDirty();
   }
 
   override hitTest(point: Point): boolean {
@@ -190,5 +231,31 @@ export const ShapeFactories = {
     path.closePath();
 
     return path;
+  },
+
+  /**
+   * SVG path strings for export. Use with CustomShapeNodeOptions.svgPath.
+   */
+  svg: {
+    hexagon: (w: number, h: number): string =>
+      `M ${w * 0.25} 0 L ${w * 0.75} 0 L ${w} ${h / 2} L ${w * 0.75} ${h} L ${w * 0.25} ${h} L 0 ${h / 2} Z`,
+    parallelogram: (w: number, h: number): string => {
+      const skew = w * 0.2;
+      return `M ${skew} 0 L ${w} 0 L ${w - skew} ${h} L 0 ${h} Z`;
+    },
+    cylinder: (w: number, h: number): string => {
+      const eh = h * 0.15;
+      const rx = w / 2;
+      return `M 0 ${eh} L 0 ${h - eh} A ${rx} ${eh} 0 0 1 ${w} ${h - eh} L ${w} ${eh} A ${rx} ${eh} 0 0 1 0 ${eh} Z`;
+    },
+    document: (w: number, h: number): string => {
+      const wh = h * 0.1;
+      return `M 0 0 L ${w} 0 L ${w} ${h - wh} Q ${w * 0.75} ${h} ${w * 0.5} ${h - wh} Q ${w * 0.25} ${h - wh * 2} 0 ${h - wh} Z`;
+    },
+    /** Chamfered rectangle (cut corners) */
+    chamfered: (w: number, h: number): string => {
+      const cut = Math.max(6, Math.min(20, w * 0.18, h * 0.18));
+      return `M ${cut} 0 L ${w - cut} 0 L ${w} ${cut} L ${w} ${h - cut} L ${w - cut} ${h} L ${cut} ${h} L 0 ${h - cut} L 0 ${cut} Z`;
+    },
   },
 };

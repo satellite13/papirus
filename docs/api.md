@@ -27,8 +27,8 @@
 ## Типы узлов
 
 - `RectangleNode`, `CircleNode`, `DiamondNode` — встроенные формы.
-- `CustomShapeNode` — пользовательские формы (`Path2D`).
-- `ShapeFactories` — набор готовых фабрик Path2D.
+- `CustomShapeNode` — пользовательские формы (`Path2D`). Опция `svgPath` для SVG-экспорта.
+- `ShapeFactories` — фабрики Path2D (`hexagon`, `parallelogram`, `cylinder`, `document`) и `ShapeFactories.svg` — SVG path для экспорта.
 
 ## События и ввод
 

@@ -6,6 +6,8 @@ import {
   StyleManager,
   GridOverlay,
   MiniMap,
+  ShapeFactories,
+  SvgExporter,
 } from '../../dist/papirus.js';
 import { DatabaseNode } from './DatabaseNode.js';
 
@@ -132,6 +134,7 @@ function createChamferedNode(x, y) {
     width: 140, height: 70,
     label: { text: `Chamfered ${++chamferCount}`, padding: 6, margin: 3 },
     path: createChamferedRectPath,
+    svgPath: ShapeFactories.svg.chamfered,
     anchorPoints: { top: 3, right: 2, bottom: 3, left: 2 },
     style: { fillColor: '#ede9fe', strokeColor: '#7c3aed', strokeWidth: 2 },
   });
@@ -146,6 +149,7 @@ function createHexagonNode(x, y) {
     width: 120, height: 100,
     label: { text: `Hexagon ${++hexagonCount}`, padding: 6, margin: 3 },
     path: createHexagonPath,
+    svgPath: ShapeFactories.svg.hexagon,
     anchorPoints: { top: 2, right: 1, bottom: 2, left: 1 },
     style: { fillColor: '#cffafe', strokeColor: '#0891b2', strokeWidth: 2 },
   });
@@ -167,12 +171,18 @@ function createCylinderNode(x, y) {
   return node;
 }
 
+function createDocumentSvgPath(w, h) {
+  const fold = Math.min(30, w * 0.25, h * 0.25);
+  return `M 0 0 L ${w - fold} 0 L ${w} ${fold} L ${w} ${h} L 0 ${h} Z`;
+}
+
 function createDocumentNode(x, y) {
   const node = new CustomShapeNode({
     x, y,
     width: 100, height: 130,
     label: { text: `Doc ${++documentCount}`, padding: 6, margin: 3 },
     path: createDocumentPath,
+    svgPath: createDocumentSvgPath,
     anchorPoints: { top: 2, right: 2, bottom: 2, left: 2 },
     style: { fillColor: '#fef3c7', strokeColor: '#d97706', strokeWidth: 2 },
   });
@@ -313,4 +323,9 @@ document.getElementById('fitView').addEventListener('click', () => {
 
 document.getElementById('resetView').addEventListener('click', () => {
   interactions.navigation.resetView();
+});
+
+const svgExporter = new SvgExporter(renderer);
+document.getElementById('exportSvg').addEventListener('click', () => {
+  svgExporter.download('shapes.svg', { includeBackground: true });
 });

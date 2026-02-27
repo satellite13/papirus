@@ -25,6 +25,8 @@ const svgExporter = new SvgExporter(renderer);
 svgExporter.download('diagram.svg', { includeBackground: true });
 ```
 
+**Custom shapes в SVG:** для `CustomShapeNode` укажите опцию `svgPath` — иначе экспорт использует прямоугольник. Готовые path: `ShapeFactories.svg.hexagon`, `ShapeFactories.svg.parallelogram`, `ShapeFactories.svg.cylinder`, `ShapeFactories.svg.document`, `ShapeFactories.svg.chamfered`.
+
 ## AutoLayout
 
 Быстрый grid-лейаут для массива узлов.

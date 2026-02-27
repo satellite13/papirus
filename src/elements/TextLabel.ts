@@ -210,6 +210,16 @@ export class TextLabel {
   }
 
   /**
+   * Get wrapped lines for export. Uses ctx to measure and wrap by words.
+   * Call with maxWidth = inner bounds width (e.g. bounds.width - margin*2).
+   */
+  getWrappedLines(ctx: CanvasRenderingContext2D, maxWidth: number): string[] {
+    this.setAutoMaxWidth(maxWidth);
+    this.measure(ctx);
+    return this._lines;
+  }
+
+  /**
    * Measure and layout text, returns dimensions
    */
   measure(ctx: CanvasRenderingContext2D): { width: number; height: number } {
