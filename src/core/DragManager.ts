@@ -4,6 +4,7 @@ import type { SelectionManager } from './SelectionManager';
 import type { InputEvent } from '@/events/InputHandler';
 import type { Node } from '@/elements/Node';
 import type { Bounds, Point } from '@/types';
+import { distance } from '@/utils/geometry';
 
 const ALIGNMENT_SCREEN_TOLERANCE = 8;
 
@@ -141,7 +142,8 @@ export class DragManager extends EventEmitter<DragEvents> {
     // Check if it's a node
     const node = this.renderer.getNode(element.id);
     const group = node === undefined ? this.renderer.getGroup(element.id) : undefined;
-    const edge = node === undefined && group === undefined ? this.renderer.getEdge(element.id) : undefined;
+    const edge =
+      node === undefined && group === undefined ? this.renderer.getEdge(element.id) : undefined;
     if (node === undefined && group === undefined && edge === undefined) {
       return false;
     }
@@ -232,11 +234,9 @@ export class DragManager extends EventEmitter<DragEvents> {
 
     // Check if we've moved enough to start dragging
     if (!this.isDragging) {
-      const dx = point.x - this.dragStartPoint.x;
-      const dy = point.y - this.dragStartPoint.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
+      const dist = distance(point, this.dragStartPoint);
 
-      if (distance < 3) {
+      if (dist < 3) {
         return false;
       }
 
@@ -380,7 +380,11 @@ export class DragManager extends EventEmitter<DragEvents> {
     const ORTHOGONAL_TOLERANCE = 6;
 
     for (const node of this.draggedNodes) {
-      const bindings: Array<{ edgeId: string; controlPointIndex: number; axis: 'vertical' | 'horizontal' }> = [];
+      const bindings: Array<{
+        edgeId: string;
+        controlPointIndex: number;
+        axis: 'vertical' | 'horizontal';
+      }> = [];
 
       for (const edge of this.renderer.edges.values()) {
         if (!edge.isEditablePolyline() || !edge.controlPoints || edge.controlPoints.length === 0) {
@@ -506,12 +510,20 @@ export class DragManager extends EventEmitter<DragEvents> {
       { key: 'end', value: draggedBounds.y + draggedBounds.height },
     ];
 
-    let bestVertical:
-      | { offset: number; x: number; fromY: number; toY: number; distance: number }
-      | null = null;
-    let bestHorizontal:
-      | { offset: number; y: number; fromX: number; toX: number; distance: number }
-      | null = null;
+    let bestVertical: {
+      offset: number;
+      x: number;
+      fromY: number;
+      toY: number;
+      distance: number;
+    } | null = null;
+    let bestHorizontal: {
+      offset: number;
+      y: number;
+      fromX: number;
+      toX: number;
+      distance: number;
+    } | null = null;
 
     for (const node of this.renderer.nodes.values()) {
       if (!node.visible || draggedIds.has(node.id)) {

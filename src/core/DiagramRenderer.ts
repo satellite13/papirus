@@ -66,7 +66,7 @@ const DEFAULT_OPTIONS: Required<Omit<DiagramOptions, 'scrollbar'>> = {
 };
 
 interface OverlayDragPlugin extends DiagramPlugin {
-  beginOverlayDrag?(renderer: DiagramRenderer, screenX: number, screenY: number): unknown | null;
+  beginOverlayDrag?(renderer: DiagramRenderer, screenX: number, screenY: number): unknown;
   updateOverlayDrag?(
     renderer: DiagramRenderer,
     screenX: number,
@@ -128,6 +128,8 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
   private _offsetY = 0;
   private _dirty = true;
   private _destroyed = false;
+  private _canvasRect: DOMRectReadOnly | null = null;
+  private _nodeObstaclesCache: PathObstacle[] | null = null;
 
   private animationFrameId: number | null = null;
   private devicePixelRatio: number;
@@ -334,6 +336,7 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
     this.options.width = width;
     this.options.height = height;
     this.setupCanvas();
+    this.updateCanvasRect();
     this.markDirty();
   }
 
@@ -348,7 +351,9 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
   /**
    * Enable built-in interaction handling
    */
-  enableInteractions(options: Omit<InteractionManagerOptions, 'renderer'> = {}): InteractionManager {
+  enableInteractions(
+    options: Omit<InteractionManagerOptions, 'renderer'> = {}
+  ): InteractionManager {
     if (this.interactionManager) {
       return this.interactionManager;
     }
@@ -367,7 +372,9 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
   /**
    * Enable context menu handling
    */
-  enableContextMenu(options: ConstructorParameters<typeof ContextMenuManager>[1]): ContextMenuManager {
+  enableContextMenu(
+    options: ConstructorParameters<typeof ContextMenuManager>[1]
+  ): ContextMenuManager {
     this.contextMenuManager?.destroy();
     this.contextMenuManager = new ContextMenuManager(this, options);
     return this.contextMenuManager;
@@ -409,7 +416,7 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
    * Convert screen coordinates to world coordinates
    */
   screenToWorld(screenX: number, screenY: number): Point {
-    const rect = this.canvas.getBoundingClientRect();
+    const rect = this._canvasRect ?? this.canvas.getBoundingClientRect();
     const scaleX = rect.width / this.options.width;
     const scaleY = rect.height / this.options.height;
     const canvasX = (screenX - rect.left) / scaleX;
@@ -423,7 +430,7 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
    * Convert world coordinates to screen coordinates
    */
   worldToScreen(worldX: number, worldY: number): Point {
-    const rect = this.canvas.getBoundingClientRect();
+    const rect = this._canvasRect ?? this.canvas.getBoundingClientRect();
     const scaleX = rect.width / this.options.width;
     const scaleY = rect.height / this.options.height;
     const x = (worldX * this._zoom + this._offsetX) * scaleX + rect.left;
@@ -438,6 +445,7 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
     node.setDirtyListener(() => this.markDirty());
     node.setAttachToOutlineGetter(() => this._attachToOutline);
     this._nodes.set(node.id, node);
+    this._nodeObstaclesCache = null;
     this.animationManager.registerEnter(node.id);
     this.markDirty();
     this.emit('nodeAdd', node);
@@ -534,6 +542,7 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
     }
 
     this._nodes.delete(nodeId);
+    this._nodeObstaclesCache = null;
     node.setDirtyListener(undefined);
     node.setAttachToOutlineGetter(undefined);
     this.markDirty();
@@ -671,6 +680,25 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
     this._groups.clear();
   }
 
+  /**
+   * Clear all elements from the diagram
+   */
+  clear(): void {
+    for (const node of this._nodes.values()) {
+      node.setDirtyListener(undefined);
+    }
+    for (const edge of this._edges.values()) {
+      edge.setDirtyListener(undefined);
+    }
+    for (const group of this._groups.values()) {
+      group.setDirtyListener(undefined);
+    }
+    this._nodes.clear();
+    this._edges.clear();
+    this._groups.clear();
+    this.markDirty();
+  }
+
   private setupCanvas(): void {
     const { width, height } = this.options;
     this.devicePixelRatio = this.options.retina ? window.devicePixelRatio || 1 : 1;
@@ -686,6 +714,12 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
     // Scale context for retina
     this.ctx.setTransform(1, 0, 0, 1, 0, 0);
     this.ctx.scale(this.devicePixelRatio, this.devicePixelRatio);
+
+    this.updateCanvasRect();
+  }
+
+  private updateCanvasRect(): void {
+    this._canvasRect = this.canvas.getBoundingClientRect();
   }
 
   private resolveCanvas(canvas: HTMLCanvasElement | string): HTMLCanvasElement {
@@ -733,6 +767,7 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
 
   private renderFrame(now: number): void {
     this.frameTime = now;
+    this._nodeObstaclesCache = null;
     const ctx = this.ctx;
     const { width, height, backgroundColor } = this.options;
 
@@ -753,12 +788,12 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
 
     // Apply styles from StyleManager before rendering
     if (this.styleManager) {
-    applyStyleManagerToElements(
-      this.styleManager,
-      this._groups.values(),
-      this._edges.values(),
-      this._nodes.values()
-    );
+      applyStyleManagerToElements(
+        this.styleManager,
+        this._groups.values(),
+        this._edges.values(),
+        this._nodes.values()
+      );
     }
 
     // Update group bounds before rendering
@@ -844,6 +879,8 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
   }
 
   private updateEdgeEndpoints(): void {
+    const obstacles = this.getNodeObstacles();
+
     for (const edge of this._edges.values()) {
       if (!edge.autoUpdateEndpoints) {
         continue;
@@ -872,50 +909,61 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
         }
       }
 
-      let fromPoint = fromNode.getConnectionPoint(toNode.getCenter());
-      let toPoint = toNode.getConnectionPoint(fromNode.getCenter());
+      let fromPoint: Point;
+      let toPoint: Point;
       let fromDir: string | undefined;
       let toDir: string | undefined;
 
-      if (edge.from.outlineParam !== undefined) {
-        fromPoint = fromNode.getConnectionPointAtOutlineParam(edge.from.outlineParam);
-        fromDir = this.getDirectionFromOutlineParam(edge.from.outlineParam);
-      } else if (edge.lockAnchors && edge.from.portId?.startsWith(ANCHOR_PORT_PREFIX)) {
+      if (edge.from.portId) {
         const anchorId = edge.from.portId.slice(ANCHOR_PORT_PREFIX.length);
         const anchorPoint = fromNode.getAnchorPointById(anchorId);
         if (anchorPoint) {
           fromPoint = anchorPoint;
           fromDir = anchorId.split(':')[0];
+        } else {
+          fromPoint = fromNode.getCenter();
         }
+      } else if (edge.from.outlineParam !== undefined) {
+        fromPoint = fromNode.getConnectionPointAtOutlineParam(edge.from.outlineParam);
+        fromDir = this.getDirectionFromOutlineParam(edge.from.outlineParam);
+      } else {
+        fromPoint = fromNode.getCenter();
       }
 
-      if (edge.to.outlineParam !== undefined) {
-        toPoint = toNode.getConnectionPointAtOutlineParam(edge.to.outlineParam);
-        toDir = this.getDirectionFromOutlineParam(edge.to.outlineParam);
-      } else if (edge.lockAnchors && edge.to.portId?.startsWith(ANCHOR_PORT_PREFIX)) {
+      if (edge.to.portId) {
         const anchorId = edge.to.portId.slice(ANCHOR_PORT_PREFIX.length);
         const anchorPoint = toNode.getAnchorPointById(anchorId);
         if (anchorPoint) {
           toPoint = anchorPoint;
           toDir = anchorId.split(':')[0];
+        } else {
+          toPoint = toNode.getCenter();
         }
+      } else if (edge.to.outlineParam !== undefined) {
+        toPoint = toNode.getConnectionPointAtOutlineParam(edge.to.outlineParam);
+        toDir = this.getDirectionFromOutlineParam(edge.to.outlineParam);
+      } else {
+        toPoint = toNode.getCenter();
       }
-      const obstacles: PathObstacle[] = Array.from(this._nodes.values())
-        .map((node) => ({
-          x: node.x - 8,
-          y: node.y - 8,
-          width: node.width + 16,
-          height: node.height + 16,
-          role:
-            node.id === edge.from.nodeId
-              ? ('source' as const)
-              : node.id === edge.to.nodeId
-                ? ('target' as const)
-                : ('other' as const),
-        }));
 
       edge.updateEndpoints(fromPoint, toPoint, fromDir, toDir, { obstacles });
     }
+  }
+
+  private getNodeObstacles(): PathObstacle[] {
+    if (this._nodeObstaclesCache !== null) {
+      return this._nodeObstaclesCache;
+    }
+
+    this._nodeObstaclesCache = Array.from(this._nodes.values()).map((node) => ({
+      x: node.x - 8,
+      y: node.y - 8,
+      width: node.width + 16,
+      height: node.height + 16,
+      role: 'other' as const,
+    }));
+
+    return this._nodeObstaclesCache;
   }
 
   private getDirectionFromOutlineParam(param: number): string {
@@ -950,7 +998,8 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
     if (metrics.horizontal) {
       const isHovered = this.scrollbarHoveredAxis === 'horizontal';
       const isActive = this.scrollbarActiveAxis === 'horizontal';
-      const thickness = isHovered || isActive ? this.scrollbar.hoverThickness : this.scrollbar.thickness;
+      const thickness =
+        isHovered || isActive ? this.scrollbar.hoverThickness : this.scrollbar.thickness;
       const trackY = metrics.horizontal.trackY + (metrics.horizontal.thickness - thickness) / 2;
       const radius = thickness / 2;
       const thumbColor = isActive
@@ -983,7 +1032,8 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
     if (metrics.vertical) {
       const isHovered = this.scrollbarHoveredAxis === 'vertical';
       const isActive = this.scrollbarActiveAxis === 'vertical';
-      const thickness = isHovered || isActive ? this.scrollbar.hoverThickness : this.scrollbar.thickness;
+      const thickness =
+        isHovered || isActive ? this.scrollbar.hoverThickness : this.scrollbar.thickness;
       const trackX = metrics.vertical.trackX + (metrics.vertical.thickness - thickness) / 2;
       const radius = thickness / 2;
       const thumbColor = isActive
@@ -1177,7 +1227,8 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
     }
 
     if (metrics.horizontal) {
-      const { trackX, trackY, trackLength, thumbOffset, thumbLength, maxScroll } = metrics.horizontal;
+      const { trackX, trackY, trackLength, thumbOffset, thumbLength, maxScroll } =
+        metrics.horizontal;
       const inTrack =
         localPoint.x >= trackX &&
         localPoint.x <= trackX + trackLength &&
@@ -1240,8 +1291,14 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
     const worldDy = screenDy / this.zoom;
     const currentViewportX = scrollState.viewportBounds.x;
     const currentViewportY = scrollState.viewportBounds.y;
-    const maxScrollX = Math.max(0, scrollState.contentBounds.width - scrollState.viewportBounds.width);
-    const maxScrollY = Math.max(0, scrollState.contentBounds.height - scrollState.viewportBounds.height);
+    const maxScrollX = Math.max(
+      0,
+      scrollState.contentBounds.width - scrollState.viewportBounds.width
+    );
+    const maxScrollY = Math.max(
+      0,
+      scrollState.contentBounds.height - scrollState.viewportBounds.height
+    );
     const nextViewportX = Math.min(
       Math.max(currentViewportX + worldDx, scrollState.contentBounds.x),
       scrollState.contentBounds.x + maxScrollX
@@ -1273,8 +1330,14 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
     if (!scrollState) {
       return false;
     }
-    const maxScrollX = Math.max(0, scrollState.contentBounds.width - scrollState.viewportBounds.width);
-    const maxScrollY = Math.max(0, scrollState.contentBounds.height - scrollState.viewportBounds.height);
+    const maxScrollX = Math.max(
+      0,
+      scrollState.contentBounds.width - scrollState.viewportBounds.width
+    );
+    const maxScrollY = Math.max(
+      0,
+      scrollState.contentBounds.height - scrollState.viewportBounds.height
+    );
     const targetViewportX = scrollState.contentBounds.x + maxScrollX;
     const targetViewportY = scrollState.contentBounds.y + maxScrollY;
     this.offsetX = -targetViewportX * this.zoom;
@@ -1306,7 +1369,7 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
   }
 
   screenToCanvas(screenX: number, screenY: number): Point | null {
-    const rect = this.canvas.getBoundingClientRect();
+    const rect = this._canvasRect ?? this.canvas.getBoundingClientRect();
     if (rect.width <= 0 || rect.height <= 0) {
       return null;
     }
@@ -1332,8 +1395,14 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
     const viewportBounds = this.getViewportBounds();
     const unionMinX = Math.min(rawContentBounds.x, viewportBounds.x);
     const unionMinY = Math.min(rawContentBounds.y, viewportBounds.y);
-    const unionMaxX = Math.max(rawContentBounds.x + rawContentBounds.width, viewportBounds.x + viewportBounds.width);
-    const unionMaxY = Math.max(rawContentBounds.y + rawContentBounds.height, viewportBounds.y + viewportBounds.height);
+    const unionMaxX = Math.max(
+      rawContentBounds.x + rawContentBounds.width,
+      viewportBounds.x + viewportBounds.width
+    );
+    const unionMaxY = Math.max(
+      rawContentBounds.y + rawContentBounds.height,
+      viewportBounds.y + viewportBounds.height
+    );
     const contentBounds = {
       x: unionMinX,
       y: unionMinY,
@@ -1361,8 +1430,14 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
       return null;
     }
 
-    const horizontalTrackLength = Math.max(0, availableWidth - (showVertical ? thickness + spacing : 0));
-    const verticalTrackLength = Math.max(0, availableHeight - (showHorizontal ? thickness + spacing : 0));
+    const horizontalTrackLength = Math.max(
+      0,
+      availableWidth - (showVertical ? thickness + spacing : 0)
+    );
+    const verticalTrackLength = Math.max(
+      0,
+      availableHeight - (showHorizontal ? thickness + spacing : 0)
+    );
 
     const horizontalTrackX = padding;
     const horizontalTrackY = height - padding - thickness;
@@ -1374,7 +1449,10 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
       const maxScrollX = Math.max(0, contentWidth - viewportBounds.width);
       const scrollX = Math.min(Math.max(viewportBounds.x - contentBounds.x, 0), maxScrollX);
       const ratioX = viewportBounds.width / contentWidth;
-      const thumbLength = Math.min(horizontalTrackLength, Math.max(minThumbLength, horizontalTrackLength * ratioX));
+      const thumbLength = Math.min(
+        horizontalTrackLength,
+        Math.max(minThumbLength, horizontalTrackLength * ratioX)
+      );
       const travel = Math.max(0, horizontalTrackLength - thumbLength);
       const thumbOffset = maxScrollX > 0 ? (scrollX / maxScrollX) * travel : 0;
       horizontal = {
@@ -1393,7 +1471,10 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
       const maxScrollY = Math.max(0, contentHeight - viewportBounds.height);
       const scrollY = Math.min(Math.max(viewportBounds.y - contentBounds.y, 0), maxScrollY);
       const ratioY = viewportBounds.height / contentHeight;
-      const thumbLength = Math.min(verticalTrackLength, Math.max(minThumbLength, verticalTrackLength * ratioY));
+      const thumbLength = Math.min(
+        verticalTrackLength,
+        Math.max(minThumbLength, verticalTrackLength * ratioY)
+      );
       const travel = Math.max(0, verticalTrackLength - thumbLength);
       const thumbOffset = maxScrollY > 0 ? (scrollY / maxScrollY) * travel : 0;
       vertical = {
@@ -1544,5 +1625,4 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
       viewportBounds,
     };
   }
-
 }

@@ -96,7 +96,8 @@ const applyLabelSnapshot = (
 };
 
 export const createNodeSnapshot = (node: Node): NodeSnapshot => {
-  const cornerRadius = 'cornerRadius' in node ? (node as { cornerRadius: number }).cornerRadius : undefined;
+  const cornerRadius =
+    'cornerRadius' in node ? (node as { cornerRadius: number }).cornerRadius : undefined;
   return {
     style: cloneValue(node.styleOverrides as NodeStyle),
     styleClass: node.styleClass,
@@ -123,7 +124,7 @@ export const createEdgeSnapshot = (edge: Edge): EdgeSnapshot => {
 
 export const createGroupSnapshot = (group: Group): GroupSnapshot => {
   return {
-    style: cloneValue(group.styleOverrides as ElementStyle),
+    style: cloneValue(group.styleOverrides),
     styleClass: group.styleClass,
     label: group.label,
     padding: group.padding,
@@ -134,12 +135,18 @@ export const createGroupSnapshot = (group: Group): GroupSnapshot => {
  * Command for moving nodes
  */
 export class MoveNodesCommand implements Command {
-  private readonly nodePositions: Map<string, { before: { x: number; y: number }; after: { x: number; y: number } }>;
+  private readonly nodePositions: Map<
+    string,
+    { before: { x: number; y: number }; after: { x: number; y: number } }
+  >;
   private readonly getNode: (id: string) => { x: number; y: number } | undefined;
 
   constructor(
     getNode: (id: string) => { x: number; y: number } | undefined,
-    nodePositions: Map<string, { before: { x: number; y: number }; after: { x: number; y: number } }>
+    nodePositions: Map<
+      string,
+      { before: { x: number; y: number }; after: { x: number; y: number } }
+    >
   ) {
     this.getNode = getNode;
     this.nodePositions = new Map(nodePositions);

@@ -53,7 +53,9 @@ describe('Node', () => {
 
   it('wraps label by words before expanding node width', () => {
     const ctx = mockCanvasContext();
-    ctx.measureText = ((text: string) => ({ width: text.length * 8 })) as CanvasRenderingContext2D['measureText'];
+    ctx.measureText = ((text: string) => ({
+      width: text.length * 8,
+    })) as CanvasRenderingContext2D['measureText'];
 
     const node = new RectangleNode({
       x: 0,
@@ -71,7 +73,9 @@ describe('Node', () => {
 
   it('expands node width when a single word cannot wrap', () => {
     const ctx = mockCanvasContext();
-    ctx.measureText = ((text: string) => ({ width: text.length * 8 })) as CanvasRenderingContext2D['measureText'];
+    ctx.measureText = ((text: string) => ({
+      width: text.length * 8,
+    })) as CanvasRenderingContext2D['measureText'];
 
     const node = new RectangleNode({
       x: 0,
@@ -88,7 +92,9 @@ describe('Node', () => {
 
   it('wraps label with left icon before expanding width', () => {
     const ctx = mockCanvasContext();
-    ctx.measureText = ((text: string) => ({ width: text.length * 8 })) as CanvasRenderingContext2D['measureText'];
+    ctx.measureText = ((text: string) => ({
+      width: text.length * 8,
+    })) as CanvasRenderingContext2D['measureText'];
 
     const node = new RectangleNode({
       x: 0,
@@ -109,7 +115,9 @@ describe('Node', () => {
 
   it('does not render centered label over left icon', () => {
     const ctx = mockCanvasContext();
-    ctx.measureText = ((text: string) => ({ width: text.length * 8 })) as CanvasRenderingContext2D['measureText'];
+    ctx.measureText = ((text: string) => ({
+      width: text.length * 8,
+    })) as CanvasRenderingContext2D['measureText'];
 
     const node = new RectangleNode({
       x: 0,
@@ -145,7 +153,9 @@ describe('Node', () => {
 
   it('uses inscribed text area for circle and diamond labels', () => {
     const ctx = mockCanvasContext();
-    ctx.measureText = ((text: string) => ({ width: text.length * 8 })) as CanvasRenderingContext2D['measureText'];
+    ctx.measureText = ((text: string) => ({
+      width: text.length * 8,
+    })) as CanvasRenderingContext2D['measureText'];
     const text = 'alpha beta gamma delta epsilon';
 
     const circle = new CircleNode({ x: 0, y: 0, width: 120, height: 120, label: text });
@@ -162,7 +172,6 @@ describe('Node', () => {
 
   it('getConnectionPointAtOutlineParam and getClosestPointOnOutline work for rectangle', () => {
     const node = new RectangleNode({ x: 10, y: 20, width: 100, height: 60 });
-    const P = 2 * (100 + 60);
 
     // param 0 = top-left corner
     const p0 = node.getConnectionPointAtOutlineParam(0);
@@ -188,7 +197,6 @@ describe('Node', () => {
   it('getConnectionPointAtOutlineParam and getClosestPointOnOutline work for circle', () => {
     const node = new CircleNode({ x: 0, y: 0, width: 100, height: 60 });
     const center = { x: 50, y: 30 };
-    const rx = 50;
     const ry = 30;
 
     const p0 = node.getConnectionPointAtOutlineParam(0);
@@ -210,7 +218,6 @@ describe('Node', () => {
   it('getConnectionPointAtOutlineParam and getClosestPointOnOutline work for diamond', () => {
     const node = new DiamondNode({ x: 0, y: 0, width: 100, height: 60 });
     const center = { x: 50, y: 30 };
-    const hw = 50;
     const hh = 30;
 
     const p0 = node.getConnectionPointAtOutlineParam(0);

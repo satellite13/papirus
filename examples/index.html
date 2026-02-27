@@ -1,208 +1,223 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Papirus - Interactive Diagram Library</title>
-  <link rel="stylesheet" href="shared/styles.css">
-  <style>
-    .hero {
-      text-align: center;
-      padding: 60px 20px;
-    }
-    
-    .hero-title {
-      font-size: 48px;
-      font-weight: 800;
-      letter-spacing: -0.03em;
-      margin-bottom: 16px;
-      background: linear-gradient(135deg, var(--primary) 0%, #8b5cf6 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-    
-    .hero-subtitle {
-      font-size: 20px;
-      color: var(--muted);
-      max-width: 600px;
-      margin: 0 auto 32px;
-    }
-    
-    .hero-actions {
-      display: flex;
-      gap: 12px;
-      justify-content: center;
-      flex-wrap: wrap;
-    }
-    
-    .btn-lg {
-      padding: 12px 24px;
-      font-size: 15px;
-    }
-    
-    .section-title {
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 16px;
-    }
-    
-    .stats {
-      display: flex;
-      gap: 32px;
-      justify-content: center;
-      padding: 32px;
-      border-top: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
-    }
-    
-    .stat {
-      text-align: center;
-    }
-    
-    .stat-value {
-      font-size: 32px;
-      font-weight: 700;
-      color: var(--text);
-    }
-    
-    .stat-label {
-      font-size: 14px;
-      color: var(--muted);
-    }
-  </style>
-</head>
-<body>
-  <div class="page">
-    <!-- Header -->
-    <header class="header">
-      <a href="index.html" class="logo">
-        <div class="logo-icon">P</div>
-        <div class="title-group">
-          <div class="title">Papirus</div>
-          <div class="subtitle">Interactive Diagram Library</div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Papirus - Interactive Diagram Library</title>
+    <link rel="stylesheet" href="shared/styles.css" />
+    <style>
+      .hero {
+        text-align: center;
+        padding: 60px 20px;
+      }
+
+      .hero-title {
+        font-size: 48px;
+        font-weight: 800;
+        letter-spacing: -0.03em;
+        margin-bottom: 16px;
+        background: linear-gradient(135deg, var(--primary) 0%, #8b5cf6 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+
+      .hero-subtitle {
+        font-size: 20px;
+        color: var(--muted);
+        max-width: 600px;
+        margin: 0 auto 32px;
+      }
+
+      .hero-actions {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+
+      .btn-lg {
+        padding: 12px 24px;
+        font-size: 15px;
+      }
+
+      .section-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 16px;
+      }
+
+      .stats {
+        display: flex;
+        gap: 32px;
+        justify-content: center;
+        padding: 32px;
+        border-top: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
+      }
+
+      .stat {
+        text-align: center;
+      }
+
+      .stat-value {
+        font-size: 32px;
+        font-weight: 700;
+        color: var(--text);
+      }
+
+      .stat-label {
+        font-size: 14px;
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <!-- Header -->
+      <header class="header">
+        <a href="index.html" class="logo">
+          <div class="logo-icon">P</div>
+          <div class="title-group">
+            <div class="title">Papirus</div>
+            <div class="subtitle">Interactive Diagram Library</div>
+          </div>
+        </a>
+        <div class="header-actions"></div>
+      </header>
+
+      <!-- Hero -->
+      <section class="hero">
+        <h1 class="hero-title">Papirus</h1>
+        <p class="hero-subtitle">
+          TypeScript library for building interactive 2D diagrams and flowcharts on HTML Canvas.
+          Zero dependencies, framework-agnostic, fully typed.
+        </p>
+        <div class="hero-actions">
+          <a href="basic/index.html" class="btn btn-primary btn-lg">Try Demo →</a>
+          <a
+            href="https://gitverse.ru/ngroznykh/papirus#readme"
+            class="btn btn-lg"
+            target="_blank"
+            rel="noopener"
+            >Documentation</a
+          >
         </div>
-      </a>
-      <div class="header-actions">
-      </div>
-    </header>
+      </section>
 
-    <!-- Hero -->
-    <section class="hero">
-      <h1 class="hero-title">Papirus</h1>
-      <p class="hero-subtitle">
-        TypeScript library for building interactive 2D diagrams and flowcharts on HTML Canvas. 
-        Zero dependencies, framework-agnostic, fully typed.
-      </p>
-      <div class="hero-actions">
-        <a href="basic/index.html" class="btn btn-primary btn-lg">Try Demo →</a>
-        <a href="https://gitverse.ru/ngroznykh/papirus#readme" class="btn btn-lg" target="_blank" rel="noopener">Documentation</a>
+      <!-- Stats -->
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-value">0</div>
+          <div class="stat-label">Dependencies</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">TS</div>
+          <div class="stat-label">Fully Typed</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">MIT</div>
+          <div class="stat-label">License</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">~15kb</div>
+          <div class="stat-label">Minified</div>
+        </div>
       </div>
-    </section>
 
-    <!-- Stats -->
-    <div class="stats">
-      <div class="stat">
-        <div class="stat-value">0</div>
-        <div class="stat-label">Dependencies</div>
-      </div>
-      <div class="stat">
-        <div class="stat-value">TS</div>
-        <div class="stat-label">Fully Typed</div>
-      </div>
-      <div class="stat">
-        <div class="stat-value">MIT</div>
-        <div class="stat-label">License</div>
-      </div>
-      <div class="stat">
-        <div class="stat-value">~15kb</div>
-        <div class="stat-label">Minified</div>
-      </div>
-    </div>
+      <!-- Examples -->
+      <section>
+        <h2 class="section-title">Interactive Examples</h2>
+        <div class="features">
+          <a href="basic/index.html" class="feature-card">
+            <div class="feature-icon">🎨</div>
+            <h3 class="feature-title">Basic Flowchart</h3>
+            <p class="feature-desc">
+              Minimal setup with nodes, edges, groups, selection, drag & drop, zoom, and pan.
+              Focuses on the core API first.
+            </p>
+          </a>
 
-    <!-- Examples -->
-    <section>
-      <h2 class="section-title">Interactive Examples</h2>
-      <div class="features">
-        <a href="basic/index.html" class="feature-card">
-          <div class="feature-icon">🎨</div>
-          <h3 class="feature-title">Basic Flowchart</h3>
-          <p class="feature-desc">
-            Minimal setup with nodes, edges, groups, selection, drag & drop, zoom, and pan.
-            Focuses on the core API first.
-          </p>
-        </a>
+          <a href="ports/index.html" class="feature-card">
+            <div class="feature-icon">🔌</div>
+            <h3 class="feature-title">Ports & Connections</h3>
+            <p class="feature-desc">
+              Connection points on nodes, path types (straight, polyline, editable polyline,
+              bezier), arrow markers, and connection validation.
+            </p>
+          </a>
 
-        <a href="ports/index.html" class="feature-card">
-          <div class="feature-icon">🔌</div>
-          <h3 class="feature-title">Ports & Connections</h3>
-          <p class="feature-desc">
-            Connection points on nodes, path types (straight, polyline, editable polyline, bezier), 
-            arrow markers, and connection validation.
-          </p>
-        </a>
+          <a href="custom-shapes/index.html" class="feature-card">
+            <div class="feature-icon">🔷</div>
+            <h3 class="feature-title">Custom Shapes</h3>
+            <p class="feature-desc">
+              Create custom node shapes with Path2D and custom anchors. Shows a clean extension path
+              for your own shapes.
+            </p>
+          </a>
 
-        <a href="custom-shapes/index.html" class="feature-card">
-          <div class="feature-icon">🔷</div>
-          <h3 class="feature-title">Custom Shapes</h3>
-          <p class="feature-desc">
-            Create custom node shapes with Path2D and custom anchors.
-            Shows a clean extension path for your own shapes.
-          </p>
-        </a>
-      </div>
-    </section>
+          <a href="performance/index.html" class="feature-card">
+            <div class="feature-icon">⚡</div>
+            <h3 class="feature-title">Performance Test</h3>
+            <p class="feature-desc">
+              Stress test with 1000+ nodes and edges. Real-time FPS counter and render time metrics.
+            </p>
+          </a>
+        </div>
+      </section>
 
-    <!-- Features List -->
-    <section>
-      <h2 class="section-title">Features</h2>
-      <div class="card">
-        <div class="card-body">
-          <div class="features" style="grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));">
-            <div class="info-panel">
-              <h4>Core</h4>
-              <ul>
-                <li>Multiple node shapes</li>
-                <li>Edge routing (4 types)</li>
-                <li>Groups & nesting</li>
-                <li>Ports & connections</li>
-              </ul>
-            </div>
-            <div class="info-panel">
-              <h4>Interactions</h4>
-              <ul>
-                <li>Drag & select</li>
-                <li>Zoom & pan</li>
-                <li>Undo / redo</li>
-                <li>Copy / paste</li>
-              </ul>
-            </div>
-            <div class="info-panel">
-              <h4>Styling</h4>
-              <ul>
-                <li>Theme system</li>
-                <li>Style classes</li>
-                <li>Icons & labels</li>
-                <li>Custom fonts</li>
-              </ul>
-            </div>
-            <div class="info-panel">
-              <h4>Export</h4>
-              <ul>
-                <li>PNG export</li>
-                <li>SVG export</li>
-                <li>JSON serialization</li>
-                <li>Save / load</li>
-              </ul>
+      <!-- Features List -->
+      <section>
+        <h2 class="section-title">Features</h2>
+        <div class="card">
+          <div class="card-body">
+            <div
+              class="features"
+              style="grid-template-columns: repeat(auto-fill, minmax(200px, 1fr))"
+            >
+              <div class="info-panel">
+                <h4>Core</h4>
+                <ul>
+                  <li>Multiple node shapes</li>
+                  <li>Edge routing (4 types)</li>
+                  <li>Groups & nesting</li>
+                  <li>Ports & connections</li>
+                </ul>
+              </div>
+              <div class="info-panel">
+                <h4>Interactions</h4>
+                <ul>
+                  <li>Drag & select</li>
+                  <li>Zoom & pan</li>
+                  <li>Undo / redo</li>
+                  <li>Copy / paste</li>
+                </ul>
+              </div>
+              <div class="info-panel">
+                <h4>Styling</h4>
+                <ul>
+                  <li>Theme system</li>
+                  <li>Style classes</li>
+                  <li>Icons & labels</li>
+                  <li>Custom fonts</li>
+                </ul>
+              </div>
+              <div class="info-panel">
+                <h4>Export</h4>
+                <ul>
+                  <li>PNG export</li>
+                  <li>SVG export</li>
+                  <li>JSON serialization</li>
+                  <li>Save / load</li>
+                </ul>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </section>
-  </div>
-
-</body>
+      </section>
+    </div>
+  </body>
 </html>

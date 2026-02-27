@@ -15,6 +15,7 @@ import {
   BEZIER_MAX_OFFSET,
   OUTLINE_SNAP_SCREEN_TOLERANCE,
 } from '@/constants';
+import { distance } from '@/utils/geometry';
 
 const EDGE_AXIS_MAGNET_SCREEN_TOLERANCE = 10;
 
@@ -339,9 +340,9 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
         if (otherNode) {
           const alignRef = edge.isEditablePolyline()
             ? this.getNearestBendPointForAxisAlignment(edge, this.reconnectingEndpoint!)
-            : (this.reconnectingEndpoint === 'start'
+            : this.reconnectingEndpoint === 'start'
               ? this.getTargetPointForReconnect(edge, toNode!, 'to', snappedPoint)
-              : this.getTargetPointForReconnect(edge, fromNode!, 'from', snappedPoint));
+              : this.getTargetPointForReconnect(edge, fromNode!, 'from', snappedPoint);
           snappedPoint = this.applyAxisAlignmentToPoint(snappedPoint, alignRef);
           const reprojected = targetNode.getClosestPointOnOutline(snappedPoint);
           snappedPoint = reprojected.point;
@@ -401,7 +402,11 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     return node.getConnectionPoint(fallbackPoint);
   }
 
-  private getTargetDirForReconnect(edge: Edge, node: Node, endpoint: 'from' | 'to'): string | undefined {
+  private getTargetDirForReconnect(
+    edge: Edge,
+    node: Node,
+    endpoint: 'from' | 'to'
+  ): string | undefined {
     const ep = endpoint === 'from' ? edge.from : edge.to;
     if (this.attachToOutline && ep.outlineParam !== undefined) {
       return this.getDirectionFromOutlineParam(ep.outlineParam, node);
@@ -501,7 +506,9 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
 
       for (const node of this.renderer.nodes.values()) {
         if (!node.visible || !this.isCompatibleTarget(node)) continue;
-        const forbidden = this._connectionValidator && this.sourceNode &&
+        const forbidden =
+          this._connectionValidator &&
+          this.sourceNode &&
           !this._connectionValidator(this.sourceNode.id, node.id);
         if (forbidden) continue;
 
@@ -529,7 +536,9 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
         }
       }
     } else if (targetNode && this.isCompatibleTarget(targetNode)) {
-      const forbidden = this._connectionValidator && this.sourceNode &&
+      const forbidden =
+        this._connectionValidator &&
+        this.sourceNode &&
         !this._connectionValidator(this.sourceNode.id, targetNode.id);
       if (!forbidden) {
         const nearestAnchor = targetNode.getNearestAnchor(cursorPoint);
@@ -541,7 +550,9 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     }
 
     if (targetNode) {
-      const forbidden = this._connectionValidator && this.sourceNode &&
+      const forbidden =
+        this._connectionValidator &&
+        this.sourceNode &&
         !this._connectionValidator(this.sourceNode.id, targetNode.id);
       this.setCursor(forbidden ? 'not-allowed' : 'crosshair');
     } else {
@@ -555,11 +566,7 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
       this.sourcePoint = this.sourceNode.getConnectionPointAtOutlineParam(this.sourceOutlineParam);
     }
 
-    this.emit(
-      'connectionMove',
-      this.sourcePoint!,
-      this.previewEndpoint
-    );
+    this.emit('connectionMove', this.sourcePoint!, this.previewEndpoint);
     this.renderer.markDirty();
 
     return true;
@@ -680,8 +687,8 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
       targetNode = this.renderer.getNode(this.previewTargetNodeId) ?? null;
     }
     if (targetNode) {
-      const allowed = !this._connectionValidator ||
-        this._connectionValidator(this.sourceNode!.id, targetNode.id);
+      const allowed =
+        !this._connectionValidator || this._connectionValidator(this.sourceNode!.id, targetNode.id);
       if (allowed) {
         let from: EdgeEndpoint;
         let to: EdgeEndpoint;
@@ -703,7 +710,9 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
           };
           to = {
             nodeId: targetNode.id,
-            portId: nearestTargetAnchor ? `${ANCHOR_PORT_PREFIX}${nearestTargetAnchor.id}` : undefined,
+            portId: nearestTargetAnchor
+              ? `${ANCHOR_PORT_PREFIX}${nearestTargetAnchor.id}`
+              : undefined,
           };
         }
         createdEdge = this.createEdge(from, to);
@@ -751,12 +760,14 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     const start = this.sourcePoint!;
     const end = this.previewEndpoint;
 
-    const fromDir = this.sourceOutlineParam !== null
-      ? this.getDirectionFromOutlineParam(this.sourceOutlineParam, this.sourceNode!)
-      : this.sourceAnchorId?.split(':')[0];
-    const toDir = this.previewTargetOutlineParam !== null
-      ? this.getDirectionFromOutlineParam(this.previewTargetOutlineParam, this.sourceNode!)
-      : this.previewTargetAnchorId?.split(':')[0];
+    const fromDir =
+      this.sourceOutlineParam !== null
+        ? this.getDirectionFromOutlineParam(this.sourceOutlineParam, this.sourceNode!)
+        : this.sourceAnchorId?.split(':')[0];
+    const toDir =
+      this.previewTargetOutlineParam !== null
+        ? this.getDirectionFromOutlineParam(this.previewTargetOutlineParam, this.sourceNode!)
+        : this.previewTargetAnchorId?.split(':')[0];
 
     ctx.strokeStyle = '#3b82f6';
     ctx.lineWidth = 2;
@@ -801,41 +812,43 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     fromDir?: string,
     toDir?: string
   ): void {
-    const dx = end.x - start.x;
-    const dy = end.y - start.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
+    const dist = distance(start, end);
 
     ctx.beginPath();
     ctx.moveTo(start.x, start.y);
 
     // If directions are specified, use them for control points
     if (fromDir || toDir) {
-      const fromOffset = this.getDirectionOffset(fromDir, distance);
-      const toOffset = this.getDirectionOffset(toDir, distance);
+      const fromOffset = this.getDirectionOffset(fromDir, dist);
+      const toOffset = this.getDirectionOffset(toDir, dist);
 
       ctx.bezierCurveTo(
-        start.x + fromOffset.x, start.y + fromOffset.y,
-        end.x + toOffset.x, end.y + toOffset.y,
-        end.x, end.y
+        start.x + fromOffset.x,
+        start.y + fromOffset.y,
+        end.x + toOffset.x,
+        end.y + toOffset.y,
+        end.x,
+        end.y
       );
     } else {
       // Default behavior: auto-detect direction
+      const dx = end.x - start.x;
+      const dy = end.y - start.y;
       const offset = Math.min(Math.abs(dx), Math.abs(dy), BEZIER_MAX_OFFSET) * 0.5 + 50;
 
       if (Math.abs(dx) > Math.abs(dy)) {
         // Horizontal dominant
         const offsetX = offset * Math.sign(dx || 1);
-        ctx.bezierCurveTo(
-          start.x + offsetX, start.y,
-          end.x - offsetX, end.y,
-          end.x, end.y
-        );
+        ctx.bezierCurveTo(start.x + offsetX, start.y, end.x - offsetX, end.y, end.x, end.y);
       } else {
         // Vertical dominant
         ctx.bezierCurveTo(
-          start.x, start.y + offset * Math.sign(dy || 1),
-          end.x, end.y - offset * Math.sign(dy || 1),
-          end.x, end.y
+          start.x,
+          start.y + offset * Math.sign(dy || 1),
+          end.x,
+          end.y - offset * Math.sign(dy || 1),
+          end.x,
+          end.y
         );
       }
     }
@@ -1099,7 +1112,11 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     return { x, y };
   }
 
-  private drawPlus(radius: number, ctx: CanvasRenderingContext2D, anchor: { id: AnchorId; point: Point }): void {
+  private drawPlus(
+    radius: number,
+    ctx: CanvasRenderingContext2D,
+    anchor: { id: AnchorId; point: Point }
+  ): void {
     const plusSize = radius * 0.5;
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 1.5;
@@ -1112,14 +1129,20 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     return;
   }
 
-  private renderAnchorHighlights(ctx: CanvasRenderingContext2D, point: Point, reconnecting: boolean): void {
+  private renderAnchorHighlights(
+    ctx: CanvasRenderingContext2D,
+    point: Point,
+    reconnecting: boolean
+  ): void {
     const node = this.getNodeAtPoint(point, reconnecting);
     if (!node) {
       return;
     }
 
     // Check if connection to this target is allowed
-    const forbidden = this._connectionValidator && this.sourceNode &&
+    const forbidden =
+      this._connectionValidator &&
+      this.sourceNode &&
       !this._connectionValidator(this.sourceNode.id, node.id);
 
     const anchors = node.getAnchors();
@@ -1156,7 +1179,11 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     ctx.restore();
   }
 
-  private drawCross(radius: number, ctx: CanvasRenderingContext2D, anchor: { id: AnchorId; point: Point }): void {
+  private drawCross(
+    radius: number,
+    ctx: CanvasRenderingContext2D,
+    anchor: { id: AnchorId; point: Point }
+  ): void {
     const size = radius * 0.4;
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 1.5;

@@ -1,6 +1,7 @@
 import type { Point } from '@/types';
 import type { PathStrategy, PathStrategyOptions, PathObstacle } from './PathStrategy';
-import { distanceToSegment } from '@/utils/geometry';
+import { distance, distanceToSegment } from '@/utils/geometry';
+import { isHorizontal, isVertical, isOppositeDirections } from '@/utils/direction';
 
 const MIN_SEGMENT_LENGTH = 20;
 const SELF_LOOP_MIN_DISTANCE = 1;
@@ -16,23 +17,6 @@ const OBSTACLE_MARGIN = 12;
 const ROUTE_EXIT_DISTANCE = 32;
 const TURN_PENALTY = 70;
 const FIRST_VERTICAL_PENALTY = 28;
-
-function isHorizontal(dir?: string): boolean {
-  return dir === 'left' || dir === 'right';
-}
-
-function isVertical(dir?: string): boolean {
-  return dir === 'top' || dir === 'bottom';
-}
-
-function isOppositeDirections(fromDir?: string, toDir?: string): boolean {
-  return (
-    (fromDir === 'left' && toDir === 'right') ||
-    (fromDir === 'right' && toDir === 'left') ||
-    (fromDir === 'top' && toDir === 'bottom') ||
-    (fromDir === 'bottom' && toDir === 'top')
-  );
-}
 
 function expandObstacles(obstacles: PathObstacle[], margin: number): PathObstacle[] {
   return obstacles.map((obstacle) => ({
@@ -294,7 +278,9 @@ function buildRoutedPolyline(
   }
   routed.reverse();
 
-  const internal = simplifyPath(routed).filter((_, idx, arr) => idx !== 0 && idx !== arr.length - 1);
+  const internal = simplifyPath(routed).filter(
+    (_, idx, arr) => idx !== 0 && idx !== arr.length - 1
+  );
   return simplifyPath([from, startExit, ...internal, endEntry, to]);
 }
 
@@ -317,19 +303,18 @@ export class PolylinePathStrategy implements PathStrategy {
       return [from, { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 }, to];
     }
 
-    const dx = to.x - from.x;
-    const dy = to.y - from.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
+    const dist = distance(from, to);
     const selfLoop = _options?.selfLoop ?? false;
     const obstacles = _options?.obstacles ?? [];
 
-    if (!selfLoop && distance < OBSTACLE_ROUTING_DISTANCE) {
+    if (!selfLoop && dist < OBSTACLE_ROUTING_DISTANCE) {
       const routed = buildRoutedPolyline(from, to, fromDir, toDir, obstacles);
       if (routed) {
         return routed;
       }
     }
-    if (selfLoop && distance < SELF_LOOP_MIN_DISTANCE && (fromDir || toDir)) {
+
+    if (selfLoop && dist < SELF_LOOP_MIN_DISTANCE && (fromDir || toDir)) {
       const dir = fromDir ?? toDir;
       switch (dir) {
         case 'bottom':
@@ -364,9 +349,16 @@ export class PolylinePathStrategy implements PathStrategy {
       }
     }
 
-    if (selfLoop && distance < OPPOSITE_BYPASS_DISTANCE && fromDir && toDir && isOppositeDirections(fromDir, toDir)) {
+    if (
+      selfLoop &&
+      dist < OPPOSITE_BYPASS_DISTANCE &&
+      fromDir &&
+      toDir &&
+      isOppositeDirections(fromDir, toDir)
+    ) {
       if (isHorizontal(fromDir) && isHorizontal(toDir)) {
-        const fromStepX = fromDir === 'left' ? -OPPOSITE_BYPASS_CLEARANCE : OPPOSITE_BYPASS_CLEARANCE;
+        const fromStepX =
+          fromDir === 'left' ? -OPPOSITE_BYPASS_CLEARANCE : OPPOSITE_BYPASS_CLEARANCE;
         const toStepX = toDir === 'left' ? -OPPOSITE_BYPASS_CLEARANCE : OPPOSITE_BYPASS_CLEARANCE;
         const sideY = from.x <= to.x ? -1 : 1;
         const outerY = from.y + sideY * OPPOSITE_BYPASS_ARC;
@@ -380,7 +372,8 @@ export class PolylinePathStrategy implements PathStrategy {
         ];
       }
       if (isVertical(fromDir) && isVertical(toDir)) {
-        const fromStepY = fromDir === 'top' ? -OPPOSITE_BYPASS_CLEARANCE : OPPOSITE_BYPASS_CLEARANCE;
+        const fromStepY =
+          fromDir === 'top' ? -OPPOSITE_BYPASS_CLEARANCE : OPPOSITE_BYPASS_CLEARANCE;
         const toStepY = toDir === 'top' ? -OPPOSITE_BYPASS_CLEARANCE : OPPOSITE_BYPASS_CLEARANCE;
         const sideX = from.y <= to.y ? 1 : -1;
         const outerX = from.x + sideX * OPPOSITE_BYPASS_ARC;
@@ -397,18 +390,42 @@ export class PolylinePathStrategy implements PathStrategy {
 
     if (
       selfLoop &&
-      distance < CORNER_BYPASS_DISTANCE &&
+      dist < CORNER_BYPASS_DISTANCE &&
       fromDir &&
       toDir &&
       ((isHorizontal(fromDir) && isVertical(toDir)) || (isVertical(fromDir) && isHorizontal(toDir)))
     ) {
       const fromOuter = {
-        x: from.x + (fromDir === 'left' ? -CORNER_BYPASS_CLEARANCE : fromDir === 'right' ? CORNER_BYPASS_CLEARANCE : 0),
-        y: from.y + (fromDir === 'top' ? -CORNER_BYPASS_CLEARANCE : fromDir === 'bottom' ? CORNER_BYPASS_CLEARANCE : 0),
+        x:
+          from.x +
+          (fromDir === 'left'
+            ? -CORNER_BYPASS_CLEARANCE
+            : fromDir === 'right'
+              ? CORNER_BYPASS_CLEARANCE
+              : 0),
+        y:
+          from.y +
+          (fromDir === 'top'
+            ? -CORNER_BYPASS_CLEARANCE
+            : fromDir === 'bottom'
+              ? CORNER_BYPASS_CLEARANCE
+              : 0),
       };
       const toOuter = {
-        x: to.x + (toDir === 'left' ? -CORNER_BYPASS_CLEARANCE : toDir === 'right' ? CORNER_BYPASS_CLEARANCE : 0),
-        y: to.y + (toDir === 'top' ? -CORNER_BYPASS_CLEARANCE : toDir === 'bottom' ? CORNER_BYPASS_CLEARANCE : 0),
+        x:
+          to.x +
+          (toDir === 'left'
+            ? -CORNER_BYPASS_CLEARANCE
+            : toDir === 'right'
+              ? CORNER_BYPASS_CLEARANCE
+              : 0),
+        y:
+          to.y +
+          (toDir === 'top'
+            ? -CORNER_BYPASS_CLEARANCE
+            : toDir === 'bottom'
+              ? CORNER_BYPASS_CLEARANCE
+              : 0),
       };
       const corner = isHorizontal(fromDir)
         ? { x: fromOuter.x, y: toOuter.y }
@@ -446,8 +463,14 @@ export class PolylinePathStrategy implements PathStrategy {
     if (fromVertical && toVertical) {
       // Both vertical: route with horizontal middle segment
       const midY = (from.y + to.y) / 2;
-      const exitY = fromDir === 'top' ? Math.min(from.y - MIN_SEGMENT_LENGTH, midY) : Math.max(from.y + MIN_SEGMENT_LENGTH, midY);
-      const entryY = toDir === 'top' ? Math.min(to.y - MIN_SEGMENT_LENGTH, midY) : Math.max(to.y + MIN_SEGMENT_LENGTH, midY);
+      const exitY =
+        fromDir === 'top'
+          ? Math.min(from.y - MIN_SEGMENT_LENGTH, midY)
+          : Math.max(from.y + MIN_SEGMENT_LENGTH, midY);
+      const entryY =
+        toDir === 'top'
+          ? Math.min(to.y - MIN_SEGMENT_LENGTH, midY)
+          : Math.max(to.y + MIN_SEGMENT_LENGTH, midY);
 
       if (Math.abs(exitY - entryY) < 1) {
         points.push({ x: from.x, y: exitY });
@@ -459,8 +482,14 @@ export class PolylinePathStrategy implements PathStrategy {
     } else if (fromHorizontal && toHorizontal) {
       // Both horizontal: route with vertical middle segment
       const midX = (from.x + to.x) / 2;
-      const exitX = fromDir === 'left' ? Math.min(from.x - MIN_SEGMENT_LENGTH, midX) : Math.max(from.x + MIN_SEGMENT_LENGTH, midX);
-      const entryX = toDir === 'left' ? Math.min(to.x - MIN_SEGMENT_LENGTH, midX) : Math.max(to.x + MIN_SEGMENT_LENGTH, midX);
+      const exitX =
+        fromDir === 'left'
+          ? Math.min(from.x - MIN_SEGMENT_LENGTH, midX)
+          : Math.max(from.x + MIN_SEGMENT_LENGTH, midX);
+      const entryX =
+        toDir === 'left'
+          ? Math.min(to.x - MIN_SEGMENT_LENGTH, midX)
+          : Math.max(to.x + MIN_SEGMENT_LENGTH, midX);
 
       if (Math.abs(exitX - entryX) < 1) {
         points.push({ x: exitX, y: from.y });

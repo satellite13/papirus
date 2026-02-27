@@ -4,6 +4,7 @@ import type { SelectionManager } from './SelectionManager';
 import type { InputEvent } from '@/events/InputHandler';
 import type { Bounds, Point } from '@/types';
 import type { ResizeHandle } from '@/elements/Node';
+import { distance } from '@/utils/geometry';
 
 /**
  * Resize events
@@ -124,10 +125,8 @@ export class ResizeManager extends EventEmitter<ResizeEvents> {
     const point = { x: event.worldX, y: event.worldY };
 
     if (!this.isResizing) {
-      const dx = point.x - this.startPoint.x;
-      const dy = point.y - this.startPoint.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-      if (distance < 3) {
+      const dist = distance(point, this.startPoint);
+      if (dist < 3) {
         return false;
       }
       this.isResizing = true;

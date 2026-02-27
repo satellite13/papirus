@@ -3,8 +3,15 @@ import type { Bounds } from '@/types';
 export type NodeImageCornerPlacement = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
 export type NodeImageEdgePlacement = 'top' | 'bottom' | 'left' | 'right';
 
-export function isCornerPlacement(placement: NodeImagePlacement): placement is NodeImageCornerPlacement {
-  return placement === 'top-left' || placement === 'top-right' || placement === 'bottom-left' || placement === 'bottom-right';
+export function isCornerPlacement(
+  placement: NodeImagePlacement
+): placement is NodeImageCornerPlacement {
+  return (
+    placement === 'top-left' ||
+    placement === 'top-right' ||
+    placement === 'bottom-left' ||
+    placement === 'bottom-right'
+  );
 }
 
 export type NodeImageFit = 'contain' | 'cover' | 'stretch' | 'none';
@@ -118,7 +125,7 @@ export class NodeImage {
     this._onChange = onChange;
     this._image = this.resolveImage(options.source);
     this.attachHandlers();
-    this.applySource(options.source);
+    void this.applySource(options.source);
   }
 
   get options(): NodeImageOptions {
@@ -144,7 +151,7 @@ export class NodeImage {
     this._naturalHeight = 0;
     this._image = this.resolveImage(source);
     this.attachHandlers();
-    this.applySource(source);
+    void this.applySource(source);
     this._onChange?.();
   }
 

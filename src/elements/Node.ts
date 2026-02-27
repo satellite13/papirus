@@ -1,7 +1,12 @@
 import { Element, generateId } from './Element';
 import { Port, type PortOptions } from './Port';
 import { TextLabel, type TextLabelOptions } from './TextLabel';
-import { NodeImage, type NodeImageOptions, type NodeImagePlacement, isCornerPlacement } from './NodeImage';
+import {
+  NodeImage,
+  type NodeImageOptions,
+  type NodeImagePlacement,
+  isCornerPlacement,
+} from './NodeImage';
 import type { StyleManager } from '@/styles/StyleManager';
 import type { Bounds, LabelPlacement, NodeStyle, Point, Size } from '@/types';
 export type { LabelPlacement } from '../types';
@@ -89,9 +94,12 @@ export abstract class Node extends Element {
 
     if (options.label !== undefined) {
       if (typeof options.label === 'string') {
-        this._label = new TextLabel({ text: options.label, onChange: () => this.markDirty() });
+        this._label = new TextLabel({
+          text: options.label,
+          onChange: (): void => this.markDirty(),
+        });
       } else {
-        this._label = new TextLabel({ ...options.label, onChange: () => this.markDirty() });
+        this._label = new TextLabel({ ...options.label, onChange: (): void => this.markDirty() });
       }
     }
 
@@ -154,10 +162,10 @@ export abstract class Node extends Element {
     if (value === undefined) {
       this._label = undefined;
     } else if (typeof value === 'string') {
-      this._label = new TextLabel({ text: value, onChange: () => this.markDirty() });
+      this._label = new TextLabel({ text: value, onChange: (): void => this.markDirty() });
     } else {
       this._label = value;
-      this._label.setOnChange(() => this.markDirty());
+      this._label.setOnChange((): void => this.markDirty());
     }
     this.markDirty();
   }
@@ -450,7 +458,9 @@ export abstract class Node extends Element {
    * Get label bounds and wrapped lines for SVG export. Replicates renderContents layout logic.
    * Returns the bounds passed to label.render() and the wrapped text lines, or null if no label.
    */
-  getLabelBoundsForExport(ctx: CanvasRenderingContext2D): { bounds: Bounds; lines: string[] } | null {
+  getLabelBoundsForExport(
+    ctx: CanvasRenderingContext2D
+  ): { bounds: Bounds; lines: string[] } | null {
     if (!this._label) {
       return null;
     }
@@ -733,7 +743,7 @@ export abstract class Node extends Element {
     const bounds = this.getBounds();
     const { x, y, width: w, height: h } = bounds;
     const perimeter = 2 * (w + h);
-    let s = ((param % 1) + 1) % 1 * perimeter;
+    let s = (((param % 1) + 1) % 1) * perimeter;
 
     if (s < w) return { x: x + s, y };
     s -= w;
@@ -811,7 +821,9 @@ export abstract class Node extends Element {
     };
   }
 
-  private getResizeHandlePositions(offset = RESIZE_HANDLE_OFFSET): { type: ResizeHandle; x: number; y: number }[] {
+  private getResizeHandlePositions(
+    offset = RESIZE_HANDLE_OFFSET
+  ): { type: ResizeHandle; x: number; y: number }[] {
     const { x, y, width, height } = this.getBounds();
 
     return [
@@ -834,7 +846,11 @@ export abstract class Node extends Element {
     }
   }
 
-  private calculateContentMinSize(labelSize: Size | undefined, iconBoxSize: Size | undefined, bounds: Bounds): Size {
+  private calculateContentMinSize(
+    labelSize: Size | undefined,
+    iconBoxSize: Size | undefined,
+    bounds: Bounds
+  ): Size {
     let minWidth = 0;
     let minHeight = 0;
 
@@ -1090,9 +1106,15 @@ export abstract class Node extends Element {
     };
 
     addPoints('top', top, (t) => ({ x: bounds.x + bounds.width * t, y: bounds.y }));
-    addPoints('bottom', bottom, (t) => ({ x: bounds.x + bounds.width * t, y: bounds.y + bounds.height }));
+    addPoints('bottom', bottom, (t) => ({
+      x: bounds.x + bounds.width * t,
+      y: bounds.y + bounds.height,
+    }));
     addPoints('left', left, (t) => ({ x: bounds.x, y: bounds.y + bounds.height * t }));
-    addPoints('right', right, (t) => ({ x: bounds.x + bounds.width, y: bounds.y + bounds.height * t }));
+    addPoints('right', right, (t) => ({
+      x: bounds.x + bounds.width,
+      y: bounds.y + bounds.height * t,
+    }));
 
     if (anchors.length === 0) {
       return [];

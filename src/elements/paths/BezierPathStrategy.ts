@@ -1,10 +1,13 @@
 import type { Point } from '@/types';
 import type { PathStrategy, PathStrategyOptions } from './PathStrategy';
-import {
-  bezierPoint,
-  distanceToSegment,
-} from '@/utils/geometry';
+import { bezierPoint, distance, distanceToSegment } from '@/utils/geometry';
 import { BEZIER_MAX_OFFSET } from '@/constants';
+import {
+  isHorizontal,
+  isVertical,
+  isOppositeDirections,
+  directionToVector as dirToVector,
+} from '@/utils/direction';
 
 const SELF_LOOP_MIN_DISTANCE = 1;
 const SELF_LOOP_OFFSET = 90;
@@ -68,39 +71,12 @@ function createSelfLoopPath(point: Point, dir?: string): Point[] {
   }
 }
 
-function isHorizontal(dir?: string): boolean {
-  return dir === 'left' || dir === 'right';
-}
-
-function isVertical(dir?: string): boolean {
-  return dir === 'top' || dir === 'bottom';
-}
-
-function isOppositeDirections(fromDir?: string, toDir?: string): boolean {
-  return (
-    (fromDir === 'left' && toDir === 'right') ||
-    (fromDir === 'right' && toDir === 'left') ||
-    (fromDir === 'top' && toDir === 'bottom') ||
-    (fromDir === 'bottom' && toDir === 'top')
-  );
-}
-
-function dirToVector(dir?: string): Point {
-  switch (dir) {
-    case 'top':
-      return { x: 0, y: -1 };
-    case 'bottom':
-      return { x: 0, y: 1 };
-    case 'left':
-      return { x: -1, y: 0 };
-    case 'right':
-      return { x: 1, y: 0 };
-    default:
-      return { x: 0, y: 0 };
-  }
-}
-
-function createOppositeBypassPath(from: Point, to: Point, fromDir?: string, toDir?: string): Point[] | null {
+function createOppositeBypassPath(
+  from: Point,
+  to: Point,
+  fromDir?: string,
+  toDir?: string
+): Point[] | null {
   if (!fromDir || !toDir || !isOppositeDirections(fromDir, toDir)) {
     return null;
   }
@@ -145,11 +121,15 @@ function createOppositeBypassPath(from: Point, to: Point, fromDir?: string, toDi
   return null;
 }
 
-function createCornerBypassPath(from: Point, to: Point, fromDir?: string, toDir?: string): Point[] | null {
+function createCornerBypassPath(
+  from: Point,
+  to: Point,
+  fromDir?: string,
+  toDir?: string
+): Point[] | null {
   if (!fromDir || !toDir) return null;
   const orthogonal =
-    (isHorizontal(fromDir) && isVertical(toDir)) ||
-    (isVertical(fromDir) && isHorizontal(toDir));
+    (isHorizontal(fromDir) && isVertical(toDir)) || (isVertical(fromDir) && isHorizontal(toDir));
   if (!orthogonal) return null;
 
   const fromOut = dirToVector(fromDir);
@@ -177,26 +157,24 @@ export class BezierPathStrategy implements PathStrategy {
     toDir?: string,
     options?: PathStrategyOptions
   ): Point[] {
-    const dx = to.x - from.x;
-    const dy = to.y - from.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
+    const dist = distance(from, to);
     const loopDir = fromDir ?? toDir;
     const selfLoop = options?.selfLoop ?? false;
 
     // For self-loop edges, build an explicit outer loop so the edge
     // does not pass under the node it is attached to.
-    if (selfLoop && distance < SELF_LOOP_MIN_DISTANCE && loopDir) {
+    if (selfLoop && dist < SELF_LOOP_MIN_DISTANCE && loopDir) {
       return createSelfLoopPath(from, loopDir);
     }
 
-    if (selfLoop && distance < OPPOSITE_BYPASS_DISTANCE) {
+    if (selfLoop && dist < OPPOSITE_BYPASS_DISTANCE) {
       const oppositeBypass = createOppositeBypassPath(from, to, fromDir, toDir);
       if (oppositeBypass) {
         return oppositeBypass;
       }
     }
 
-    if (selfLoop && distance < CORNER_BYPASS_DISTANCE) {
+    if (selfLoop && dist < CORNER_BYPASS_DISTANCE) {
       const cornerBypass = createCornerBypassPath(from, to, fromDir, toDir);
       if (cornerBypass) {
         return cornerBypass;
@@ -215,8 +193,8 @@ export class BezierPathStrategy implements PathStrategy {
 
     // If directions are specified, use them for control points
     if (fromDir || toDir) {
-      const fromOffset = getDirectionOffset(fromDir, distance);
-      const toOffset = getDirectionOffset(toDir, distance);
+      const fromOffset = getDirectionOffset(fromDir, dist);
+      const toOffset = getDirectionOffset(toDir, dist);
 
       return [
         from,
@@ -227,26 +205,18 @@ export class BezierPathStrategy implements PathStrategy {
     }
 
     // Default behavior: auto-detect direction
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
     const offset = Math.min(Math.abs(dx), Math.abs(dy), BEZIER_MAX_OFFSET) * 0.5 + 50;
 
     if (Math.abs(dx) > Math.abs(dy)) {
       // Horizontal dominant
       const offsetX = offset * Math.sign(dx || 1);
-      return [
-        from,
-        { x: from.x + offsetX, y: from.y },
-        { x: to.x - offsetX, y: to.y },
-        to,
-      ];
+      return [from, { x: from.x + offsetX, y: from.y }, { x: to.x - offsetX, y: to.y }, to];
     } else {
       // Vertical dominant
       const offsetY = offset * Math.sign(dy || 1);
-      return [
-        from,
-        { x: from.x, y: from.y + offsetY },
-        { x: to.x, y: to.y - offsetY },
-        to,
-      ];
+      return [from, { x: from.x, y: from.y + offsetY }, { x: to.x, y: to.y - offsetY }, to];
     }
   }
 

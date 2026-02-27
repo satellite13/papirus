@@ -108,9 +108,12 @@ export class Edge extends Element {
 
     if (options.label !== undefined) {
       if (typeof options.label === 'string') {
-        this._label = new TextLabel({ text: options.label, onChange: () => this.markDirty() });
+        this._label = new TextLabel({
+          text: options.label,
+          onChange: (): void => this.markDirty(),
+        });
       } else {
-        this._label = new TextLabel({ ...options.label, onChange: () => this.markDirty() });
+        this._label = new TextLabel({ ...options.label, onChange: (): void => this.markDirty() });
       }
     }
   }
@@ -250,10 +253,12 @@ export class Edge extends Element {
     if (this._controlPoints && this._controlPoints.length > 0) {
       return this._controlPoints.map((point) => ({ ...point }));
     }
-    return [{
-      x: (this._fromPoint.x + this._toPoint.x) / 2,
-      y: (this._fromPoint.y + this._toPoint.y) / 2,
-    }];
+    return [
+      {
+        x: (this._fromPoint.x + this._toPoint.x) / 2,
+        y: (this._fromPoint.y + this._toPoint.y) / 2,
+      },
+    ];
   }
 
   /**
@@ -275,7 +280,10 @@ export class Edge extends Element {
 
     if (this._state !== 'normal') {
       const normalStyle = styleManager.getEdgeStyle('normal', this._styleClass);
-      if (mergedStyle.strokeColor === baseStyle.strokeColor && normalStyle.strokeColor !== undefined) {
+      if (
+        mergedStyle.strokeColor === baseStyle.strokeColor &&
+        normalStyle.strokeColor !== undefined
+      ) {
         mergedStyle = { ...mergedStyle, strokeColor: normalStyle.strokeColor };
       }
     }
@@ -301,10 +309,10 @@ export class Edge extends Element {
     if (value === undefined) {
       this._label = undefined;
     } else if (typeof value === 'string') {
-      this._label = new TextLabel({ text: value, onChange: () => this.markDirty() });
+      this._label = new TextLabel({ text: value, onChange: (): void => this.markDirty() });
     } else {
       this._label = value;
-      this._label.setOnChange(() => this.markDirty());
+      this._label.setOnChange((): void => this.markDirty());
     }
     this.markDirty();
   }
@@ -505,7 +513,6 @@ export class Edge extends Element {
     if (style.lineJoin !== undefined) {
       ctx.lineJoin = style.lineJoin;
     }
-
   }
 
   private renderHighlight(ctx: CanvasRenderingContext2D): void {
@@ -534,12 +541,14 @@ export class Edge extends Element {
     if (path.length < 2) return;
 
     // Calculate how much to shorten the line at each end for markers
-    const startOffset = this._startMarker && this._startMarker.type !== 'none'
-      ? this.getMarkerLength(this._startMarker)
-      : 0;
-    const endOffset = this._endMarker && this._endMarker.type !== 'none'
-      ? this.getMarkerLength(this._endMarker)
-      : 0;
+    const startOffset =
+      this._startMarker && this._startMarker.type !== 'none'
+        ? this.getMarkerLength(this._startMarker)
+        : 0;
+    const endOffset =
+      this._endMarker && this._endMarker.type !== 'none'
+        ? this.getMarkerLength(this._endMarker)
+        : 0;
 
     // Get shortened start point
     const start = path[0]!;
@@ -788,9 +797,15 @@ export class Edge extends Element {
     // Diamond points relative to the tip
     const points = [
       { x: to.x, y: to.y }, // tip
-      { x: to.x - halfLength * cos + halfWidth * sin, y: to.y - halfLength * sin - halfWidth * cos },
+      {
+        x: to.x - halfLength * cos + halfWidth * sin,
+        y: to.y - halfLength * sin - halfWidth * cos,
+      },
       { x: to.x - size * cos, y: to.y - size * sin }, // back
-      { x: to.x - halfLength * cos - halfWidth * sin, y: to.y - halfLength * sin + halfWidth * cos },
+      {
+        x: to.x - halfLength * cos - halfWidth * sin,
+        y: to.y - halfLength * sin + halfWidth * cos,
+      },
     ];
 
     ctx.beginPath();

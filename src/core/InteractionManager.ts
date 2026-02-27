@@ -1,5 +1,10 @@
 import { InputHandler } from '@/events/InputHandler';
-import type { InputEvent, WheelInputEvent, PanInputEvent, PinchInputEvent } from '@/events/InputHandler';
+import type {
+  InputEvent,
+  WheelInputEvent,
+  PanInputEvent,
+  PinchInputEvent,
+} from '@/events/InputHandler';
 import type { DiagramRenderer, OverlayDragSession } from './DiagramRenderer';
 import { SelectionManager } from './SelectionManager';
 import { DragManager } from './DragManager';
@@ -23,6 +28,7 @@ import type { Group } from '@/elements/Group';
 import type { Node } from '@/elements/Node';
 import { CompositeCommand } from './history/commands';
 import { LabelEditor } from './LabelEditor';
+import { shallowEqual } from '@/utils/style';
 
 export interface InteractionKeymap {
   deleteKeys: string[];
@@ -181,7 +187,7 @@ export class InteractionManager {
     const before = createNodeSnapshot(node);
     apply(node);
     const after = createNodeSnapshot(node);
-    if (JSON.stringify(before) === JSON.stringify(after)) {
+    if (shallowEqual(before, after)) {
       return;
     }
     this.queuePropertyChange('node', nodeId, before, after);
@@ -195,7 +201,7 @@ export class InteractionManager {
     const before = createEdgeSnapshot(edge);
     apply(edge);
     const after = createEdgeSnapshot(edge);
-    if (JSON.stringify(before) === JSON.stringify(after)) {
+    if (shallowEqual(before, after)) {
       return;
     }
     this.queuePropertyChange('edge', edgeId, before, after);
@@ -209,7 +215,7 @@ export class InteractionManager {
     const before = createGroupSnapshot(group);
     apply(group);
     const after = createGroupSnapshot(group);
-    if (JSON.stringify(before) === JSON.stringify(after)) {
+    if (shallowEqual(before, after)) {
       return;
     }
     this.queuePropertyChange('group', groupId, before, after);
@@ -452,7 +458,11 @@ export class InteractionManager {
     const overScrollbar = this.renderer.updateScrollbarHover(event.screenX, event.screenY);
 
     if (this.overlayDragSession) {
-      const moved = this.renderer.updateOverlayDrag(this.overlayDragSession, event.screenX, event.screenY);
+      const moved = this.renderer.updateOverlayDrag(
+        this.overlayDragSession,
+        event.screenX,
+        event.screenY
+      );
       if (moved) {
         return;
       }
@@ -700,7 +710,12 @@ export class InteractionManager {
     }
   }
 
-  private startLabelEdit(kind: 'node' | 'edge', id: string, text: string, worldPosition: Point): void {
+  private startLabelEdit(
+    kind: 'node' | 'edge',
+    id: string,
+    text: string,
+    worldPosition: Point
+  ): void {
     this.labelEditor.start(
       kind,
       id,
@@ -792,7 +807,7 @@ export class InteractionManager {
     }
     window.clearTimeout(pending.timerId);
     this.pendingPropertyChanges.delete(key);
-    if (JSON.stringify(pending.before) === JSON.stringify(pending.after)) {
+    if (shallowEqual(pending.before as object, pending.after as object)) {
       return;
     }
 
