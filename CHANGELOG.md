@@ -7,6 +7,21 @@
 
 ## [Unreleased]
 
+## [0.3.19] - 2026-02-27
+
+### Fixed
+- При смене типа связи с `editable-polyline` на `bezier`/`straight`/`polyline` точки перелома теперь удаляются.
+- Убран type casting для `attachToOutline` в ConnectionManager.
+
+### Changed
+- Рефакторинг: `mergeBounds`, `clonePoints` в geometry; константы для tolerance; `hasEditableControlPoints`, `getPathVertices` в Edge.
+- Оптимизация `resolveAlignmentDelta`: проверка только узлов в области перетаскивания.
+- Оптимизация итерации edges в ConnectionManager (обратный цикл вместо `reverse()`).
+
+### Added
+- Тесты для ConnectionManager: создание связи (attachToOutline), reconnect.
+- Снижены пороги coverage (lines/statements 48%, branches/functions 39%).
+
 ## [0.3.18] - 2026-02-27
 
 ### Fixed
@@ -171,7 +186,8 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.3.18...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.3.19...HEAD
+[0.3.19]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.19
 [0.3.18]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.18
 [0.3.17]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.17
 [0.3.16]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.16
