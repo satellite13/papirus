@@ -153,6 +153,9 @@ export class Edge extends Element {
     if (this._type !== value) {
       this._type = value;
       this._pathStrategy = this.getPathStrategy(value);
+      if (value !== 'editable-polyline' && this._controlPoints?.length) {
+        this.controlPoints = undefined;
+      }
       this.markDirty();
     }
   }

@@ -220,6 +220,24 @@ describe('Edge', () => {
     ]);
   });
 
+  it('clears control points when switching from editable-polyline to another type', () => {
+    const edge = new Edge({
+      from: { nodeId: 'a' },
+      to: { nodeId: 'b' },
+      type: 'editable-polyline',
+      controlPoints: [{ x: 50, y: 10 }, { x: 80, y: 20 }],
+    });
+    edge.updateEndpoints({ x: 0, y: 0 }, { x: 100, y: 0 });
+    expect(edge.controlPoints).toHaveLength(2);
+
+    edge.type = 'bezier';
+    expect(edge.controlPoints).toBeUndefined();
+    expect(edge.type).toBe('bezier');
+
+    edge.type = 'straight';
+    expect(edge.controlPoints).toBeUndefined();
+  });
+
   describe('hasEditableControlPoints', () => {
     it('returns false for non-editable-polyline', () => {
       const edge = new Edge({
