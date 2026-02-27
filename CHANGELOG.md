@@ -7,6 +7,11 @@
 
 ## [Unreleased]
 
+## [0.3.21] - 2025-02-27
+
+### Fixed
+- Горячие клавиши (Ctrl+Z/Y/C/V) работают при любой раскладке: используется `event.code` вместо `event.key` для буквенных клавиш.
+
 ## [0.3.20] - 2026-02-27
 
 ### Fixed
@@ -191,7 +196,8 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.3.20...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.3.21...HEAD
+[0.3.21]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.21
 [0.3.20]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.20
 [0.3.19]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.19
 [0.3.18]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.18

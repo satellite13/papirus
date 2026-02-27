@@ -649,7 +649,10 @@ export class InteractionManager {
 
   private handleKeyDown(event: KeyboardEvent, options: InteractionManagerOptions): void {
     const isCtrlOrMeta = event.ctrlKey || event.metaKey;
-    const key = event.key.toLowerCase();
+    // Use event.code for letter keys to work with any keyboard layout (e.g. Russian)
+    const key = event.code.startsWith('Key')
+      ? event.code.slice(3).toLowerCase()
+      : event.key.toLowerCase();
 
     if (isCtrlOrMeta && (key === 'z' || key === 'y')) {
       this.flushPendingPropertyChanges();

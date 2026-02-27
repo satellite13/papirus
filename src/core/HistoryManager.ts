@@ -117,11 +117,14 @@ export class HistoryManager extends EventEmitter<HistoryEvents> {
   }
 
   /**
-   * Handle keyboard shortcuts
+   * Handle keyboard shortcuts.
+   * Uses event.code for letter keys to work with any keyboard layout (e.g. Russian).
    */
   handleKeyDown(event: KeyboardEvent): boolean {
     const isCtrlOrMeta = event.ctrlKey || event.metaKey;
-    const key = event.key.toLowerCase();
+    const key = event.code.startsWith('Key')
+      ? event.code.slice(3).toLowerCase()
+      : event.key.toLowerCase();
 
     if (isCtrlOrMeta && key === 'z' && !event.shiftKey) {
       event.preventDefault();
