@@ -791,6 +791,11 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
         }
       }
 
+      // Invalidate cached canvas rect every frame so that screenToWorld /
+      // worldToScreen pick up layout changes (e.g. surrounding panels resized
+      // or repositioned the canvas without changing its own dimensions).
+      this._canvasRect = null;
+
       if (this._dirty) {
         this.renderFrame(now);
         this._dirty = false;
