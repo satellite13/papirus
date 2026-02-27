@@ -348,141 +348,14 @@ export abstract class Node extends Element {
   }
 
   /**
-   * Get label bounds and wrapped lines for SVG export. Replicates renderContents layout logic.
-   * Returns the bounds passed to label.render() and the wrapped text lines, or null if no label.
+   * Calculate layout for icon and label
+   * Returns computed bounds for both elements
    */
-  getLabelBoundsForExport(ctx: CanvasRenderingContext2D): { bounds: Bounds; lines: string[] } | null {
-    if (!this._label) {
-      return null;
-    }
-
-    const bounds = this.getBounds();
-    const iconBoxSize = this._icon ? this.getIconBoxSize() : undefined;
-    const autoBounds = this.getAutoLabelBounds(bounds, iconBoxSize);
-
-    this._label.setAutoMaxWidth(autoBounds.width);
-    const labelSize = this._label.measure(ctx);
-
-    let labelBounds = this.getLabelContainerBounds(bounds);
-
-    if (
-      this._icon &&
-      iconBoxSize &&
-      this._labelPlacement === 'auto' &&
-      this._icon.placement !== 'center'
-    ) {
-      const gap = this._icon.gap;
-      const placement = this._icon.placement;
-
-      if (!isCornerPlacement(placement)) {
-        const contentBounds = this.getLabelContainerBounds(bounds);
-        switch (placement) {
-          case 'top':
-            labelBounds = {
-              x: contentBounds.x,
-              y: contentBounds.y + iconBoxSize.height + gap,
-              width: contentBounds.width,
-              height: Math.max(0, contentBounds.height - iconBoxSize.height - gap),
-            };
-            break;
-          case 'bottom':
-            labelBounds = {
-              x: contentBounds.x,
-              y: contentBounds.y,
-              width: contentBounds.width,
-              height: Math.max(0, contentBounds.height - iconBoxSize.height - gap),
-            };
-            break;
-          case 'left':
-            labelBounds = {
-              x: contentBounds.x + iconBoxSize.width + gap,
-              y: contentBounds.y,
-              width: Math.max(0, contentBounds.width - iconBoxSize.width - gap),
-              height: contentBounds.height,
-            };
-            break;
-          case 'right':
-            labelBounds = {
-              x: contentBounds.x,
-              y: contentBounds.y,
-              width: Math.max(0, contentBounds.width - iconBoxSize.width - gap),
-              height: contentBounds.height,
-            };
-            break;
-          default:
-            break;
-        }
-      }
-    } else {
-      labelBounds = this.getLabelBounds(autoBounds, labelSize, this._labelPlacement);
-    }
-
-    const lines = this._label.getWrappedLines(ctx, Math.max(0, autoBounds.width));
-    return { bounds: labelBounds, lines };
-  }
-
-  /**
-   * Render label
-   */
-  protected renderLabel(ctx: CanvasRenderingContext2D, bounds: Bounds = this.getBounds()): void {
-    if (this._label === undefined) {
-      return;
-    }
-
-    const labelOpacity = this._label.style.opacity ?? 1;
-    ctx.globalAlpha = labelOpacity;
-    this._label.render(ctx, bounds);
-    ctx.globalAlpha = 1;
-  }
-
-  /**
-   * Get world position of label center.
-   */
-  getLabelPosition(): Point {
-    const bounds = this.getBounds();
-    const placement = this._labelPlacement === 'auto' ? 'center' : this._labelPlacement;
-
-    switch (placement) {
-      case 'top':
-        return { x: bounds.x + bounds.width / 2, y: bounds.y };
-      case 'bottom':
-        return { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height };
-      case 'left':
-        return { x: bounds.x, y: bounds.y + bounds.height / 2 };
-      case 'right':
-        return { x: bounds.x + bounds.width, y: bounds.y + bounds.height / 2 };
-      default:
-        return { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
-    }
-  }
-
-  /**
-   * Render icon, label, and ports
-   */
-  protected renderContents(ctx: CanvasRenderingContext2D): void {
-    // Reset dash settings so icon/label/ports render solid
-    ctx.setLineDash([]);
-    ctx.lineDashOffset = 0;
-
-    let bounds = this.getBounds();
-    let iconBoxSize = this._icon ? this.getIconBoxSize() : undefined;
-
-    if (this._label) {
-      this._label.setAutoMaxWidth(this.getAutoLabelBounds(bounds, iconBoxSize).width);
-    }
-    let labelSize = this._label ? this._label.measure(ctx) : undefined;
-
-    if (labelSize || iconBoxSize) {
-      this.ensureContentsFit(labelSize, iconBoxSize);
-      bounds = this.getBounds();
-
-      iconBoxSize = this._icon ? this.getIconBoxSize() : undefined;
-      if (this._label) {
-        this._label.setAutoMaxWidth(this.getAutoLabelBounds(bounds, iconBoxSize).width);
-        labelSize = this._label.measure(ctx);
-      }
-    }
-
+  protected calculateContentLayout(
+    bounds: Bounds,
+    iconBoxSize?: Size,
+    labelSize?: Size
+  ): { iconBounds: Bounds; labelBounds: Bounds } {
     let iconBounds = bounds;
     let labelBounds = this.getLabelContainerBounds(bounds);
 
@@ -502,9 +375,7 @@ export abstract class Node extends Element {
       const placement = this._icon.placement;
 
       if (isCornerPlacement(placement)) {
-        // For corner placements, icon goes in corner, label uses remaining space
         iconBounds = this.getIconBounds(bounds, iconBoxSize, placement);
-        // Label gets shape-safe content bounds (centered by default)
         labelBounds = this.getLabelContainerBounds(bounds);
       } else {
         const contentBounds = this.getLabelContainerBounds(bounds);
@@ -565,13 +436,103 @@ export abstract class Node extends Element {
               height: contentBounds.height,
             };
             break;
-          default:
-            break;
         }
       }
     } else if (this._label && labelSize) {
-      labelBounds = this.getLabelBounds(this.getAutoLabelBounds(bounds, iconBoxSize), labelSize, this._labelPlacement);
+      const autoBounds = this.getAutoLabelBounds(bounds, iconBoxSize);
+      labelBounds = this.getLabelBounds(autoBounds, labelSize, this._labelPlacement);
     }
+
+    return { iconBounds, labelBounds };
+  }
+
+  /**
+   * Get label bounds and wrapped lines for SVG export. Replicates renderContents layout logic.
+   * Returns the bounds passed to label.render() and the wrapped text lines, or null if no label.
+   */
+  getLabelBoundsForExport(ctx: CanvasRenderingContext2D): { bounds: Bounds; lines: string[] } | null {
+    if (!this._label) {
+      return null;
+    }
+
+    const bounds = this.getBounds();
+    const iconBoxSize = this._icon ? this.getIconBoxSize() : undefined;
+    const autoBounds = this.getAutoLabelBounds(bounds, iconBoxSize);
+
+    this._label.setAutoMaxWidth(autoBounds.width);
+    const labelSize = this._label.measure(ctx);
+
+    const { labelBounds } = this.calculateContentLayout(bounds, iconBoxSize, labelSize);
+
+    const lines = this._label.getWrappedLines(ctx, Math.max(0, autoBounds.width));
+    return { bounds: labelBounds, lines };
+  }
+
+  /**
+   * Render label
+   */
+  protected renderLabel(ctx: CanvasRenderingContext2D, bounds: Bounds = this.getBounds()): void {
+    if (this._label === undefined) {
+      return;
+    }
+
+    const labelOpacity = this._label.style.opacity ?? 1;
+    ctx.globalAlpha = labelOpacity;
+    this._label.render(ctx, bounds);
+    ctx.globalAlpha = 1;
+  }
+
+  /**
+   * Get world position of label center.
+   */
+  getLabelPosition(): Point {
+    const bounds = this.getBounds();
+    const placement = this._labelPlacement === 'auto' ? 'center' : this._labelPlacement;
+
+    switch (placement) {
+      case 'top':
+        return { x: bounds.x + bounds.width / 2, y: bounds.y };
+      case 'bottom':
+        return { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height };
+      case 'left':
+        return { x: bounds.x, y: bounds.y + bounds.height / 2 };
+      case 'right':
+        return { x: bounds.x + bounds.width, y: bounds.y + bounds.height / 2 };
+      default:
+        return { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
+    }
+  }
+
+  /**
+   * Render icon, label, and ports
+   */
+  protected renderContents(ctx: CanvasRenderingContext2D): void {
+    // Reset dash settings so icon/label/ports render solid
+    ctx.setLineDash([]);
+    ctx.lineDashOffset = 0;
+
+    let bounds = this.getBounds();
+    const iconBoxSize = this._icon ? this.getIconBoxSize() : undefined;
+
+    if (this._label) {
+      this._label.setAutoMaxWidth(this.getAutoLabelBounds(bounds, iconBoxSize).width);
+    }
+    const labelSize = this._label ? this._label.measure(ctx) : undefined;
+
+    if (labelSize || iconBoxSize) {
+      this.ensureContentsFit(labelSize, iconBoxSize);
+      // Re-measure after potential resize
+      if (this._label && iconBoxSize) {
+        bounds = this.getBounds();
+        this._label.setAutoMaxWidth(this.getAutoLabelBounds(bounds, iconBoxSize).width);
+      }
+    }
+
+    const { iconBounds, labelBounds } = this.calculateContentLayout(
+      this.getBounds(),
+      iconBoxSize,
+      labelSize
+    );
 
     if (this._icon) {
       this._icon.render(ctx, iconBounds);

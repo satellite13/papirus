@@ -7,7 +7,7 @@ import type { ArrowMarkerConfig, TextStyle } from '@/types';
 import type { NodeImageOptions, NodeImagePlacement } from '@/elements/NodeImage';
 import { ARROW_ANGLE } from '@/constants';
 import { EDGE_LABEL_BACKGROUND_PADDING, EDGE_LABEL_BACKGROUND_RADIUS } from '@/constants';
-import { applyStyleManagerToElements } from './applyStyleManager';
+import { applyStyleManagerToElements } from './style';
 import { getContentBounds } from './contentBounds';
 import { downloadBlob } from './download';
 

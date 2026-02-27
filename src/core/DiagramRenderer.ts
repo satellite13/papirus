@@ -8,7 +8,8 @@ import type { Bounds, DiagramOptions, Point, ScrollbarOptions, ViewportState } f
 import { InteractionManager } from './InteractionManager';
 import type { InteractionManagerOptions } from './InteractionManager';
 import { ANCHOR_PORT_PREFIX } from '@/constants';
-import { applyStyleManagerToElements } from '@/utils/applyStyleManager';
+import { drawRoundedRectPath } from '@/utils/geometry';
+import { applyStyleManagerToElements } from '@/utils/style';
 import { getContentBounds } from '@/utils/contentBounds';
 import { AnimationManager } from './AnimationManager';
 import { ContextMenuManager } from './ContextMenuManager';
@@ -939,17 +940,7 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
 
     const colors = this.resolveScrollbarColors();
     const drawRoundedRect = (x: number, y: number, w: number, h: number, r: number): void => {
-      ctx.beginPath();
-      ctx.moveTo(x + r, y);
-      ctx.lineTo(x + w - r, y);
-      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-      ctx.lineTo(x + w, y + h - r);
-      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-      ctx.lineTo(x + r, y + h);
-      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-      ctx.lineTo(x, y + r);
-      ctx.quadraticCurveTo(x, y, x + r, y);
-      ctx.closePath();
+      drawRoundedRectPath(ctx, x, y, w, h, r);
     };
 
     ctx.save();

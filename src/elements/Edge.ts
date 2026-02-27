@@ -11,7 +11,7 @@ import type {
 } from '@/types';
 import type { StyleManager } from '@/styles/StyleManager';
 import { shallowEqual } from '@/utils/style';
-import { bezierPoint } from '@/utils/geometry';
+import { bezierPoint, drawRoundedRectPath } from '@/utils/geometry';
 import {
   type PathStrategy,
   type PathStrategyOptions,
@@ -902,18 +902,7 @@ export class Edge extends Element {
     height: number,
     radius: number
   ): void {
-    const r = Math.min(radius, width / 2, height / 2);
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.lineTo(x + width - r, y);
-    ctx.quadraticCurveTo(x + width, y, x + width, y + r);
-    ctx.lineTo(x + width, y + height - r);
-    ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
-    ctx.lineTo(x + r, y + height);
-    ctx.quadraticCurveTo(x, y + height, x, y + height - r);
-    ctx.lineTo(x, y + r);
-    ctx.quadraticCurveTo(x, y, x + r, y);
-    ctx.closePath();
+    drawRoundedRectPath(ctx, x, y, width, height, radius);
   }
 
   private getPathMidpoint(): Point {

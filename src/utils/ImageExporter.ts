@@ -1,5 +1,5 @@
 import type { DiagramRenderer } from '@/core/DiagramRenderer';
-import { applyStyleManagerToElements } from './applyStyleManager';
+import { applyStyleManagerToElements } from './style';
 import { getContentBounds } from './contentBounds';
 import { downloadBlob } from './download';
 

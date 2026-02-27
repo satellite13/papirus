@@ -124,6 +124,7 @@ export { MiniMap } from './core/overlays/MiniMap';
 export type { MiniMapOptions } from './core/overlays/MiniMap';
 
 export * from './utils/geometry';
+export { applyNodeStyle, renderFillAndStroke, applyEdgeStyle } from './utils/canvas';
 export type { PathStrategyOptions } from './elements/paths/PathStrategy';
 
 // Types
