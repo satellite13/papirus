@@ -5,11 +5,11 @@ import type { Node } from '@/elements/Node';
 import type { Group } from '@/elements/Group';
 import type { ArrowMarkerConfig, TextStyle } from '@/types';
 import type { NodeImageOptions, NodeImagePlacement } from '@/elements/NodeImage';
-import { ARROW_ANGLE } from '@/constants';
 import { EDGE_LABEL_BACKGROUND_PADDING, EDGE_LABEL_BACKGROUND_RADIUS } from '@/constants';
 import { applyStyleManagerToElements } from './style';
 import { getContentBounds } from './contentBounds';
 import { downloadBlob } from './download';
+import { generateSvgMarker, calculateMarkerPoints } from './markers';
 
 export interface SvgExportOptions {
   padding?: number;
@@ -324,45 +324,7 @@ export class SvgExporter {
   }
 
   private getMarkerPoints(edge: Edge, position: 'start' | 'end'): { from: Point; to: Point } | null {
-    const path = edge.path;
-    if (path.length < 2) {
-      return null;
-    }
-
-    if (edge.type === 'bezier' && path.length >= 4) {
-      const epsilon = 0.001;
-      const isSame = (a: Point, b: Point): boolean =>
-        Math.abs(a.x - b.x) < epsilon && Math.abs(a.y - b.y) < epsilon;
-
-      if (position === 'end') {
-        const endIndex = path.length - 1;
-        const endPoint = path[endIndex]!;
-        let from = path[endIndex - 1]!;
-        if (isSame(from, endPoint)) {
-          from = path[endIndex - 2]!;
-          if (isSame(from, endPoint)) {
-            from = path[0]!;
-          }
-        }
-        return { from, to: endPoint };
-      }
-
-      const start = path[0]!;
-      let next = path[1]!;
-      if (isSame(next, start)) {
-        next = path[2]!;
-        if (isSame(next, start)) {
-          next = path[path.length - 1]!;
-        }
-      }
-      return { from: next, to: start };
-    }
-
-    if (position === 'end') {
-      return { from: path[path.length - 2]!, to: path[path.length - 1]! };
-    }
-
-    return { from: path[1]!, to: path[0]! };
+    return calculateMarkerPoints(edge.path, position, edge.type);
   }
 
   private renderMarkerShape(
@@ -371,47 +333,7 @@ export class SvgExporter {
     to: Point,
     edgeStroke: string
   ): string {
-    const angle = Math.atan2(to.y - from.y, to.x - from.x);
-    const size = marker.size ?? 12;
-    const stroke = marker.strokeColor ?? edgeStroke;
-    const fill = marker.fillColor ?? stroke;
-    const fillOpacity = marker.fillOpacity ?? 1;
-
-    switch (marker.type) {
-      case 'open': {
-        const x1 = to.x - size * Math.cos(angle - ARROW_ANGLE);
-        const y1 = to.y - size * Math.sin(angle - ARROW_ANGLE);
-        const x2 = to.x - size * Math.cos(angle + ARROW_ANGLE);
-        const y2 = to.y - size * Math.sin(angle + ARROW_ANGLE);
-        return `<path d="M ${to.x} ${to.y} L ${x1} ${y1} M ${to.x} ${to.y} L ${x2} ${y2}" fill="none" stroke="${stroke}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>`;
-      }
-      case 'diamond': {
-        const halfLength = size / 2;
-        const halfWidth = size * 0.3;
-        const cos = Math.cos(angle);
-        const sin = Math.sin(angle);
-        const p1x = to.x - halfLength * cos + halfWidth * sin;
-        const p1y = to.y - halfLength * sin - halfWidth * cos;
-        const backX = to.x - size * cos;
-        const backY = to.y - size * sin;
-        const p2x = to.x - halfLength * cos - halfWidth * sin;
-        const p2y = to.y - halfLength * sin + halfWidth * cos;
-        return `<path d="M ${to.x} ${to.y} L ${p1x} ${p1y} L ${backX} ${backY} L ${p2x} ${p2y} Z" fill="${fill}" fill-opacity="${fillOpacity}" stroke="${stroke}" stroke-width="1"/>`;
-      }
-      case 'circle': {
-        const cx = to.x - size * Math.cos(angle);
-        const cy = to.y - size * Math.sin(angle);
-        return `<circle cx="${cx}" cy="${cy}" r="${size}" fill="${fill}" fill-opacity="${fillOpacity}" stroke="${stroke}" stroke-width="1"/>`;
-      }
-      case 'arrow':
-      default: {
-        const x1 = to.x - size * Math.cos(angle - ARROW_ANGLE);
-        const y1 = to.y - size * Math.sin(angle - ARROW_ANGLE);
-        const x2 = to.x - size * Math.cos(angle + ARROW_ANGLE);
-        const y2 = to.y - size * Math.sin(angle + ARROW_ANGLE);
-        return `<path d="M ${to.x} ${to.y} L ${x1} ${y1} L ${x2} ${y2} Z" fill="${fill}" fill-opacity="${fillOpacity}" stroke="${stroke}" stroke-width="1"/>`;
-      }
-    }
+    return generateSvgMarker(marker, from, to, edgeStroke);
   }
 
   private buildPath(edge: Edge): string {

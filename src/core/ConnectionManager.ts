@@ -162,53 +162,9 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
   }
 
   /**
-   * Handle mouse down on a node
-   */
-  handleNodeMouseDown(event: InputEvent, node: Node): boolean {
-    this.sourceNode = node;
-    this.isConnecting = true;
-    const target = { x: event.worldX, y: event.worldY };
-
-    if (this.attachToOutline) {
-      const { point, param } = node.getClosestPointOnOutline(target);
-      this.sourceOutlineParam = param;
-      this.sourceAnchorId = null;
-      this.sourcePoint = point;
-    } else {
-      const anchor = node.getNearestAnchor(target);
-      this.sourceOutlineParam = null;
-      this.sourceAnchorId = anchor?.id ?? null;
-      this.sourcePoint = anchor?.point ?? node.getConnectionPoint(target);
-    }
-    this.previewEndpoint = target;
-
-    this.emit('connectionStart', node);
-    return true;
-  }
-
-  /**
-   * Check if mouse is over a port and start connection
-   */
-  tryStartConnection(event: InputEvent): boolean {
-    const point = { x: event.worldX, y: event.worldY };
-
-    // First check if clicking on edge handle for reconnection
-    if (this.tryStartReconnection(event)) {
-      return true;
-    }
-
-    const node = this.getNodeAtPoint(point, false);
-    if (node) {
-      return this.handleNodeMouseDown(event, node);
-    }
-
-    return false;
-  }
-
-  /**
    * Try to start connection from a hovered anchor point.
    * When attachToOutline + Shift: start from anywhere on node outline.
-   * Otherwise: requires clicking on an anchor so that node drag still works.
+   * Otherwise: requires clicking on an anchor/port so that node drag still works.
    */
   tryStartConnectionAtPoint(event: InputEvent): boolean {
     const point = { x: event.worldX, y: event.worldY };
@@ -230,26 +186,26 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
       return true;
     }
 
+    // Try to find anchor at point (for precise click on port)
     const hover = this.getAnchorAtPoint(node, point);
-    if (!hover) {
-      return false;
+    if (hover) {
+      this.sourceNode = node;
+      this.isConnecting = true;
+      this.sourceAnchorId = hover.id;
+      this.sourcePoint = hover.point;
+      this.previewEndpoint = point;
+      if (this.attachToOutline) {
+        const { param } = node.getClosestPointOnOutline(point);
+        this.sourceOutlineParam = param;
+      } else {
+        this.sourceOutlineParam = null;
+      }
+      this.emit('connectionStart', node);
+      this.renderer.markDirty();
+      return true;
     }
 
-    this.sourceNode = node;
-    this.isConnecting = true;
-    this.sourceAnchorId = hover.id;
-    this.sourcePoint = hover.point;
-    this.previewEndpoint = point;
-    if (this.attachToOutline) {
-      const { param } = node.getClosestPointOnOutline(point);
-      this.sourceOutlineParam = param;
-    } else {
-      this.sourceOutlineParam = null;
-    }
-
-    this.emit('connectionStart', node);
-    this.renderer.markDirty();
-    return true;
+    return false;
   }
 
   /**
@@ -1239,6 +1195,11 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
   }
 
   private getAnchorAtPoint(node: Node, point: Point): { id: string; point: Point } | null {
+    // Get only port-side anchors if attachToOutline is disabled and node has ports
+    const anchorIds = !this.attachToOutline && node.ports.length > 0
+      ? node.getPortAnchorIds()
+      : null;
+    
     const anchors = node.getAnchors();
     if (anchors.length === 0) {
       return null;
@@ -1250,6 +1211,10 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     let minDist = Infinity;
 
     for (const anchor of anchors) {
+      // Skip anchors not on port sides when in port mode
+      if (anchorIds && !anchorIds.includes(anchor.id)) {
+        continue;
+      }
       const dx = point.x - anchor.point.x;
       const dy = point.y - anchor.point.y;
       const dist = dx * dx + dy * dy;

@@ -127,6 +127,7 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
   private _offsetX = 0;
   private _offsetY = 0;
   private _dirty = true;
+  private _styleDirty = true;
   private _destroyed = false;
   private _canvasRect: DOMRectReadOnly | null = null;
   private _nodeObstaclesCache: PathObstacle[] | null = null;
@@ -138,6 +139,8 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
   private _edges = new Map<string, Edge>();
   private _groups = new Map<string, Group>();
   private _attachToOutline = false;
+  /** Reverse index: nodeId -> edgeIds connected to this node */
+  private _nodeEdgeIndex = new Map<string, Set<string>>();
 
   /** When true, ports and anchor points are hidden (attach anywhere on outline) */
   get attachToOutline(): boolean {
@@ -312,6 +315,7 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
    */
   setStyleManager(styleManager: StyleManager | undefined): void {
     this.styleManager = styleManager;
+    this._styleDirty = true;
     this.markDirty();
   }
 
@@ -320,6 +324,13 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
    */
   getStyleManager(): StyleManager | undefined {
     return this.styleManager;
+  }
+
+  /**
+   * Mark styles as dirty (force re-apply on next render)
+   */
+  markStyleDirty(): void {
+    this._styleDirty = true;
   }
 
   /**
@@ -495,9 +506,31 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
   addEdge(edge: Edge): void {
     edge.setDirtyListener(() => this.markDirty());
     this._edges.set(edge.id, edge);
+    // Update reverse index
+    this._updateEdgeIndex(edge.id, edge.from.nodeId, true);
+    this._updateEdgeIndex(edge.id, edge.to.nodeId, true);
     this.animationManager.registerEnter(edge.id);
     this.markDirty();
     this.emit('edgeAdd', edge);
+  }
+
+  /**
+   * Update edge reverse index
+   */
+  private _updateEdgeIndex(edgeId: string, nodeId: string, add: boolean): void {
+    let edgeIds = this._nodeEdgeIndex.get(nodeId);
+    if (!edgeIds) {
+      edgeIds = new Set();
+      this._nodeEdgeIndex.set(nodeId, edgeIds);
+    }
+    if (add) {
+      edgeIds.add(edgeId);
+    } else {
+      edgeIds.delete(edgeId);
+      if (edgeIds.size === 0) {
+        this._nodeEdgeIndex.delete(nodeId);
+      }
+    }
   }
 
   /**
@@ -526,15 +559,13 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
       return false;
     }
 
-    const edgesToRemove: string[] = [];
-    for (const edge of this._edges.values()) {
-      if (edge.from.nodeId === nodeId || edge.to.nodeId === nodeId) {
-        edgesToRemove.push(edge.id);
+    // Use reverse index to find connected edges (O(1) instead of O(n))
+    const edgesToRemove = this._nodeEdgeIndex.get(nodeId);
+    if (edgesToRemove) {
+      // Copy to array since removeEdgeImmediate will modify the index
+      for (const edgeId of Array.from(edgesToRemove)) {
+        this.removeEdgeImmediate(edgeId);
       }
-    }
-
-    for (const edgeId of edgesToRemove) {
-      this.removeEdgeImmediate(edgeId);
     }
 
     for (const group of this._groups.values()) {
@@ -555,6 +586,10 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
     if (edge === undefined) {
       return false;
     }
+
+    // Clean up reverse index
+    this._updateEdgeIndex(edgeId, edge.from.nodeId, false);
+    this._updateEdgeIndex(edgeId, edge.to.nodeId, false);
 
     this._edges.delete(edgeId);
     edge.setDirtyListener(undefined);
@@ -678,6 +713,7 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
     this._nodes.clear();
     this._edges.clear();
     this._groups.clear();
+    this._nodeEdgeIndex.clear();
   }
 
   /**
@@ -696,6 +732,7 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
     this._nodes.clear();
     this._edges.clear();
     this._groups.clear();
+    this._nodeEdgeIndex.clear();
     this.markDirty();
   }
 
@@ -786,14 +823,15 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
       underlayRenderer(ctx);
     }
 
-    // Apply styles from StyleManager before rendering
-    if (this.styleManager) {
+    // Apply styles from StyleManager before rendering (only if dirty)
+    if (this.styleManager && this._styleDirty) {
       applyStyleManagerToElements(
         this.styleManager,
         this._groups.values(),
         this._edges.values(),
         this._nodes.values()
       );
+      this._styleDirty = false;
     }
 
     // Update group bounds before rendering
@@ -876,6 +914,63 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
     }
 
     renderFn();
+  }
+
+  /**
+   * Update edge endpoints to reflect current node positions
+   * Called during drag to keep control points in sync
+   */
+  updateEdgeEndpointsForDrag(): void {
+    for (const edge of this._edges.values()) {
+      if (!edge.autoUpdateEndpoints) {
+        continue;
+      }
+
+      const fromNode = this._nodes.get(edge.from.nodeId);
+      const toNode = this._nodes.get(edge.to.nodeId);
+      if (fromNode === undefined || toNode === undefined) {
+        continue;
+      }
+
+      let fromPoint: Point;
+      let toPoint: Point;
+      let fromDir: string | undefined;
+      let toDir: string | undefined;
+
+      if (edge.from.portId) {
+        const anchorId = edge.from.portId.slice(ANCHOR_PORT_PREFIX.length);
+        const anchorPoint = fromNode.getAnchorPointById(anchorId);
+        if (anchorPoint) {
+          fromPoint = anchorPoint;
+          fromDir = anchorId.split(':')[0];
+        } else {
+          fromPoint = fromNode.getCenter();
+        }
+      } else if (edge.from.outlineParam !== undefined) {
+        fromPoint = fromNode.getConnectionPointAtOutlineParam(edge.from.outlineParam);
+        fromDir = this.getDirectionFromOutlineParam(edge.from.outlineParam);
+      } else {
+        fromPoint = fromNode.getCenter();
+      }
+
+      if (edge.to.portId) {
+        const anchorId = edge.to.portId.slice(ANCHOR_PORT_PREFIX.length);
+        const anchorPoint = toNode.getAnchorPointById(anchorId);
+        if (anchorPoint) {
+          toPoint = anchorPoint;
+          toDir = anchorId.split(':')[0];
+        } else {
+          toPoint = toNode.getCenter();
+        }
+      } else if (edge.to.outlineParam !== undefined) {
+        toPoint = toNode.getConnectionPointAtOutlineParam(edge.to.outlineParam);
+        toDir = this.getDirectionFromOutlineParam(edge.to.outlineParam);
+      } else {
+        toPoint = toNode.getCenter();
+      }
+
+      edge.updateEndpoints(fromPoint, toPoint, fromDir, toDir);
+    }
   }
 
   private updateEdgeEndpoints(): void {

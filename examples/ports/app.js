@@ -167,36 +167,36 @@ const output2 = createOutputNode(500, 350);
 // Create edges
 const edges = [
   new Edge({
-    from: { nodeId: input1.id, portId: input1.ports[0].id },
-    to: { nodeId: process1.id, portId: process1.ports[0].id },
+    from: { nodeId: input1.id, portId: 'anchor:right:0' },
+    to: { nodeId: process1.id, portId: 'anchor:left:0' },
     type: 'bezier',
     endMarker: { type: 'open', size: 10 },
     label: 'ingest',
   }),
   new Edge({
-    from: { nodeId: input2.id, portId: input2.ports[0].id },
-    to: { nodeId: process2.id, portId: process2.ports[0].id },
+    from: { nodeId: input2.id, portId: 'anchor:right:0' },
+    to: { nodeId: process2.id, portId: 'anchor:left:0' },
     type: 'bezier',
     endMarker: { type: 'open', size: 10 },
     label: 'ingest',
   }),
   new Edge({
-    from: { nodeId: process1.id, portId: process1.ports[1].id },
-    to: { nodeId: output1.id, portId: output1.ports[0].id },
+    from: { nodeId: process1.id, portId: 'anchor:right:0' },
+    to: { nodeId: output1.id, portId: 'anchor:left:0' },
     type: 'bezier',
     endMarker: { type: 'arrow', size: 10 },
     label: 'result',
   }),
   new Edge({
-    from: { nodeId: process2.id, portId: process2.ports[1].id },
-    to: { nodeId: output2.id, portId: output2.ports[0].id },
+    from: { nodeId: process2.id, portId: 'anchor:right:0' },
+    to: { nodeId: output2.id, portId: 'anchor:left:0' },
     type: 'bezier',
     endMarker: { type: 'arrow', size: 10 },
     label: 'result',
   }),
   new Edge({
-    from: { nodeId: process1.id, portId: process1.ports[3].id },
-    to: { nodeId: process2.id, portId: process2.ports[2].id },
+    from: { nodeId: process1.id, portId: 'anchor:bottom:0' },
+    to: { nodeId: process2.id, portId: 'anchor:top:0' },
     type: 'editable-polyline',
     controlPoints: [
       { x: 380, y: 240 },

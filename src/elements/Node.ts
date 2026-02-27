@@ -73,6 +73,7 @@ export abstract class Node extends Element {
   protected _labelPlacement: LabelPlacement;
   protected _resizeHandlesEnabled: boolean;
   private _attachToOutlineGetter?: () => boolean;
+  private _anchorCache: { id: AnchorId; point: Point }[] | null = null;
 
   protected constructor(options: NodeOptions) {
     super({
@@ -278,6 +279,21 @@ export abstract class Node extends Element {
       this._showPortsAlways = value;
       this.markDirty();
     }
+  }
+
+  /**
+   * Mark this element as needing re-render and invalidate anchor cache
+   */
+  override markDirty(): void {
+    super.markDirty();
+    this.invalidateAnchorCache();
+  }
+
+  /**
+   * Invalidate anchor cache
+   */
+  private invalidateAnchorCache(): void {
+    this._anchorCache = null;
   }
 
   get resizeHandlesEnabled(): boolean {
@@ -680,6 +696,55 @@ export abstract class Node extends Element {
    */
   getAnchorPoints(): Point[] {
     return this.getAnchorsOnOutline().map((anchor) => anchor.point);
+  }
+
+  /**
+   * Get anchor IDs for sides that have ports
+   */
+  getPortAnchorIds(): string[] {
+    const portSides = new Set<string>();
+    for (const port of this._ports) {
+      if (typeof port.position === 'string') {
+        portSides.add(port.position);
+      }
+    }
+    const anchors = this.getAnchorsOnOutline();
+    return anchors
+      .filter((anchor) => {
+        const side = anchor.id.split(':')[0];
+        return side && portSides.has(side);
+      })
+      .map((anchor) => anchor.id);
+  }
+
+  /**
+   * Get nearest anchor that belongs to a port side
+   */
+  getNearestPortAnchor(target: Point): { id: AnchorId; point: Point } | null {
+    const portAnchorIds = this.getPortAnchorIds();
+    if (portAnchorIds.length === 0) {
+      return null;
+    }
+    const anchors = this.getAnchorsOnOutline().filter((anchor) =>
+      portAnchorIds.includes(anchor.id)
+    );
+    if (anchors.length === 0) {
+      return null;
+    }
+
+    let closest = anchors[0]!;
+    let minDist = (target.x - closest.point.x) ** 2 + (target.y - closest.point.y) ** 2;
+
+    for (let i = 1; i < anchors.length; i++) {
+      const anchor = anchors[i]!;
+      const dist = (target.x - anchor.point.x) ** 2 + (target.y - anchor.point.y) ** 2;
+      if (dist < minDist) {
+        minDist = dist;
+        closest = anchor;
+      }
+    }
+
+    return closest;
   }
 
   /**
@@ -1088,6 +1153,10 @@ export abstract class Node extends Element {
   }
 
   private getAnchorsOnOutline(): { id: AnchorId; point: Point }[] {
+    if (this._anchorCache !== null) {
+      return this._anchorCache;
+    }
+
     const { top, right, bottom, left } = this._anchorPoints;
     const bounds = this.getBounds();
     const anchors: { id: AnchorId; point: Point }[] = [];
@@ -1117,12 +1186,15 @@ export abstract class Node extends Element {
     }));
 
     if (anchors.length === 0) {
+      this._anchorCache = [];
       return [];
     }
 
-    return anchors.map((anchor) => ({
+    const result = anchors.map((anchor) => ({
       id: anchor.id,
       point: this.getOutlinePointToward(anchor.point),
     }));
+    this._anchorCache = result;
+    return result;
   }
 }

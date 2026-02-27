@@ -51,6 +51,10 @@ export class DragManager extends EventEmitter<DragEvents> {
     string,
     Array<{ edgeId: string; controlPointIndex: number; axis: 'vertical' | 'horizontal' }>
   >();
+  /** Edges (editable-polyline) where both endpoints are in selection — control points follow delta */
+  private editablePolylineFullyConnectedEdges = new Set<string>();
+  /** Snapshot of control points at drag start for cancel/restore */
+  private initialControlPointsForFullyConnected = new Map<string, Point[]>();
   private alignmentGuides: AlignmentGuide[] = [];
   private _handledMouseDown = false;
   private draggedGroupSelection = false;
@@ -270,6 +274,7 @@ export class DragManager extends EventEmitter<DragEvents> {
     const alignedDelta = this.resolveAlignmentDelta(totalDelta);
 
     // Move nodes using initial position + total offset
+    let firstDelta: Point | null = null;
     for (const node of this.draggedNodes) {
       const initial = this.initialPositions.get(node.id);
       if (initial === undefined) continue;
@@ -286,10 +291,17 @@ export class DragManager extends EventEmitter<DragEvents> {
 
       node.x = newX;
       node.y = newY;
-      this.followNearestEditableBend(node.id, newX - prevX, newY - prevY);
+      const dx = newX - prevX;
+      const dy = newY - prevY;
+      if (firstDelta === null) {
+        firstDelta = { x: dx, y: dy };
+      }
+      this.followNearestEditableBend(node.id, dx, dy);
     }
 
-    this.lastDragPoint = point;
+    if (firstDelta !== null) {
+      this.followEditableBendForFullyConnectedEdges(firstDelta.x, firstDelta.y);
+    }
     this.emit(
       'drag',
       this.draggedNodes.map((n) => n.id),
@@ -347,6 +359,13 @@ export class DragManager extends EventEmitter<DragEvents> {
         }
         node.state = 'selected';
       }
+      // Restore control points for fully-connected editable polyline edges
+      for (const [edgeId, points] of this.initialControlPointsForFullyConnected) {
+        const edge = this.renderer.getEdge(edgeId);
+        if (edge) {
+          edge.controlPoints = points.map((p) => ({ ...p }));
+        }
+      }
     }
 
     this.reset();
@@ -368,6 +387,8 @@ export class DragManager extends EventEmitter<DragEvents> {
     this.lastDragPoint = null;
     this.initialPositions.clear();
     this.editableBendFollow.clear();
+    this.editablePolylineFullyConnectedEdges.clear();
+    this.initialControlPointsForFullyConnected.clear();
     this.alignmentGuides = [];
     this.draggedGroupSelection = false;
     // Note: _handledMouseDown is reset at the start of next handleMouseDown
@@ -376,8 +397,30 @@ export class DragManager extends EventEmitter<DragEvents> {
 
   private buildEditableBendFollowBindings(): void {
     this.editableBendFollow.clear();
+    this.editablePolylineFullyConnectedEdges.clear();
+    this.initialControlPointsForFullyConnected.clear();
     const draggedIds = new Set(this.draggedNodes.map((node) => node.id));
     const ORTHOGONAL_TOLERANCE = 6;
+
+    // Collect editable-polyline edges where both endpoints are dragged — all control points follow
+    for (const edge of this.renderer.edges.values()) {
+      if (
+        !edge.isEditablePolyline() ||
+        !edge.controlPoints ||
+        edge.controlPoints.length === 0
+      ) {
+        continue;
+      }
+      const isFromDragged = draggedIds.has(edge.from.nodeId);
+      const isToDragged = draggedIds.has(edge.to.nodeId);
+      if (isFromDragged && isToDragged) {
+        this.editablePolylineFullyConnectedEdges.add(edge.id);
+        this.initialControlPointsForFullyConnected.set(
+          edge.id,
+          edge.controlPoints.map((p) => ({ ...p }))
+        );
+      }
+    }
 
     for (const node of this.draggedNodes) {
       const bindings: Array<{
@@ -402,26 +445,10 @@ export class DragManager extends EventEmitter<DragEvents> {
           continue;
         }
 
+        // Use the next control point from the attachment (not the nearest by distance)
+        const controlPointIndex = isFrom ? 0 : edge.controlPoints.length - 1;
+        const nearestPoint = edge.controlPoints[controlPointIndex]!;
         const endpoint = isFrom ? edge.startPoint : edge.endPoint;
-        let nearestIndex = -1;
-        let nearestDistanceSq = Infinity;
-
-        for (let i = 0; i < edge.controlPoints.length; i++) {
-          const point = edge.controlPoints[i]!;
-          const dx = point.x - endpoint.x;
-          const dy = point.y - endpoint.y;
-          const distSq = dx * dx + dy * dy;
-          if (distSq < nearestDistanceSq) {
-            nearestDistanceSq = distSq;
-            nearestIndex = i;
-          }
-        }
-
-        if (nearestIndex < 0) {
-          continue;
-        }
-
-        const nearestPoint = edge.controlPoints[nearestIndex]!;
         const deltaX = Math.abs(nearestPoint.x - endpoint.x);
         const deltaY = Math.abs(nearestPoint.y - endpoint.y);
 
@@ -442,7 +469,7 @@ export class DragManager extends EventEmitter<DragEvents> {
 
         bindings.push({
           edgeId: edge.id,
-          controlPointIndex: nearestIndex,
+          controlPointIndex,
           axis,
         });
       }
@@ -478,6 +505,27 @@ export class DragManager extends EventEmitter<DragEvents> {
         continue;
       }
       nextControlPoints[binding.controlPointIndex] = point;
+      edge.controlPoints = nextControlPoints;
+    }
+  }
+
+  /**
+   * For editable-polyline edges where both endpoints are dragged:
+   * move all control points by the same delta to preserve relative positions.
+   */
+  private followEditableBendForFullyConnectedEdges(deltaX: number, deltaY: number): void {
+    if (deltaX === 0 && deltaY === 0) {
+      return;
+    }
+    for (const edgeId of this.editablePolylineFullyConnectedEdges) {
+      const edge = this.renderer.getEdge(edgeId);
+      if (!edge?.controlPoints || edge.controlPoints.length === 0) {
+        continue;
+      }
+      const nextControlPoints = edge.controlPoints.map((p) => ({
+        x: p.x + deltaX,
+        y: p.y + deltaY,
+      }));
       edge.controlPoints = nextControlPoints;
     }
   }

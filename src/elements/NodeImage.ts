@@ -1,4 +1,5 @@
 import type { Bounds } from '@/types';
+import { LRUCache } from '@/utils/LRUCache';
 
 export type NodeImageCornerPlacement = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
 export type NodeImageEdgePlacement = 'top' | 'bottom' | 'left' | 'right';
@@ -45,7 +46,8 @@ export interface NodeImageOptions {
   offsetY?: number;
 }
 
-const svgTextCache = new Map<string, Promise<string>>();
+// LRU cache for fetched SVG content (limit 100 entries to prevent memory growth)
+const svgTextCache = new LRUCache<string, Promise<string>>(100);
 
 function styleSetColor(style: string, key: 'stroke' | 'fill', color: string): string {
   const hasKey = new RegExp(`${key}\\s*:`).test(style);

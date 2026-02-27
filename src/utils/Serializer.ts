@@ -12,6 +12,7 @@ import type {
   SerializedAnchorPoints,
   SerializedTextLabel,
 } from '@/types';
+import { omitDefaultValues, omitEmptyValues, hasNonDefaultValues } from './omitDefaults';
 
 const SERIALIZER_VERSION = '1.1';
 
@@ -222,22 +223,26 @@ export class Serializer {
     // Serialize label - full TextLabel if it has more than just text
     let label: string | SerializedTextLabel | undefined;
     if (node.label) {
-      const hasExtendedOptions =
-        node.label.styleClass !== undefined ||
-        node.label.maxWidth !== undefined ||
-        node.label.padding !== 8 ||
-        node.label.margin !== 0 ||
-        Object.keys(node.label.style).length > 0;
+      const labelDefaults = { padding: 8, margin: 0, style: {}, maxWidth: undefined, styleClass: undefined };
+      const labelData = {
+        text: node.label.text,
+        style: node.label.style,
+        maxWidth: node.label.maxWidth,
+        padding: node.label.padding,
+        margin: node.label.margin,
+        styleClass: node.label.styleClass,
+      };
+      const hasExtendedOptions = hasNonDefaultValues(labelData, labelDefaults);
 
       if (hasExtendedOptions) {
-        label = {
+        label = omitEmptyValues({
           text: node.label.text,
           style: Object.keys(node.label.style).length > 0 ? node.label.style : undefined,
           maxWidth: node.label.maxWidth,
           padding: node.label.padding !== 8 ? node.label.padding : undefined,
           margin: node.label.margin !== 0 ? node.label.margin : undefined,
           styleClass: node.label.styleClass,
-        };
+        }) as SerializedTextLabel | undefined;
       } else {
         label = node.label.text;
       }
@@ -271,14 +276,10 @@ export class Serializer {
     // Serialize anchor points if non-default
     let anchorPoints: SerializedAnchorPoints | undefined;
     const ap = node.anchorPoints;
-    const hasCustomAnchors = ap.top !== 1 || ap.right !== 1 || ap.bottom !== 1 || ap.left !== 1;
-    if (hasCustomAnchors) {
-      anchorPoints = {
-        top: ap.top !== 1 ? ap.top : undefined,
-        right: ap.right !== 1 ? ap.right : undefined,
-        bottom: ap.bottom !== 1 ? ap.bottom : undefined,
-        left: ap.left !== 1 ? ap.left : undefined,
-      };
+    const anchorDefaults = { top: 1, right: 1, bottom: 1, left: 1 };
+    const anchorData = { top: ap.top, right: ap.right, bottom: ap.bottom, left: ap.left };
+    if (hasNonDefaultValues(anchorData, anchorDefaults)) {
+      anchorPoints = omitDefaultValues(anchorData, anchorDefaults);
     }
 
     return {

@@ -249,6 +249,7 @@ export class SelectionManager extends EventEmitter<SelectionEvents> {
     updateState(this.renderer.groups.values());
 
     this.renderer.markDirty();
+    this.renderer.markStyleDirty();
   }
 
   private emitSelect(): void {

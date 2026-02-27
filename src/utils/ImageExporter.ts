@@ -2,6 +2,7 @@ import type { DiagramRenderer } from '@/core/DiagramRenderer';
 import { applyStyleManagerToElements } from './style';
 import { getContentBounds } from './contentBounds';
 import { downloadBlob } from './download';
+import { getAllElements } from './elementIterator';
 
 export interface ExportOptions {
   scale?: number;
@@ -100,23 +101,9 @@ export class ImageExporter {
       this.renderer.nodes.values()
     );
 
-    // Render elements (in correct order)
-    for (const group of this.renderer.groups.values()) {
-      if (group.visible) {
-        group.render(ctx);
-      }
-    }
-
-    for (const edge of this.renderer.edges.values()) {
-      if (edge.visible) {
-        edge.render(ctx);
-      }
-    }
-
-    for (const node of this.renderer.nodes.values()) {
-      if (node.visible) {
-        node.render(ctx);
-      }
+    // Render elements (in correct order: groups -> edges -> nodes)
+    for (const element of getAllElements(this.renderer, { visibleOnly: true })) {
+      element.render(ctx);
     }
 
     // Convert to blob
