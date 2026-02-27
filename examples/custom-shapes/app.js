@@ -65,7 +65,7 @@ renderer.use(gridOverlay);
 renderer.use(miniMap);
 
 // Interactions
-const interactions = renderer.enableInteractions();
+const interactions = renderer.enableInteractions({ attachToOutline: false });
 
 // Custom shape path functions
 function createChamferedRectPath(width, height) {
@@ -316,6 +316,23 @@ document.getElementById('addCylinder').addEventListener('click', () => {
 document.getElementById('addDocument').addEventListener('click', () => {
   createDocumentNode(50 + Math.random() * 200, 50 + Math.random() * 400);
 });
+
+let attachToOutlineEnabled = false;
+const outlineButton = document.getElementById('toggleOutline');
+const outlineButtonLabel = document.getElementById('toggleOutlineLabel');
+
+function updateOutlineLabel() {
+  outlineButtonLabel.textContent = attachToOutlineEnabled ? 'Outline ON' : 'Outline OFF';
+  outlineButton.classList.toggle('btn-primary', attachToOutlineEnabled);
+}
+
+outlineButton.addEventListener('click', () => {
+  attachToOutlineEnabled = !attachToOutlineEnabled;
+  interactions.connection.setAttachToOutline(attachToOutlineEnabled);
+  updateOutlineLabel();
+});
+
+updateOutlineLabel();
 
 document.getElementById('fitView').addEventListener('click', () => {
   interactions.navigation.fitToView();

@@ -2,6 +2,8 @@ import { Node, type NodeOptions } from '../Node';
 import { NODE_HITBOX_PADDING } from '@/constants';
 import type { Point } from '@/types';
 
+const OUTLINE_SAMPLE_COUNT = 64;
+
 export interface CustomShapeNodeOptions extends NodeOptions {
   path: Path2D | ((width: number, height: number) => Path2D);
   /**
@@ -23,6 +25,7 @@ export class CustomShapeNode extends Node {
   private _cachedPath: Path2D | null = null;
   private _cachedWidth = 0;
   private _cachedHeight = 0;
+  private _cachedOutline: { points: Point[]; lengths: number[]; totalLength: number } | null = null;
 
   constructor(options: CustomShapeNodeOptions) {
     super(options);
@@ -67,6 +70,7 @@ export class CustomShapeNode extends Node {
   setPathFactory(factory: (width: number, height: number) => Path2D): void {
     this._pathFactory = factory;
     this._cachedPath = null;
+    this._cachedOutline = null;
     this.markDirty();
   }
 
@@ -82,6 +86,7 @@ export class CustomShapeNode extends Node {
       this._cachedPath = this._pathFactory(this._width, this._height);
       this._cachedWidth = this._width;
       this._cachedHeight = this._height;
+      this._cachedOutline = null;
     }
     return this._cachedPath;
   }
@@ -108,6 +113,198 @@ export class CustomShapeNode extends Node {
       this._svgPathFactory = value;
     }
     this.markDirty();
+  }
+
+  private getOutlineSample(): { points: Point[]; lengths: number[]; totalLength: number } | null {
+    this.getPath();
+    if (
+      this._cachedOutline !== null &&
+      this._cachedWidth === this._width &&
+      this._cachedHeight === this._height
+    ) {
+      return this._cachedOutline;
+    }
+
+    const canvas = typeof document !== 'undefined' ? document.createElement('canvas') : null;
+    const ctx = canvas?.getContext('2d');
+    if (!ctx) {
+      return null;
+    }
+
+    const path = this.getPath();
+    const cx = this._width / 2;
+    const cy = this._height / 2;
+    const maxR = Math.max(this._width, this._height);
+
+    const isInside = (lx: number, ly: number): boolean => ctx.isPointInPath(path, lx, ly);
+
+    const getBoundaryPoint = (dx: number, dy: number): Point => {
+      const len = Math.hypot(dx, dy);
+      if (len < 1e-9) return { x: cx, y: cy };
+      const ux = dx / len;
+      const uy = dy / len;
+      let lo = 0;
+      let hi = maxR;
+      for (let i = 0; i < 20; i++) {
+        const mid = (lo + hi) / 2;
+        const px = cx + ux * mid;
+        const py = cy + uy * mid;
+        if (isInside(px, py)) {
+          lo = mid;
+        } else {
+          hi = mid;
+        }
+      }
+      const t = (lo + hi) / 2;
+      return { x: cx + ux * t, y: cy + uy * t };
+    };
+
+    const points: Point[] = [];
+    for (let i = 0; i < OUTLINE_SAMPLE_COUNT; i++) {
+      const angle = (i / OUTLINE_SAMPLE_COUNT) * Math.PI * 2 - Math.PI / 2;
+      const dx = Math.cos(angle);
+      const dy = Math.sin(angle);
+      points.push(getBoundaryPoint(dx, dy));
+    }
+
+    const lengths: number[] = [];
+    let totalLength = 0;
+    for (let i = 0; i < OUTLINE_SAMPLE_COUNT; i++) {
+      const a = points[i]!;
+      const b = points[(i + 1) % OUTLINE_SAMPLE_COUNT]!;
+      const segLen = Math.hypot(b.x - a.x, b.y - a.y);
+      lengths.push(segLen);
+      totalLength += segLen;
+    }
+
+    this._cachedOutline = { points, lengths, totalLength };
+    return this._cachedOutline;
+  }
+
+  private localToWorld(p: Point): Point {
+    return { x: p.x + this._x, y: p.y + this._y };
+  }
+
+  override getConnectionPointAtOutlineParam(param: number): Point {
+    const sample = this.getOutlineSample();
+    if (!sample) return super.getConnectionPointAtOutlineParam(param);
+    const { points, lengths, totalLength } = sample;
+    let s = ((param % 1) + 1) % 1 * totalLength;
+
+    for (let i = 0; i < OUTLINE_SAMPLE_COUNT; i++) {
+      const segLen = lengths[i]!;
+      if (s < segLen) {
+        const a = points[i]!;
+        const b = points[(i + 1) % OUTLINE_SAMPLE_COUNT]!;
+        const t = segLen > 0 ? s / segLen : 0;
+        const local = {
+          x: a.x + t * (b.x - a.x),
+          y: a.y + t * (b.y - a.y),
+        };
+        return this.localToWorld(local);
+      }
+      s -= segLen;
+    }
+    return this.localToWorld(points[0]!);
+  }
+
+  override getClosestPointOnOutline(target: Point): { point: Point; param: number } {
+    const sample = this.getOutlineSample();
+    if (!sample) return super.getClosestPointOnOutline(target);
+    const { points, lengths, totalLength } = sample;
+    const localTarget = { x: target.x - this._x, y: target.y - this._y };
+
+    const projectSegment = (
+      ax: number,
+      ay: number,
+      bx: number,
+      by: number,
+      segLen: number,
+      segStartParam: number
+    ): { point: Point; param: number; distSq: number } => {
+      const dx = bx - ax;
+      const dy = by - ay;
+      const lenSq = dx * dx + dy * dy;
+      let t = lenSq > 0 ? ((localTarget.x - ax) * dx + (localTarget.y - ay) * dy) / lenSq : 0;
+      t = Math.max(0, Math.min(1, t));
+      const px = ax + t * dx;
+      const py = ay + t * dy;
+      const distSq = (localTarget.x - px) ** 2 + (localTarget.y - py) ** 2;
+      const param = segStartParam + (segLen > 0 ? (t * segLen) / totalLength : 0);
+      return { point: { x: px, y: py }, param, distSq };
+    };
+
+    let best = projectSegment(
+      points[0]!.x,
+      points[0]!.y,
+      points[1]!.x,
+      points[1]!.y,
+      lengths[0]!,
+      0
+    );
+    let segStartParam = lengths[0]! / totalLength;
+
+    for (let i = 1; i < OUTLINE_SAMPLE_COUNT; i++) {
+      const a = points[i]!;
+      const b = points[(i + 1) % OUTLINE_SAMPLE_COUNT]!;
+      const segLen = lengths[i]!;
+      const r = projectSegment(a.x, a.y, b.x, b.y, segLen, segStartParam);
+      if (r.distSq < best.distSq) best = r;
+      segStartParam += segLen / totalLength;
+    }
+
+    const param = ((best.param % 1) + 1) % 1;
+    return { point: this.localToWorld(best.point), param };
+  }
+
+  protected override getOutlinePointToward(target: Point): Point {
+    if (typeof document === 'undefined') {
+      return super.getOutlinePointToward(target);
+    }
+
+    const center = this.getCenter();
+    const dx = target.x - center.x;
+    const dy = target.y - center.y;
+
+    if (Math.abs(dx) < 1e-9 && Math.abs(dy) < 1e-9) {
+      return center;
+    }
+
+    const localCenter = { x: this._width / 2, y: this._height / 2 };
+    const localDx = target.x - center.x;
+    const localDy = target.y - center.y;
+
+    const boundary = this.getBoundaryPointOnRay(localCenter.x, localCenter.y, localDx, localDy);
+    return this.localToWorld(boundary);
+  }
+
+  private getBoundaryPointOnRay(ox: number, oy: number, dx: number, dy: number): Point {
+    const len = Math.hypot(dx, dy);
+    if (len < 1e-9) return { x: ox, y: oy };
+    const ux = dx / len;
+    const uy = dy / len;
+    const maxR = Math.max(this._width, this._height) * 2;
+    const path = this.getPath();
+
+    const canvas = typeof document !== 'undefined' ? document.createElement('canvas') : null;
+    const ctx = canvas?.getContext('2d');
+    if (!ctx) return { x: ox, y: oy };
+    const isInside = (lx: number, ly: number): boolean => ctx.isPointInPath(path, lx, ly);
+
+    let lo = 0;
+    let hi = maxR;
+    for (let i = 0; i < 20; i++) {
+      const mid = (lo + hi) / 2;
+      const px = ox + ux * mid;
+      const py = oy + uy * mid;
+      if (isInside(px, py)) {
+        lo = mid;
+      } else {
+        hi = mid;
+      }
+    }
+    const t = (lo + hi) / 2;
+    return { x: ox + ux * t, y: oy + uy * t };
   }
 
   override hitTest(point: Point): boolean {

@@ -7,6 +7,11 @@
 
 ## [Unreleased]
 
+## [0.3.18] - 2026-02-27
+
+### Fixed
+- При `attachToOutline` стрелка для `CustomShapeNode` следует контуру фигуры (Path2D), а не описанному прямоугольнику.
+
 ## [0.3.17] - 2026-02-27
 
 ### Added
@@ -166,7 +171,8 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.3.17...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.3.18...HEAD
+[0.3.18]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.18
 [0.3.17]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.17
 [0.3.16]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.16
 [0.3.15]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.15
