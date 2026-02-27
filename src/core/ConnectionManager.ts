@@ -6,18 +6,17 @@ import type { Edge } from '@/elements/Edge';
 import type { EdgeEndpoint, Point } from '@/types';
 import {
   ANCHOR_PORT_PREFIX,
-  EDGE_HANDLE_RADIUS,
-  EDGE_CONTROL_POINT_RADIUS,
+  EDGE_AXIS_MAGNET_SCREEN_TOLERANCE,
   EDGE_ADD_CONTROL_RADIUS,
-  ANCHOR_POINT_RADIUS,
-  ANCHOR_POINT_HOVER_RADIUS,
-  ANCHOR_POINT_HITBOX_RADIUS,
-  BEZIER_MAX_OFFSET,
+  EDGE_CONTROL_POINT_RADIUS,
+  EDGE_HANDLE_RADIUS,
   OUTLINE_SNAP_SCREEN_TOLERANCE,
+  ANCHOR_POINT_HITBOX_RADIUS,
+  ANCHOR_POINT_HOVER_RADIUS,
+  ANCHOR_POINT_RADIUS,
+  BEZIER_MAX_OFFSET,
 } from '@/constants';
-import { distance } from '@/utils/geometry';
-
-const EDGE_AXIS_MAGNET_SCREEN_TOLERANCE = 10;
+import { clonePoints, distance } from '@/utils/geometry';
 
 /**
  * Connection events
@@ -93,7 +92,7 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
    */
   setAttachToOutline(enabled: boolean): void {
     this.attachToOutline = enabled;
-    (this.renderer as { attachToOutline?: boolean }).attachToOutline = enabled;
+    this.renderer.attachToOutline = enabled;
   }
 
   /**
@@ -535,25 +534,24 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     const point = { x: event.worldX, y: event.worldY };
     const radius = EDGE_CONTROL_POINT_RADIUS / Math.max(this.renderer.zoom, 0.0001);
     const radiusSq = radius * radius;
-    const edges = Array.from(this.renderer.edges.values()).reverse();
+    const edges = [...this.renderer.edges.values()];
 
-    for (const edge of edges) {
-      if (edge.state !== 'selected' || !edge.isEditablePolyline()) {
-        continue;
-      }
-      if (!edge.controlPoints || edge.controlPoints.length === 0) {
+    for (let i = edges.length - 1; i >= 0; i--) {
+      const edge = edges[i]!;
+      if (edge.state !== 'selected' || !edge.hasEditableControlPoints()) {
         continue;
       }
 
-      for (let i = 0; i < edge.controlPoints.length; i++) {
-        const controlPoint = edge.controlPoints[i]!;
+      const cps = edge.controlPoints!;
+      for (let i = 0; i < cps.length; i++) {
+        const controlPoint = cps[i]!;
         const dx = point.x - controlPoint.x;
         const dy = point.y - controlPoint.y;
         if (dx * dx + dy * dy > radiusSq) {
           continue;
         }
 
-        const next = [...edge.controlPoints];
+        const next = clonePoints(cps);
         next.splice(i, 1);
         edge.controlPoints = next.length > 0 ? next : undefined;
         if (
@@ -906,14 +904,17 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     const addRadius = EDGE_ADD_CONTROL_RADIUS / Math.max(this.renderer.zoom, 0.0001);
     const pointRadiusSq = pointRadius * pointRadius;
     const addRadiusSq = addRadius * addRadius;
-    const edges = Array.from(this.renderer.edges.values()).reverse();
+    const edges = [...this.renderer.edges.values()];
 
-    for (const edge of edges) {
+    for (let i = edges.length - 1; i >= 0; i--) {
+      const edge = edges[i]!;
       if (edge.state !== 'selected' || !edge.isEditablePolyline()) {
         continue;
       }
 
       const controlPoints = edge.getEditableControlPoints();
+      if (controlPoints.length === 0) continue;
+
       for (let i = 0; i < controlPoints.length; i++) {
         const dx = point.x - controlPoints[i]!.x;
         const dy = point.y - controlPoints[i]!.y;
@@ -929,7 +930,7 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
         return true;
       }
 
-      const insertControls = this.getInsertControls(edge, controlPoints);
+      const insertControls = this.getInsertControls(edge);
       for (const insertControl of insertControls) {
         const dx = point.x - insertControl.point.x;
         const dy = point.y - insertControl.point.y;
@@ -937,7 +938,7 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
           continue;
         }
 
-        const materialized = edge.controlPoints ? [...edge.controlPoints] : [...controlPoints];
+        const materialized = edge.controlPoints ? clonePoints(edge.controlPoints) : clonePoints(controlPoints);
         materialized.splice(insertControl.index, 0, this.snapPoint(insertControl.point));
         edge.controlPoints = materialized;
         this.activeControlPointDrag = { edge, index: insertControl.index };
@@ -962,7 +963,7 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
       }
 
       const controlPoints = edge.getEditableControlPoints();
-      const insertControls = this.getInsertControls(edge, controlPoints);
+      const insertControls = this.getInsertControls(edge);
       for (const insertControl of insertControls) {
         this.drawAddControl(ctx, insertControl.point, addRadius);
       }
@@ -975,8 +976,8 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     ctx.restore();
   }
 
-  private getInsertControls(edge: Edge, controlPoints: Point[]): { point: Point; index: number }[] {
-    const vertices = [edge.startPoint, ...controlPoints, edge.endPoint];
+  private getInsertControls(edge: Edge): { point: Point; index: number }[] {
+    const vertices = edge.getPathVertices();
     const controls: { point: Point; index: number }[] = [];
     for (let i = 0; i < vertices.length - 1; i++) {
       const start = vertices[i]!;

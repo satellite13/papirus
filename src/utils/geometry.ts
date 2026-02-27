@@ -212,6 +212,37 @@ export function bezierPoint(p0: Point, p1: Point, p2: Point, p3: Point, t: numbe
 }
 
 /**
+ * Merge multiple bounds into a single bounding box.
+ * Returns null if the iterable is empty.
+ */
+export function mergeBounds(
+  sources: Iterable<{ x: number; y: number; width: number; height: number }>
+): Bounds | null {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  let hasContent = false;
+
+  for (const b of sources) {
+    minX = Math.min(minX, b.x);
+    minY = Math.min(minY, b.y);
+    maxX = Math.max(maxX, b.x + b.width);
+    maxY = Math.max(maxY, b.y + b.height);
+    hasContent = true;
+  }
+
+  return hasContent ? { x: minX, y: minY, width: maxX - minX, height: maxY - minY } : null;
+}
+
+/**
+ * Create a shallow copy of an array of points.
+ */
+export function clonePoints(points: Point[]): Point[] {
+  return points.map((p) => ({ ...p }));
+}
+
+/**
  * Draw a rounded rectangle path
  */
 export function drawRoundedRectPath(

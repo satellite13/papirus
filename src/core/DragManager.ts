@@ -4,9 +4,8 @@ import type { SelectionManager } from './SelectionManager';
 import type { InputEvent } from '@/events/InputHandler';
 import type { Node } from '@/elements/Node';
 import type { Bounds, Point } from '@/types';
-import { distance } from '@/utils/geometry';
-
-const ALIGNMENT_SCREEN_TOLERANCE = 8;
+import { ALIGNMENT_SCREEN_TOLERANCE, DRAG_START_THRESHOLD, EDITABLE_POLYLINE_ORTHOGONAL_TOLERANCE } from '@/constants';
+import { distance, mergeBounds, clonePoints, rectsIntersect } from '@/utils/geometry';
 
 interface AlignmentGuide {
   orientation: 'vertical' | 'horizontal';
@@ -240,7 +239,7 @@ export class DragManager extends EventEmitter<DragEvents> {
     if (!this.isDragging) {
       const dist = distance(point, this.dragStartPoint);
 
-      if (dist < 3) {
+      if (dist < DRAG_START_THRESHOLD) {
         return false;
       }
 
@@ -363,7 +362,7 @@ export class DragManager extends EventEmitter<DragEvents> {
       for (const [edgeId, points] of this.initialControlPointsForFullyConnected) {
         const edge = this.renderer.getEdge(edgeId);
         if (edge) {
-          edge.controlPoints = points.map((p) => ({ ...p }));
+          edge.controlPoints = clonePoints(points);
         }
       }
     }
@@ -400,40 +399,24 @@ export class DragManager extends EventEmitter<DragEvents> {
     this.editablePolylineFullyConnectedEdges.clear();
     this.initialControlPointsForFullyConnected.clear();
     const draggedIds = new Set(this.draggedNodes.map((node) => node.id));
-    const ORTHOGONAL_TOLERANCE = 6;
+    const nodeBindings = new Map<string, Array<{ edgeId: string; controlPointIndex: number; axis: 'vertical' | 'horizontal' }>>();
 
-    // Collect editable-polyline edges where both endpoints are dragged — all control points follow
+    // Single pass: collect fully-connected edges and single-node bindings
     for (const edge of this.renderer.edges.values()) {
-      if (
-        !edge.isEditablePolyline() ||
-        !edge.controlPoints ||
-        edge.controlPoints.length === 0
-      ) {
+      if (!edge.hasEditableControlPoints()) {
         continue;
       }
+
       const isFromDragged = draggedIds.has(edge.from.nodeId);
       const isToDragged = draggedIds.has(edge.to.nodeId);
+
       if (isFromDragged && isToDragged) {
         this.editablePolylineFullyConnectedEdges.add(edge.id);
-        this.initialControlPointsForFullyConnected.set(
-          edge.id,
-          edge.controlPoints.map((p) => ({ ...p }))
-        );
+        this.initialControlPointsForFullyConnected.set(edge.id, clonePoints(edge.controlPoints!));
+        continue;
       }
-    }
 
-    for (const node of this.draggedNodes) {
-      const bindings: Array<{
-        edgeId: string;
-        controlPointIndex: number;
-        axis: 'vertical' | 'horizontal';
-      }> = [];
-
-      for (const edge of this.renderer.edges.values()) {
-        if (!edge.isEditablePolyline() || !edge.controlPoints || edge.controlPoints.length === 0) {
-          continue;
-        }
-
+      for (const node of this.draggedNodes) {
         const isFrom = edge.from.nodeId === node.id;
         const isTo = edge.to.nodeId === node.id;
         if (!isFrom && !isTo) {
@@ -445,21 +428,20 @@ export class DragManager extends EventEmitter<DragEvents> {
           continue;
         }
 
-        // Use the next control point from the attachment (not the nearest by distance)
-        const controlPointIndex = isFrom ? 0 : edge.controlPoints.length - 1;
-        const nearestPoint = edge.controlPoints[controlPointIndex]!;
+        const controlPointIndex = isFrom ? 0 : edge.controlPoints!.length - 1;
+        const nearestPoint = edge.controlPoints![controlPointIndex]!;
         const endpoint = isFrom ? edge.startPoint : edge.endPoint;
         const deltaX = Math.abs(nearestPoint.x - endpoint.x);
         const deltaY = Math.abs(nearestPoint.y - endpoint.y);
 
-        if (deltaX <= ORTHOGONAL_TOLERANCE && deltaY <= ORTHOGONAL_TOLERANCE) {
+        if (deltaX <= EDITABLE_POLYLINE_ORTHOGONAL_TOLERANCE && deltaY <= EDITABLE_POLYLINE_ORTHOGONAL_TOLERANCE) {
           continue;
         }
 
         let axis: 'vertical' | 'horizontal' | null = null;
-        if (deltaX <= ORTHOGONAL_TOLERANCE || deltaX <= deltaY) {
+        if (deltaX <= EDITABLE_POLYLINE_ORTHOGONAL_TOLERANCE || deltaX <= deltaY) {
           axis = 'vertical';
-        } else if (deltaY <= ORTHOGONAL_TOLERANCE || deltaY < deltaX) {
+        } else if (deltaY <= EDITABLE_POLYLINE_ORTHOGONAL_TOLERANCE || deltaY < deltaX) {
           axis = 'horizontal';
         }
 
@@ -467,15 +449,15 @@ export class DragManager extends EventEmitter<DragEvents> {
           continue;
         }
 
-        bindings.push({
-          edgeId: edge.id,
-          controlPointIndex,
-          axis,
-        });
+        const bindings = nodeBindings.get(node.id) ?? [];
+        bindings.push({ edgeId: edge.id, controlPointIndex, axis });
+        nodeBindings.set(node.id, bindings);
       }
+    }
 
+    for (const [nodeId, bindings] of nodeBindings) {
       if (bindings.length > 0) {
-        this.editableBendFollow.set(node.id, bindings);
+        this.editableBendFollow.set(nodeId, bindings);
       }
     }
   }
@@ -546,6 +528,13 @@ export class DragManager extends EventEmitter<DragEvents> {
 
     const tolerance = ALIGNMENT_SCREEN_TOLERANCE / Math.max(this.renderer.zoom, 0.0001);
     const draggedIds = new Set(this.draggedNodes.map((node) => node.id));
+    const searchPadding = tolerance * 2;
+    const searchBounds: Bounds = {
+      x: draggedBounds.x - searchPadding,
+      y: draggedBounds.y - searchPadding,
+      width: draggedBounds.width + searchPadding * 2,
+      height: draggedBounds.height + searchPadding * 2,
+    };
 
     const movingXLines = [
       { key: 'start', value: draggedBounds.x },
@@ -577,8 +566,10 @@ export class DragManager extends EventEmitter<DragEvents> {
       if (!node.visible || draggedIds.has(node.id)) {
         continue;
       }
-
       const bounds = node.getBounds();
+      if (!rectsIntersect(searchBounds, bounds)) {
+        continue;
+      }
       const targetXLines = [
         { key: 'start', value: bounds.x },
         { key: 'center', value: bounds.x + bounds.width / 2 },
@@ -657,35 +648,17 @@ export class DragManager extends EventEmitter<DragEvents> {
   }
 
   private getDraggedBounds(delta: Point): Bounds | null {
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
-    let hasBounds = false;
-
+    const sources: Bounds[] = [];
     for (const node of this.draggedNodes) {
       const initial = this.initialPositions.get(node.id);
-      if (!initial) {
-        continue;
-      }
-      const x = initial.x + delta.x;
-      const y = initial.y + delta.y;
-      minX = Math.min(minX, x);
-      minY = Math.min(minY, y);
-      maxX = Math.max(maxX, x + node.width);
-      maxY = Math.max(maxY, y + node.height);
-      hasBounds = true;
+      if (!initial) continue;
+      sources.push({
+        x: initial.x + delta.x,
+        y: initial.y + delta.y,
+        width: node.width,
+        height: node.height,
+      });
     }
-
-    if (!hasBounds) {
-      return null;
-    }
-
-    return {
-      x: minX,
-      y: minY,
-      width: maxX - minX,
-      height: maxY - minY,
-    };
+    return mergeBounds(sources);
   }
 }

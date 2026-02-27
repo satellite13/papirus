@@ -220,6 +220,72 @@ describe('Edge', () => {
     ]);
   });
 
+  describe('hasEditableControlPoints', () => {
+    it('returns false for non-editable-polyline', () => {
+      const edge = new Edge({
+        from: { nodeId: 'a' },
+        to: { nodeId: 'b' },
+        type: 'straight',
+      });
+      expect(edge.hasEditableControlPoints()).toBe(false);
+    });
+
+    it('returns false for editable-polyline without materialized control points', () => {
+      const edge = new Edge({
+        from: { nodeId: 'a' },
+        to: { nodeId: 'b' },
+        type: 'editable-polyline',
+      });
+      edge.updateEndpoints({ x: 0, y: 0 }, { x: 100, y: 0 });
+      expect(edge.hasEditableControlPoints()).toBe(false);
+    });
+
+    it('returns true for editable-polyline with control points', () => {
+      const edge = new Edge({
+        from: { nodeId: 'a' },
+        to: { nodeId: 'b' },
+        type: 'editable-polyline',
+        controlPoints: [{ x: 50, y: 10 }],
+      });
+      edge.updateEndpoints({ x: 0, y: 0 }, { x: 100, y: 0 });
+      expect(edge.hasEditableControlPoints()).toBe(true);
+    });
+  });
+
+  describe('getPathVertices', () => {
+    it('returns [start, ...controlPoints, end] for editable-polyline with control points', () => {
+      const edge = new Edge({
+        from: { nodeId: 'a' },
+        to: { nodeId: 'b' },
+        type: 'editable-polyline',
+        controlPoints: [{ x: 40, y: 0 }, { x: 60, y: 30 }],
+      });
+      edge.updateEndpoints({ x: 0, y: 0 }, { x: 100, y: 20 });
+
+      const vertices = edge.getPathVertices();
+      expect(vertices).toHaveLength(4);
+      expect(vertices[0]).toEqual({ x: 0, y: 0 });
+      expect(vertices[1]).toEqual({ x: 40, y: 0 });
+      expect(vertices[2]).toEqual({ x: 60, y: 30 });
+      expect(vertices[3]).toEqual({ x: 100, y: 20 });
+    });
+
+    it('returns [start, virtualMidpoint, end] for editable-polyline without control points', () => {
+      const edge = new Edge({
+        from: { nodeId: 'a' },
+        to: { nodeId: 'b' },
+        type: 'editable-polyline',
+      });
+      edge.updateEndpoints({ x: 0, y: 0 }, { x: 100, y: 20 });
+
+      const vertices = edge.getPathVertices();
+      expect(vertices).toHaveLength(3);
+      expect(vertices[0]).toEqual({ x: 0, y: 0 });
+      expect(vertices[1]).toEqual({ x: 50, y: 10 });
+      expect(vertices[2]).toEqual({ x: 100, y: 20 });
+    });
+  });
+
   describe('markers', () => {
     it('supports start and end marker configuration', () => {
       const edge = new Edge({

@@ -243,6 +243,24 @@ export class Edge extends Element {
   }
 
   /**
+   * Whether this edge has editable control points (editable-polyline with non-empty controlPoints).
+   */
+  hasEditableControlPoints(): boolean {
+    return this.isEditablePolyline() && !!this._controlPoints?.length;
+  }
+
+  /**
+   * Returns path vertices for editable polyline: [startPoint, ...controlPoints, endPoint].
+   * Requires endpoints to be updated (startPoint/endPoint valid).
+   */
+  getPathVertices(): Point[] {
+    const cps = this._controlPoints && this._controlPoints.length > 0
+      ? this._controlPoints
+      : this.getEditableControlPoints();
+    return [this._fromPoint, ...cps, this._toPoint];
+  }
+
+  /**
    * Returns current editable control points.
    * For a fresh editable-polyline edge, exposes a virtual midpoint handle.
    */

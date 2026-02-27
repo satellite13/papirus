@@ -44,3 +44,15 @@ export const OUTLINE_SNAP_SCREEN_TOLERANCE = 40;
 export const SELECTION_RECT_MIN_SIZE = 1;
 export const DEFAULT_SELECTION_COLOR = '#3b82f6';
 export const DEFAULT_HOVER_COLOR = '#6366f1';
+
+// Drag
+/** Minimum distance (world units) to start a drag */
+export const DRAG_START_THRESHOLD = 3;
+/** Screen tolerance for alignment guides when dragging */
+export const ALIGNMENT_SCREEN_TOLERANCE = 8;
+
+// Editable polyline
+/** Max distance (world units) for control point to be considered orthogonal to endpoint */
+export const EDITABLE_POLYLINE_ORTHOGONAL_TOLERANCE = 6;
+/** Screen tolerance for axis magnet when dragging editable polyline control points */
+export const EDGE_AXIS_MAGNET_SCREEN_TOLERANCE = 10;

@@ -29,6 +29,7 @@ import type { Node } from '@/elements/Node';
 import { CompositeCommand } from './history/commands';
 import { LabelEditor } from './LabelEditor';
 import { shallowEqual } from '@/utils/style';
+import { mergeBounds } from '@/utils/geometry';
 
 export interface InteractionKeymap {
   deleteKeys: string[];
@@ -1059,37 +1060,13 @@ export class InteractionManager {
   }
 
   private getSelectionBounds(): Bounds | null {
-    const selected = Array.from(this.selectionManager.selectedIds);
-    if (selected.length === 0) {
-      return null;
-    }
-
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
-    let hasBounds = false;
-
-    for (const id of selected) {
+    const sources: Bounds[] = [];
+    for (const id of this.selectionManager.selectedIds) {
       const node = this.renderer.getNode(id);
-      if (!node) continue;
-      const bounds = node.getBounds();
-      minX = Math.min(minX, bounds.x);
-      minY = Math.min(minY, bounds.y);
-      maxX = Math.max(maxX, bounds.x + bounds.width);
-      maxY = Math.max(maxY, bounds.y + bounds.height);
-      hasBounds = true;
+      if (node) {
+        sources.push(node.getBounds());
+      }
     }
-
-    if (!hasBounds) {
-      return null;
-    }
-
-    return {
-      x: minX,
-      y: minY,
-      width: maxX - minX,
-      height: maxY - minY,
-    };
+    return mergeBounds(sources);
   }
 }

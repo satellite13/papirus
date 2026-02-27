@@ -27,6 +27,118 @@ describe('InteractionManager', () => {
     expect(renderer.getNode(node.id)).toBeUndefined();
   });
 
+  it('drags selected node and updates position', () => {
+    const canvas = document.createElement('canvas');
+    vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 300,
+      height: 200,
+      right: 300,
+      bottom: 200,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+    const renderer = new DiagramRenderer(canvas, { width: 300, height: 200, retina: false });
+    const interaction = new InteractionManager({ renderer });
+
+    const node = new RectangleNode({ x: 50, y: 50, width: 60, height: 40 });
+    renderer.addNode(node);
+    interaction.selection.select(node.id);
+
+    const centerX = 50 + 60 / 2;
+    const centerY = 50 + 40 / 2;
+
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', { clientX: centerX, clientY: centerY, button: 0, bubbles: true })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mousemove', {
+        clientX: centerX + 40,
+        clientY: centerY + 50,
+        button: 0,
+        buttons: 1,
+        bubbles: true,
+      })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mouseup', {
+        clientX: centerX + 40,
+        clientY: centerY + 50,
+        button: 0,
+        bubbles: true,
+      })
+    );
+
+    expect(node.x).toBe(90);
+    expect(node.y).toBe(100);
+  });
+
+  it('drags two nodes with editable-polyline: control points follow delta', () => {
+    const canvas = document.createElement('canvas');
+    vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 400,
+      height: 200,
+      right: 400,
+      bottom: 200,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+    const renderer = new DiagramRenderer(canvas, { width: 400, height: 200, retina: false });
+    const interaction = renderer.enableInteractions({ alignToNodes: false });
+
+    const nodeA = new RectangleNode({ x: 50, y: 80, width: 60, height: 40 });
+    const nodeB = new RectangleNode({ x: 250, y: 80, width: 60, height: 40 });
+    renderer.addNode(nodeA);
+    renderer.addNode(nodeB);
+
+    const edge = new Edge({
+      from: { nodeId: nodeA.id },
+      to: { nodeId: nodeB.id },
+      type: 'editable-polyline',
+      controlPoints: [{ x: 150, y: 50 }, { x: 200, y: 120 }],
+    });
+    renderer.addEdge(edge);
+    edge.updateEndpoints({ x: 110, y: 100 }, { x: 250, y: 100 });
+
+    interaction.selection.select(nodeA.id);
+    interaction.selection.addToSelection(nodeB.id);
+
+    const startX = 80;
+    const startY = 100;
+    const deltaX = 30;
+    const deltaY = -20;
+
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', { clientX: startX, clientY: startY, button: 0, bubbles: true })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mousemove', {
+        clientX: startX + deltaX,
+        clientY: startY + deltaY,
+        button: 0,
+        buttons: 1,
+        bubbles: true,
+      })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mouseup', {
+        clientX: startX + deltaX,
+        clientY: startY + deltaY,
+        button: 0,
+        bubbles: true,
+      })
+    );
+
+    expect(edge.controlPoints).toHaveLength(2);
+    expect(edge.controlPoints![0]).toEqual({ x: 180, y: 30 });
+    expect(edge.controlPoints![1]).toEqual({ x: 230, y: 100 });
+  });
+
   it('edits node label on double click', () => {
     const canvas = document.createElement('canvas');
     vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({
@@ -381,6 +493,116 @@ describe('InteractionManager', () => {
     );
 
     expect(renderer.offsetX).toBeLessThan(0);
+  });
+
+  it('undo restores deleted node', () => {
+    const canvas = document.createElement('canvas');
+    const renderer = new DiagramRenderer(canvas, { width: 200, height: 100, retina: false });
+    const interaction = new InteractionManager({ renderer });
+
+    const node = new RectangleNode({ x: 10, y: 10, width: 20, height: 20 });
+    renderer.addNode(node);
+    interaction.selection.select(node.id);
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete' }));
+    expect(renderer.getNode(node.id)).toBeUndefined();
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true }));
+    expect(renderer.getNode(node.id)).toBeDefined();
+  });
+
+  it('resizes node via corner handle', () => {
+    const canvas = document.createElement('canvas');
+    vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 300,
+      height: 200,
+      right: 300,
+      bottom: 200,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+    const renderer = new DiagramRenderer(canvas, { width: 300, height: 200, retina: false });
+    const interaction = renderer.enableInteractions();
+
+    const node = new RectangleNode({ x: 50, y: 50, width: 60, height: 40 });
+    renderer.addNode(node);
+    interaction.selection.select(node.id);
+
+    const seHandleX = 50 + 60 + 6;
+    const seHandleY = 50 + 40 + 6;
+
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', {
+        clientX: seHandleX,
+        clientY: seHandleY,
+        button: 0,
+        bubbles: true,
+      })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mousemove', {
+        clientX: seHandleX + 20,
+        clientY: seHandleY + 10,
+        button: 0,
+        buttons: 1,
+        bubbles: true,
+      })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mouseup', {
+        clientX: seHandleX + 20,
+        clientY: seHandleY + 10,
+        button: 0,
+        bubbles: true,
+      })
+    );
+
+    expect(node.width).toBe(80);
+    expect(node.height).toBe(50);
+  });
+
+  it('selection rect selects nodes within bounds', () => {
+    const canvas = document.createElement('canvas');
+    vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 300,
+      height: 200,
+      right: 300,
+      bottom: 200,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+    const renderer = new DiagramRenderer(canvas, { width: 300, height: 200, retina: false });
+    const interaction = renderer.enableInteractions();
+
+    const nodeA = new RectangleNode({ x: 50, y: 50, width: 40, height: 40 });
+    const nodeB = new RectangleNode({ x: 150, y: 50, width: 40, height: 40 });
+    renderer.addNode(nodeA);
+    renderer.addNode(nodeB);
+
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', { clientX: 10, clientY: 10, button: 0, ctrlKey: true, bubbles: true })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mousemove', {
+        clientX: 100,
+        clientY: 100,
+        button: 0,
+        buttons: 1,
+        ctrlKey: true,
+        bubbles: true,
+      })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mouseup', { clientX: 100, clientY: 100, button: 0, bubbles: true })
+    );
+
+    expect(interaction.selection.selectedIds.has(nodeA.id)).toBe(true);
   });
 
   it('ends active minimap drag session on destroy', () => {
