@@ -108,7 +108,45 @@ renderer.addGroup(group);
 const node = new RectangleNode({
   x: 20, y: 20, width: 120, height: 60,
   ports: [{ type: 'input', position: 'left' }],
-  icon: { source: '/icons/start.svg', fit: 'contain', scaleWithBounds: true },
+  contentInset: { top: 8, right: 10, bottom: 8, left: 10 },
+  label: {
+    text: 'Start service',
+    inset: 8,
+    style: { align: 'left', verticalAlign: 'top' },
+  },
+  icon: {
+    source: '/icons/start.svg',
+    fit: 'contain',
+    scaleWithBounds: true,
+    placement: 'top-right',
+    inset: 6,
+  },
+});
+```
+
+### Компоновка контента и фон подписи связи
+
+Компоновка узла строится в два шага:
+- `contentInset` задаёт контентную область внутри границ фигуры;
+- `label.inset` задаёт внутренний отступ текста внутри контентной области.
+
+Иконка и текст используют одну контентную область:
+- позиция иконки задаётся через `icon.placement` и `icon.inset`;
+- выравнивание текста задаётся через `label.style.align` и `label.style.verticalAlign`.
+
+Для подписей связей доступен фон через `labelBackground`:
+
+```ts
+const edge = new Edge({
+  from: { nodeId: nodeA.id },
+  to: { nodeId: nodeB.id },
+  label: 'API call',
+  labelOffset: 12,
+  labelBackground: {
+    color: '#ffffff',
+    opacity: 0.9,
+    borderRadius: 6,
+  },
 });
 ```
 

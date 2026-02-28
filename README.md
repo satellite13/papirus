@@ -107,7 +107,45 @@ renderer.addGroup(group);
 const node = new RectangleNode({
   x: 20, y: 20, width: 120, height: 60,
   ports: [{ type: 'input', position: 'left' }],
-  icon: { source: '/icons/start.svg', fit: 'contain', scaleWithBounds: true },
+  contentInset: { top: 8, right: 10, bottom: 8, left: 10 },
+  label: {
+    text: 'Start service',
+    inset: 8,
+    style: { align: 'left', verticalAlign: 'top' },
+  },
+  icon: {
+    source: '/icons/start.svg',
+    fit: 'contain',
+    scaleWithBounds: true,
+    placement: 'top-right',
+    inset: 6,
+  },
+});
+```
+
+### Content Layout and Edge Label Background
+
+Node layout is built in two steps:
+- `contentInset` defines node content area (inside shape bounds).
+- `label.inset` defines text inset inside content area.
+
+Icon and text share the same content area:
+- icon position is controlled by `icon.placement` + `icon.inset`;
+- text alignment is controlled by `label.style.align` and `label.style.verticalAlign`.
+
+Edge labels support background styling through `labelBackground`:
+
+```ts
+const edge = new Edge({
+  from: { nodeId: nodeA.id },
+  to: { nodeId: nodeB.id },
+  label: 'API call',
+  labelOffset: 12,
+  labelBackground: {
+    color: '#ffffff',
+    opacity: 0.9,
+    borderRadius: 6,
+  },
 });
 ```
 

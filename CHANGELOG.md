@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-03-01
+
+### Added
+- Node content layout settings: `contentInset`, `label.inset`, icon `placement`/`inset`, and edge `labelBackground` support across runtime/serialization/export paths.
+- Extended `basic` example controls for node/edge label layout and background customization.
+
+### Changed
+- Refactored node inner layout and SVG export behavior for text/icon/content area placement.
+- Updated README (EN/RU) and docs pages for current layout API usage.
+
+### Fixed
+- Improved selected panel refresh logic to keep style settings consistent after selection changes.
+
 ## [0.3.23] - 2026-03-01
 
 ### Added
@@ -209,7 +222,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Edge animations (flow effect)
 - Context menu and search/filter
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.3.23...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.4.0...HEAD
+[0.4.0]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.4.0
 [0.3.23]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.23
 [0.3.22]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.22
 [0.3.21]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.21
