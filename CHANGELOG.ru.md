@@ -9,6 +9,19 @@
 
 ## [Unreleased]
 
+## [0.3.23] - 2026-03-01
+
+### Добавлено
+- Стиль узла: добавлена поддержка размещения иконки и связанные параметры компоновки.
+- В примере `basic` добавлены настройки inset для содержимого/метки и inset/radius фона метки связи.
+
+### Изменено
+- Рефакторинг inner-layout узла и логики SVG-экспорта для корректного позиционирования текста, иконки и области контента.
+- Обновлены документация и примеры по новым настройкам компоновки контента.
+
+### Исправлено
+- Улучшено обновление панели стилей при смене выделения (refresh selected panel).
+
 ## [0.3.22] - 2026-02-28
 
 ### Исправлено
@@ -203,7 +216,9 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.3.21...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.3.23...HEAD
+[0.3.23]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.23
+[0.3.22]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.22
 [0.3.21]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.21
 [0.3.20]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.20
 [0.3.19]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.19

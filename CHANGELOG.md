@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.23] - 2026-03-01
+
+### Added
+- Node style: added icon placement support and related options for node layout.
+- Examples (`basic`): added controls for content/label insets and edge label background inset/radius.
+
+### Changed
+- Refactored node inner layout logic and SVG export handling for text, icon, and content area placement.
+- Updated docs and examples for new content layout settings.
+
+### Fixed
+- Improved selected panel refresh behavior to keep style panel state consistent when selection changes.
+
 ## [0.3.22] - 2026-02-28
 
 ### Fixed
@@ -196,7 +209,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Edge animations (flow effect)
 - Context menu and search/filter
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.3.22...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.3.23...HEAD
+[0.3.23]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.23
 [0.3.22]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.22
 [0.3.21]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.21
 [0.3.20]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.20
