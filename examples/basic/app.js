@@ -449,6 +449,7 @@ function updateNodePanel(node) {
   document.getElementById('nodeLabelMargin').value = node.label?.margin ?? 0;
   document.getElementById('nodeLabelPlacement').value = node.labelPlacement || 'auto';
   document.getElementById('nodeLabelAlign').value = node.label?.style?.align || 'center';
+  document.getElementById('nodeIconPlacement').value = node.icon?.placement ?? 'center';
   document.getElementById('nodeIconPadding').value = node.icon?.options.padding ?? 8;
   document.getElementById('nodeIconMargin').value = node.icon?.options.margin ?? 0;
   document.getElementById('nodeIconGap').value = node.icon?.options.gap ?? 6;
@@ -594,6 +595,17 @@ document.getElementById('nodeLabelMargin').addEventListener('input', (e) => {
   if (!selectedNode?.label) return;
   interactions.changeNodeProperties(selectedNode.id, (node) => {
     rebuildNodeLabel(node, { margin: toNonNegativeNumber(e.target.value, node.label?.margin ?? 0) });
+  });
+});
+
+document.getElementById('nodeIconPlacement').addEventListener('change', (e) => {
+  if (!selectedNode?.icon) return;
+  interactions.changeNodeProperties(selectedNode.id, (node) => {
+    if (!node.icon) return;
+    node.icon.options = {
+      ...node.icon.options,
+      placement: e.target.value,
+    };
   });
 });
 
