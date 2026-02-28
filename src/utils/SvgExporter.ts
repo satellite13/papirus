@@ -62,7 +62,7 @@ export class SvgExporter {
     const parts: string[] = [];
     const renderedEdges: string[] = [];
     parts.push(
-      `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`
+      `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`
     );
     for (const edge of this.renderer.edges.values()) {
       if (edge.visible) {
@@ -561,7 +561,8 @@ export class SvgExporter {
     }
 
     const opacity = opts.opacity ?? 1;
-    return `<image href="${this.escapeAttribute(href)}" x="${drawRect.x}" y="${drawRect.y}" width="${drawRect.width}" height="${drawRect.height}" opacity="${opacity}" preserveAspectRatio="none"/>`;
+    const escapedHref = this.escapeAttribute(href);
+    return `<image href="${escapedHref}" xlink:href="${escapedHref}" x="${drawRect.x}" y="${drawRect.y}" width="${drawRect.width}" height="${drawRect.height}" opacity="${opacity}" preserveAspectRatio="none"/>`;
   }
 
   private getIconBoxSize(
@@ -812,7 +813,7 @@ export class SvgExporter {
 
   private createEmptySvg(width: number, height: number, backgroundColor: string, includeBackground: boolean): string {
     return [
-      `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`,
+      `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`,
       includeBackground ? `<rect width="100%" height="100%" fill="${backgroundColor}"/>` : '',
       '</svg>',
     ].join('');

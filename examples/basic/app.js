@@ -441,8 +441,8 @@ function refreshSelectedPanel() {
       selectedNode = node;
       updateNodePanel(node);
       showPanel(nodeStylePanel);
+      return;
     }
-    return;
   }
   if (selectedEdge) {
     const edge = renderer.getEdge(selectedEdge.id);
@@ -450,8 +450,8 @@ function refreshSelectedPanel() {
       selectedEdge = edge;
       updateEdgePanel(edge);
       showPanel(edgeStylePanel);
+      return;
     }
-    return;
   }
   if (selectedGroup) {
     const group = renderer.getGroup(selectedGroup.id);
@@ -459,6 +459,39 @@ function refreshSelectedPanel() {
       selectedGroup = group;
       updateGroupPanel(group);
       showPanel(groupStylePanel);
+      return;
+    }
+  }
+
+  // Fallback: resolve current selection from renderer states
+  for (const node of renderer.nodes.values()) {
+    if (node.state === 'selected') {
+      selectedNode = node;
+      selectedEdge = null;
+      selectedGroup = null;
+      updateNodePanel(node);
+      showPanel(nodeStylePanel);
+      return;
+    }
+  }
+  for (const edge of renderer.edges.values()) {
+    if (edge.state === 'selected') {
+      selectedNode = null;
+      selectedEdge = edge;
+      selectedGroup = null;
+      updateEdgePanel(edge);
+      showPanel(edgeStylePanel);
+      return;
+    }
+  }
+  for (const group of renderer.groups.values()) {
+    if (group.state === 'selected') {
+      selectedNode = null;
+      selectedEdge = null;
+      selectedGroup = group;
+      updateGroupPanel(group);
+      showPanel(groupStylePanel);
+      return;
     }
   }
 }
