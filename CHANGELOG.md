@@ -9,12 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.3.22] - 2025-02-28
+## [0.3.22] - 2026-02-28
 
 ### Fixed
 - TextLabel: защита от `undefined` в `text` — при отсутствии или присвоении `undefined` (например из опций лейбла при десериализации) больше не возникает `TypeError: undefined is not an object (evaluating 'this._text.split')`. В конструкторе и сеттере используется `?? ''`, в `measure()` — безопасное разбиение по строкам.
 
-## [0.3.21] - 2025-02-27
+## [0.3.21] - 2026-02-27
 
 ### Fixed
 - Keyboard shortcuts (Ctrl+Z/Y/C/V) work with any keyboard layout: uses `event.code` instead of `event.key` for letter keys.
