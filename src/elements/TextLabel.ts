@@ -44,7 +44,7 @@ export class TextLabel {
   private _measureDirty = true;
 
   constructor(options: TextLabelOptions) {
-    this._text = options.text;
+    this._text = options.text ?? '';
     this._editableText = options.editableText;
     this._localStyle = { ...options.style };
     this._style = { ...DEFAULT_STYLE, ...options.style };
@@ -63,8 +63,9 @@ export class TextLabel {
   }
 
   set text(value: string) {
-    if (this._text !== value) {
-      this._text = value;
+    const next = value ?? '';
+    if (this._text !== next) {
+      this._text = next;
       this._lines = [];
       this._measureDirty = true;
       this._onChange?.();
@@ -236,11 +237,12 @@ export class TextLabel {
 
     const effectiveMaxWidth = this._maxWidth ?? this._autoMaxWidth;
 
+    const text = this._text ?? '';
     if (effectiveMaxWidth !== undefined) {
       const maxWidth = Math.max(0, effectiveMaxWidth - this._margin * 2);
-      this._lines = this.wrapText(ctx, this._text, Math.max(0, maxWidth - this._padding * 2));
+      this._lines = this.wrapText(ctx, text, Math.max(0, maxWidth - this._padding * 2));
     } else {
-      this._lines = this._text.split('\n');
+      this._lines = text.split('\n');
     }
 
     // Calculate dimensions
