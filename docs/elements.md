@@ -36,16 +36,24 @@ const node = new CustomShapeNode({
   width: 120, height: 80,
   path: ShapeFactories.hexagon,
   svgPath: ShapeFactories.svg.hexagon,
-  labelPlacement: 'center',
   label: 'Hexagon',
 });
 ```
 
+### Контентная область
+
+Внутри фигуры узла выделяется **контентная область** — прямоугольник, в котором рисуются метка и иконка.
+
+- **contentInset** — отступы от краёв фигуры до контентной области: `number` (одинаковый со всех сторон) или `{ top?, right?, bottom?, left? }`. По умолчанию `0`: контентная область совпадает с bounds узла.
+- Текст и иконка размещаются в одной контентной области. Отступы **текста** от краёв этой области задаются в метке через **label.inset** (число или `{ top?, right?, bottom?, left? }`).
+
+Итого два уровня: **фигура** → (contentInset) → **контентная область** → (label.inset) → **текст**.
+
 ### Опции узлов (общие)
 
-- `label` — текстовая метка (`string` или `TextLabelOptions`).
-- `labelPlacement` — позиция лейбла внутри фигуры (`auto | center | top | bottom | left | right`).
+- `label` — текстовая метка (`string` или `TextLabelOptions`). Текст занимает всю контентную область; выравнивание задаётся в опциях метки: `style.align` (горизонталь), `style.verticalAlign` (вертикаль).
 - `icon` — изображение/иконка (`NodeImageOptions`).
+- `contentInset` — отступы контентной области от краёв фигуры (см. выше).
 - `ports` — список портов (`PortOptions`).
 - `anchorPoints` — количество anchor-точек по сторонам.
 
@@ -63,7 +71,8 @@ const node = new RectangleNode({
   width: 140,
   height: 60,
   label: 'Start',
-  icon: { source: '/icons/start.svg', fit: 'contain', scaleWithBounds: true },
+  icon: { source: '/icons/start.svg', fit: 'contain', scaleWithBounds: true, inset: 6 },
+  contentInset: 8,
   ports: [{ type: 'output', position: 'right' }],
 });
 ```
@@ -74,9 +83,22 @@ const node = new RectangleNode({
 
 - `source` — URL, SVG-строка или `HTMLImageElement`
 - `fit` — `contain | cover | stretch | none` (применяется только при `scaleWithBounds: true`)
-- `placement` — `center | top | bottom | left | right`
-- `scaleWithBounds` — растягивать иконку по размеру фигуры (по умолчанию `false`)
-- `padding`, `gap`, `opacity`, `align`, `verticalAlign`, `offsetX`, `offsetY`
+- `placement` — позиция иконки в контентной области: `center | top | bottom | left | right | top-left | top-right | bottom-left | bottom-right`
+- `scaleWithBounds` — растягивать иконку по размеру зоны (по умолчанию `false`)
+- `inset` — отступ от края зоны размещения до изображения со всех сторон (по умолчанию 6)
+- `opacity`, `align`, `verticalAlign`, `offsetX`, `offsetY`
+
+Текст и иконка размещаются в одной контентной области: текст занимает её целиком (с отступом `inset` метки), иконка рисуется поверх по своему `placement` и `inset`.
+
+### TextLabel (метка узла/ребра)
+
+- `text` — строка
+- `inset` — отступ от края bounds до текста: число (одинаковый со всех сторон) или `{ top?, right?, bottom?, left? }` (по умолчанию 8)
+- `style` — стиль текста:
+  - `align` — горизонтальное выравнивание: `left | center | right`
+  - `verticalAlign` — вертикальное выравнивание внутри bounds: `top | middle | bottom`
+  - а также `font`, `fontSize`, `color`, `opacity` и др.
+- `maxWidth`, `styleClass`
 
 ## Рёбра
 

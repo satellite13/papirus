@@ -1,15 +1,15 @@
 import { Element, generateId } from './Element';
 import { Port, type PortOptions } from './Port';
 import { TextLabel, type TextLabelOptions } from './TextLabel';
-import {
-  NodeImage,
-  type NodeImageOptions,
-  type NodeImagePlacement,
-  isCornerPlacement,
-} from './NodeImage';
+import { NodeImage, type NodeImageOptions, type NodeImagePlacement } from './NodeImage';
 import type { StyleManager } from '@/styles/StyleManager';
-import type { Bounds, LabelPlacement, NodeStyle, Point, Size } from '@/types';
-export type { LabelPlacement } from '../types';
+import type {
+  Bounds,
+  ContentInsetSides,
+  NodeStyle,
+  Point,
+  Size,
+} from '@/types';
 import { shallowEqual } from '@/utils/style';
 import {
   DEFAULT_SELECTION_COLOR,
@@ -27,8 +27,9 @@ export interface NodeOptions {
   style?: NodeStyle;
   styleClass?: string;
   label?: string | TextLabelOptions;
-  labelPlacement?: LabelPlacement;
   icon?: NodeImageOptions;
+  /** Content area insets per side (default 0 = full bounds). Number = same on all sides. */
+  contentInset?: number | ContentInsetSides;
   ports?: PortOptions[];
   showPortsAlways?: boolean;
   anchorPoints?: AnchorPointsConfig;
@@ -70,8 +71,8 @@ export abstract class Node extends Element {
   protected _showPortsAlways: boolean;
   protected _anchorPoints: Required<AnchorPointsConfig>;
   protected _defaultSize: Size;
-  protected _labelPlacement: LabelPlacement;
   protected _resizeHandlesEnabled: boolean;
+  protected _contentInset: Required<ContentInsetSides>;
   private _attachToOutlineGetter?: () => boolean;
   private _anchorCache: { id: AnchorId; point: Point }[] | null = null;
 
@@ -90,8 +91,8 @@ export abstract class Node extends Element {
     this._nodeStyle = { ...DEFAULT_NODE_STYLE, ...options.style };
     this._showPortsAlways = options.showPortsAlways ?? false;
     this._anchorPoints = this.normalizeAnchorPoints(options.anchorPoints);
-    this._labelPlacement = options.labelPlacement ?? 'auto';
     this._resizeHandlesEnabled = options.resizeHandlesEnabled ?? true;
+    this._contentInset = this.normalizeContentInset(options.contentInset);
 
     if (options.label !== undefined) {
       if (typeof options.label === 'string') {
@@ -320,24 +321,22 @@ export abstract class Node extends Element {
   }
 
   /**
-   * Label placement inside the node
-   */
-  get labelPlacement(): LabelPlacement {
-    return this._labelPlacement;
-  }
-
-  set labelPlacement(value: LabelPlacement) {
-    if (this._labelPlacement !== value) {
-      this._labelPlacement = value;
-      this.markDirty();
-    }
-  }
-
-  /**
    * Default size (initial width/height)
    */
   get defaultSize(): Size {
     return { ...this._defaultSize };
+  }
+
+  /**
+   * Content area insets (per side). When all zero, content area = node bounds.
+   */
+  get contentInset(): Required<ContentInsetSides> {
+    return { ...this._contentInset };
+  }
+
+  set contentInset(value: number | ContentInsetSides) {
+    this._contentInset = this.normalizeContentInset(value);
+    this.markDirty();
   }
 
   /**
@@ -372,142 +371,24 @@ export abstract class Node extends Element {
   }
 
   /**
-   * Calculate layout for icon and label
-   * Returns computed bounds for both elements
+   * Calculate layout for icon and label.
+   * Label always gets full content area; icon is placed within the same content area.
    */
   protected calculateContentLayout(
     bounds: Bounds,
     iconBoxSize?: Size,
-    labelSize?: Size
+    _labelSize?: Size
   ): { iconBounds: Bounds; labelBounds: Bounds } {
-    let iconBounds = bounds;
-    let labelBounds = this.getLabelContainerBounds(bounds);
-
+    const contentBounds = this.getLabelContainerBounds(bounds);
+    let iconBounds = contentBounds;
     if (this._icon && iconBoxSize) {
-      iconBounds = this.getIconBounds(bounds, iconBoxSize, this._icon.placement);
+      iconBounds = this.getIconBounds(
+        contentBounds,
+        iconBoxSize,
+        this._icon.placement
+      );
     }
-
-    if (
-      this._icon &&
-      this._label &&
-      iconBoxSize &&
-      labelSize &&
-      this._labelPlacement === 'auto' &&
-      this._icon.placement !== 'center'
-    ) {
-      const gap = this._icon.gap;
-      const placement = this._icon.placement;
-
-      if (isCornerPlacement(placement)) {
-        const contentBounds = this.getLabelContainerBounds(bounds);
-        iconBounds = this.getIconBounds(contentBounds, iconBoxSize, placement);
-        // Reserve icon corner + gap so label does not overlap
-        const w = iconBoxSize.width + gap;
-        const h = iconBoxSize.height + gap;
-        switch (placement) {
-          case 'top-left':
-            labelBounds = {
-              x: contentBounds.x + w,
-              y: contentBounds.y + h,
-              width: Math.max(0, contentBounds.width - w),
-              height: Math.max(0, contentBounds.height - h),
-            };
-            break;
-          case 'top-right':
-            labelBounds = {
-              x: contentBounds.x,
-              y: contentBounds.y + h,
-              width: Math.max(0, contentBounds.width - w),
-              height: Math.max(0, contentBounds.height - h),
-            };
-            break;
-          case 'bottom-left':
-            labelBounds = {
-              x: contentBounds.x + w,
-              y: contentBounds.y,
-              width: Math.max(0, contentBounds.width - w),
-              height: Math.max(0, contentBounds.height - h),
-            };
-            break;
-          case 'bottom-right':
-            labelBounds = {
-              x: contentBounds.x,
-              y: contentBounds.y,
-              width: Math.max(0, contentBounds.width - w),
-              height: Math.max(0, contentBounds.height - h),
-            };
-            break;
-          default:
-            labelBounds = contentBounds;
-        }
-      } else {
-        const contentBounds = this.getLabelContainerBounds(bounds);
-        // Use contentBounds for both icon and label so gap is consistent (space between icon box and label)
-        switch (placement) {
-          case 'top':
-            iconBounds = {
-              x: contentBounds.x,
-              y: contentBounds.y,
-              width: contentBounds.width,
-              height: iconBoxSize.height,
-            };
-            labelBounds = {
-              x: contentBounds.x,
-              y: contentBounds.y + iconBoxSize.height + gap,
-              width: contentBounds.width,
-              height: Math.max(0, contentBounds.height - iconBoxSize.height - gap),
-            };
-            break;
-          case 'bottom':
-            iconBounds = {
-              x: contentBounds.x,
-              y: contentBounds.y + contentBounds.height - iconBoxSize.height,
-              width: contentBounds.width,
-              height: iconBoxSize.height,
-            };
-            labelBounds = {
-              x: contentBounds.x,
-              y: contentBounds.y,
-              width: contentBounds.width,
-              height: Math.max(0, contentBounds.height - iconBoxSize.height - gap),
-            };
-            break;
-          case 'left':
-            iconBounds = {
-              x: contentBounds.x,
-              y: contentBounds.y,
-              width: iconBoxSize.width,
-              height: contentBounds.height,
-            };
-            labelBounds = {
-              x: contentBounds.x + iconBoxSize.width + gap,
-              y: contentBounds.y,
-              width: Math.max(0, contentBounds.width - iconBoxSize.width - gap),
-              height: contentBounds.height,
-            };
-            break;
-          case 'right':
-            iconBounds = {
-              x: contentBounds.x + contentBounds.width - iconBoxSize.width,
-              y: contentBounds.y,
-              width: iconBoxSize.width,
-              height: contentBounds.height,
-            };
-            labelBounds = {
-              x: contentBounds.x,
-              y: contentBounds.y,
-              width: Math.max(0, contentBounds.width - iconBoxSize.width - gap),
-              height: contentBounds.height,
-            };
-            break;
-        }
-      }
-    } else if (this._label && labelSize) {
-      const autoBounds = this.getAutoLabelBounds(bounds, iconBoxSize);
-      labelBounds = this.getLabelBounds(autoBounds, labelSize, this._labelPlacement);
-    }
-
-    return { iconBounds, labelBounds };
+    return { iconBounds, labelBounds: contentBounds };
   }
 
   /**
@@ -522,15 +403,22 @@ export abstract class Node extends Element {
     }
 
     const bounds = this.getBounds();
+    const contentBounds = this.getLabelContainerBounds(bounds);
     const iconBoxSize = this._icon ? this.getIconBoxSize() : undefined;
-    const autoBounds = this.getAutoLabelBounds(bounds, iconBoxSize);
 
-    this._label.setAutoMaxWidth(autoBounds.width);
+    this._label.setAutoMaxWidth(contentBounds.width);
     const labelSize = this._label.measure(ctx);
 
-    const { labelBounds } = this.calculateContentLayout(bounds, iconBoxSize, labelSize);
+    const { labelBounds } = this.calculateContentLayout(
+      bounds,
+      iconBoxSize,
+      labelSize
+    );
 
-    const lines = this._label.getWrappedLines(ctx, Math.max(0, autoBounds.width));
+    const lines = this._label.getWrappedLines(
+      ctx,
+      Math.max(0, contentBounds.width)
+    );
     return { bounds: labelBounds, lines };
   }
 
@@ -549,24 +437,14 @@ export abstract class Node extends Element {
   }
 
   /**
-   * Get world position of label center.
+   * Get world position of label center (center of content area).
    */
   getLabelPosition(): Point {
-    const bounds = this.getBounds();
-    const placement = this._labelPlacement === 'auto' ? 'center' : this._labelPlacement;
-
-    switch (placement) {
-      case 'top':
-        return { x: bounds.x + bounds.width / 2, y: bounds.y };
-      case 'bottom':
-        return { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height };
-      case 'left':
-        return { x: bounds.x, y: bounds.y + bounds.height / 2 };
-      case 'right':
-        return { x: bounds.x + bounds.width, y: bounds.y + bounds.height / 2 };
-      default:
-        return { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
-    }
+    const bounds = this.getLabelContainerBounds(this.getBounds());
+    return {
+      x: bounds.x + bounds.width / 2,
+      y: bounds.y + bounds.height / 2,
+    };
   }
 
   /**
@@ -581,7 +459,7 @@ export abstract class Node extends Element {
     const iconBoxSize = this._icon ? this.getIconBoxSize() : undefined;
 
     if (this._label) {
-      this._label.setAutoMaxWidth(this.getAutoLabelBounds(bounds, iconBoxSize).width);
+      this._label.setAutoMaxWidth(this.getLabelContainerBounds(bounds).width);
     }
     const labelSize = this._label ? this._label.measure(ctx) : undefined;
 
@@ -590,7 +468,7 @@ export abstract class Node extends Element {
       // Re-measure after potential resize
       if (this._label && iconBoxSize) {
         bounds = this.getBounds();
-        this._label.setAutoMaxWidth(this.getAutoLabelBounds(bounds, iconBoxSize).width);
+        this._label.setAutoMaxWidth(this.getLabelContainerBounds(bounds).width);
       }
     }
 
@@ -956,177 +834,54 @@ export abstract class Node extends Element {
     iconBoxSize: Size | undefined,
     bounds: Bounds
   ): Size {
-    let minWidth = 0;
-    let minHeight = 0;
-
     const labelContainer = this.getLabelContainerBounds(bounds);
-    const widthFactor = labelContainer.width > 0 ? bounds.width / labelContainer.width : 1;
-    const heightFactor = labelContainer.height > 0 ? bounds.height / labelContainer.height : 1;
+    const widthFactor =
+      labelContainer.width > 0 ? bounds.width / labelContainer.width : 1;
+    const heightFactor =
+      labelContainer.height > 0 ? bounds.height / labelContainer.height : 1;
 
-    if (labelSize) {
-      minWidth = Math.max(minWidth, labelSize.width * widthFactor);
-      minHeight = Math.max(minHeight, labelSize.height * heightFactor);
-    }
+    const minContentWidth = Math.max(
+      labelSize?.width ?? 0,
+      iconBoxSize?.width ?? 0
+    );
+    const minContentHeight = Math.max(
+      labelSize?.height ?? 0,
+      iconBoxSize?.height ?? 0
+    );
 
-    if (iconBoxSize) {
-      minWidth = Math.max(minWidth, iconBoxSize.width);
-      minHeight = Math.max(minHeight, iconBoxSize.height);
-    }
-
-    if (labelSize && iconBoxSize && this._icon) {
-      const gap = this._icon.gap;
-      const labelPlacement = this._labelPlacement === 'auto' ? 'center' : this._labelPlacement;
-      const iconPlacement = this._icon.placement;
-
-      if (this._labelPlacement === 'auto' && iconPlacement !== 'center') {
-        if (isCornerPlacement(iconPlacement)) {
-          // Label area is content minus (icon + gap) corner; ensure it fits label
-          minWidth = Math.max(minWidth, iconBoxSize.width + gap + labelSize.width);
-          minHeight = Math.max(minHeight, iconBoxSize.height + gap + labelSize.height);
-        } else if (iconPlacement === 'top' || iconPlacement === 'bottom') {
-          minHeight = Math.max(minHeight, iconBoxSize.height + gap + labelSize.height);
-          minWidth = Math.max(minWidth, iconBoxSize.width, labelSize.width);
-        } else if (iconPlacement === 'left' || iconPlacement === 'right') {
-          minWidth = Math.max(minWidth, iconBoxSize.width + gap + labelSize.width);
-          minHeight = Math.max(minHeight, iconBoxSize.height, labelSize.height);
-        }
-      } else {
-        const labelHorizontal = labelPlacement === 'left' || labelPlacement === 'right';
-        const labelVertical = labelPlacement === 'top' || labelPlacement === 'bottom';
-        const iconHorizontal = iconPlacement === 'left' || iconPlacement === 'right';
-        const iconVertical = iconPlacement === 'top' || iconPlacement === 'bottom';
-        const labelSharesIconAxis =
-          (iconHorizontal && (labelPlacement === 'center' || labelPlacement === iconPlacement)) ||
-          (iconVertical && (labelPlacement === 'center' || labelPlacement === iconPlacement));
-
-        if (labelHorizontal && iconHorizontal && labelPlacement !== iconPlacement) {
-          minWidth = Math.max(minWidth, iconBoxSize.width + gap + labelSize.width);
-        }
-        if (labelVertical && iconVertical && labelPlacement !== iconPlacement) {
-          minHeight = Math.max(minHeight, iconBoxSize.height + gap + labelSize.height);
-        }
-        if (labelSharesIconAxis) {
-          if (iconHorizontal) {
-            minWidth = Math.max(minWidth, iconBoxSize.width + gap + labelSize.width);
-          }
-          if (iconVertical) {
-            minHeight = Math.max(minHeight, iconBoxSize.height + gap + labelSize.height);
-          }
-        }
-      }
-    }
-
-    return { width: minWidth, height: minHeight };
+    return {
+      width: minContentWidth * widthFactor,
+      height: minContentHeight * heightFactor,
+    };
   }
 
   protected getLabelContainerBounds(bounds: Bounds): Bounds {
-    return bounds;
-  }
-
-  private getAutoLabelBounds(bounds: Bounds, iconBoxSize?: Size): Bounds {
-    const contentBounds = this.getLabelContainerBounds(bounds);
-    if (!this._icon || !iconBoxSize || this._icon.placement === 'center') {
-      return contentBounds;
-    }
-
-    const gap = this._icon.gap;
-    if (isCornerPlacement(this._icon.placement)) {
-      const w = iconBoxSize.width + gap;
-      const h = iconBoxSize.height + gap;
-      switch (this._icon.placement) {
-        case 'top-left':
-          return {
-            x: contentBounds.x + w,
-            y: contentBounds.y + h,
-            width: Math.max(0, contentBounds.width - w),
-            height: Math.max(0, contentBounds.height - h),
-          };
-        case 'top-right':
-          return {
-            x: contentBounds.x,
-            y: contentBounds.y + h,
-            width: Math.max(0, contentBounds.width - w),
-            height: Math.max(0, contentBounds.height - h),
-          };
-        case 'bottom-left':
-          return {
-            x: contentBounds.x + w,
-            y: contentBounds.y,
-            width: Math.max(0, contentBounds.width - w),
-            height: Math.max(0, contentBounds.height - h),
-          };
-        case 'bottom-right':
-          return {
-            x: contentBounds.x,
-            y: contentBounds.y,
-            width: Math.max(0, contentBounds.width - w),
-            height: Math.max(0, contentBounds.height - h),
-          };
-        default:
-          return contentBounds;
-      }
-    }
-
-    switch (this._icon.placement) {
-      case 'left':
-        return {
-          x: contentBounds.x + iconBoxSize.width + gap,
-          y: contentBounds.y,
-          width: Math.max(0, contentBounds.width - iconBoxSize.width - gap),
-          height: contentBounds.height,
-        };
-      case 'right':
-        return {
-          x: contentBounds.x,
-          y: contentBounds.y,
-          width: Math.max(0, contentBounds.width - iconBoxSize.width - gap),
-          height: contentBounds.height,
-        };
-      case 'top':
-        return {
-          x: contentBounds.x,
-          y: contentBounds.y + iconBoxSize.height + gap,
-          width: contentBounds.width,
-          height: Math.max(0, contentBounds.height - iconBoxSize.height - gap),
-        };
-      case 'bottom':
-        return {
-          x: contentBounds.x,
-          y: contentBounds.y,
-          width: contentBounds.width,
-          height: Math.max(0, contentBounds.height - iconBoxSize.height - gap),
-        };
-      default:
-        return contentBounds;
-    }
-  }
-
-  private getLabelBounds(bounds: Bounds, labelSize: Size, placement: LabelPlacement): Bounds {
-    const normalizedPlacement = placement === 'auto' ? 'center' : placement;
-    const width = Math.min(labelSize.width, bounds.width);
-    const height = Math.min(labelSize.height, bounds.height);
-
-    let x = bounds.x + (bounds.width - width) / 2;
-    let y = bounds.y + (bounds.height - height) / 2;
-
-    switch (normalizedPlacement) {
-      case 'top':
-        y = bounds.y;
-        break;
-      case 'bottom':
-        y = bounds.y + bounds.height - height;
-        break;
-      case 'left':
-        x = bounds.x;
-        break;
-      case 'right':
-        x = bounds.x + bounds.width - width;
-        break;
-      default:
-        break;
-    }
-
+    const { top, right, bottom, left } = this._contentInset;
+    const x = bounds.x + left;
+    const y = bounds.y + top;
+    const width = Math.max(0, bounds.width - left - right);
+    const height = Math.max(0, bounds.height - top - bottom);
     return { x, y, width, height };
+  }
+
+  private normalizeContentInset(
+    value?: number | ContentInsetSides
+  ): Required<ContentInsetSides> {
+    const n = (v: number | undefined): number =>
+      v !== undefined && Number.isFinite(v) ? Math.max(0, v) : 0;
+    if (value === undefined) {
+      return { top: 0, right: 0, bottom: 0, left: 0 };
+    }
+    if (typeof value === 'number') {
+      const v = n(value);
+      return { top: v, right: v, bottom: v, left: v };
+    }
+    return {
+      top: n(value.top),
+      right: n(value.right),
+      bottom: n(value.bottom),
+      left: n(value.left),
+    };
   }
 
   private getIconBoxSize(): Size | undefined {
@@ -1139,15 +894,15 @@ export abstract class Node extends Element {
       return undefined;
     }
 
-    const padding = this._icon.options.padding ?? 8;
-    const margin = Math.max(0, this._icon.options.margin ?? 0);
+    const ins = this._icon.inset;
     return {
-      width: width + padding * 2 + margin * 2,
-      height: height + padding * 2 + margin * 2,
+      width: width + ins * 2,
+      height: height + ins * 2,
     };
   }
 
   private getIconBounds(bounds: Bounds, iconBoxSize: Size, placement: NodeImagePlacement): Bounds {
+    const ins = this._icon?.inset ?? 0;
     switch (placement) {
       case 'top':
         return {
@@ -1179,29 +934,29 @@ export abstract class Node extends Element {
         };
       case 'top-left':
         return {
-          x: bounds.x,
-          y: bounds.y,
+          x: bounds.x + ins,
+          y: bounds.y + ins,
           width: iconBoxSize.width,
           height: iconBoxSize.height,
         };
       case 'top-right':
         return {
-          x: bounds.x + bounds.width - iconBoxSize.width,
-          y: bounds.y,
+          x: bounds.x + bounds.width - iconBoxSize.width - ins,
+          y: bounds.y + ins,
           width: iconBoxSize.width,
           height: iconBoxSize.height,
         };
       case 'bottom-left':
         return {
-          x: bounds.x,
-          y: bounds.y + bounds.height - iconBoxSize.height,
+          x: bounds.x + ins,
+          y: bounds.y + bounds.height - iconBoxSize.height - ins,
           width: iconBoxSize.width,
           height: iconBoxSize.height,
         };
       case 'bottom-right':
         return {
-          x: bounds.x + bounds.width - iconBoxSize.width,
-          y: bounds.y + bounds.height - iconBoxSize.height,
+          x: bounds.x + bounds.width - iconBoxSize.width - ins,
+          y: bounds.y + bounds.height - iconBoxSize.height - ins,
           width: iconBoxSize.width,
           height: iconBoxSize.height,
         };

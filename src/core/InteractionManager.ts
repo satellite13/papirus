@@ -191,6 +191,7 @@ export class InteractionManager {
     if (shallowEqual(before, after)) {
       return;
     }
+    this.renderer.markStyleDirty();
     this.queuePropertyChange('node', nodeId, before, after);
   }
 
@@ -205,6 +206,7 @@ export class InteractionManager {
     if (shallowEqual(before, after)) {
       return;
     }
+    this.renderer.markStyleDirty();
     this.queuePropertyChange('edge', edgeId, before, after);
   }
 
@@ -219,6 +221,7 @@ export class InteractionManager {
     if (shallowEqual(before, after)) {
       return;
     }
+    this.renderer.markStyleDirty();
     this.queuePropertyChange('group', groupId, before, after);
   }
 
@@ -825,6 +828,7 @@ export class InteractionManager {
             pending.after as ReturnType<typeof createNodeSnapshot>
           )
         );
+        this.renderer.markStyleDirty();
         break;
       case 'edge':
         this.historyManager.execute(
@@ -835,6 +839,7 @@ export class InteractionManager {
             pending.after as ReturnType<typeof createEdgeSnapshot>
           )
         );
+        this.renderer.markStyleDirty();
         break;
       case 'group':
         this.historyManager.execute(
@@ -845,6 +850,7 @@ export class InteractionManager {
             pending.after as ReturnType<typeof createGroupSnapshot>
           )
         );
+        this.renderer.markStyleDirty();
         break;
     }
   }

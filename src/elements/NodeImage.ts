@@ -34,9 +34,12 @@ export interface NodeImageOptions {
   fit?: NodeImageFit;
   placement?: NodeImagePlacement;
   scaleWithBounds?: boolean;
-  padding?: number;
+  /** Single inset from edge of icon zone to image. Backward compat when loading: inset ?? margin ?? padding ?? 6 */
+  inset?: number;
+  /** @deprecated Use inset. Accepted when loading old serialized data. */
   margin?: number;
-  gap?: number;
+  /** @deprecated Use inset. Accepted when loading old serialized data. */
+  padding?: number;
   opacity?: number;
   strokeColor?: string;
   fillColor?: string;
@@ -143,8 +146,13 @@ export class NodeImage {
     return this._options.placement ?? 'center';
   }
 
-  get gap(): number {
-    return this._options.gap ?? 6;
+  /** Inset from edge of icon zone to image (single value for all sides) */
+  get inset(): number {
+    const v =
+      this._options.inset ??
+      this._options.margin ??
+      this._options.padding;
+    return v !== undefined && Number.isFinite(v) ? Math.max(0, v) : 6;
   }
 
   setSource(source: string | HTMLImageElement): void {
@@ -162,8 +170,7 @@ export class NodeImage {
       return;
     }
 
-    const padding = this._options.padding ?? 8;
-    const margin = Math.max(0, this._options.margin ?? 0);
+    const ins = this.inset;
     const fit = this._options.fit ?? 'none';
     const scaleWithBounds = this._options.scaleWithBounds ?? false;
     const opacity = this._options.opacity ?? 1;
@@ -173,13 +180,13 @@ export class NodeImage {
     const offsetY = this._options.offsetY ?? 0;
 
     const innerBounds: Bounds = {
-      x: bounds.x + margin,
-      y: bounds.y + margin,
-      width: Math.max(0, bounds.width - margin * 2),
-      height: Math.max(0, bounds.height - margin * 2),
+      x: bounds.x + ins,
+      y: bounds.y + ins,
+      width: Math.max(0, bounds.width - ins * 2),
+      height: Math.max(0, bounds.height - ins * 2),
     };
-    const availableWidth = Math.max(0, innerBounds.width - padding * 2);
-    const availableHeight = Math.max(0, innerBounds.height - padding * 2);
+    const availableWidth = Math.max(0, innerBounds.width);
+    const availableHeight = Math.max(0, innerBounds.height);
 
     let drawWidth = this._options.width ?? this._naturalWidth;
     let drawHeight = this._options.height ?? this._naturalHeight;
@@ -202,19 +209,19 @@ export class NodeImage {
     drawWidth = Math.min(drawWidth, maxWidth);
     drawHeight = Math.min(drawHeight, maxHeight);
 
-    let x = innerBounds.x + padding;
-    let y = innerBounds.y + padding;
+    let x = innerBounds.x;
+    let y = innerBounds.y;
 
     if (align === 'center') {
       x = innerBounds.x + (innerBounds.width - drawWidth) / 2;
     } else if (align === 'right') {
-      x = innerBounds.x + innerBounds.width - drawWidth - padding;
+      x = innerBounds.x + innerBounds.width - drawWidth;
     }
 
     if (verticalAlign === 'center') {
       y = innerBounds.y + (innerBounds.height - drawHeight) / 2;
     } else if (verticalAlign === 'bottom') {
-      y = innerBounds.y + innerBounds.height - drawHeight - padding;
+      y = innerBounds.y + innerBounds.height - drawHeight;
     }
 
     ctx.save();

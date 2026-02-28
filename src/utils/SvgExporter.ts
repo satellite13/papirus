@@ -1,5 +1,5 @@
 import type { DiagramRenderer } from '@/core/DiagramRenderer';
-import type { Point } from '@/types';
+import type { ContentInsetSides, Point } from '@/types';
 import type { Edge } from '@/elements/Edge';
 import type { Node } from '@/elements/Node';
 import type { Group } from '@/elements/Group';
@@ -232,7 +232,7 @@ export class SvgExporter {
       return '';
     }
 
-    const metrics = this.measureTextLabel(edge.label.text, edge.label.style, edge.label.padding, edge.label.margin);
+    const metrics = this.measureTextLabel(edge.label.text, edge.label.style, edge.label.inset);
     const bgPadding = edge.labelBackground?.padding ?? EDGE_LABEL_BACKGROUND_PADDING;
     const bgColor = edge.labelBackground?.color ?? '#ffffff';
     const bgOpacity = edge.labelBackground?.opacity ?? 1;
@@ -251,11 +251,31 @@ export class SvgExporter {
     return `<rect x="${x}" y="${y}" width="${width}" height="${height}" rx="${radius}" ry="${radius}" fill="${bgColor}" fill-opacity="${bgOpacity}"/>`;
   }
 
+  private normalizeLabelInset(
+    value: number | ContentInsetSides | undefined,
+    defaultVal: number
+  ): Required<ContentInsetSides> {
+    const n = (v: number | undefined): number =>
+      v !== undefined && Number.isFinite(v) ? Math.max(0, v) : defaultVal;
+    if (value === undefined) {
+      return { top: defaultVal, right: defaultVal, bottom: defaultVal, left: defaultVal };
+    }
+    if (typeof value === 'number') {
+      const v = n(value);
+      return { top: v, right: v, bottom: v, left: v };
+    }
+    return {
+      top: n(value.top),
+      right: n(value.right),
+      bottom: n(value.bottom),
+      left: n(value.left),
+    };
+  }
+
   private measureTextLabel(
     text: string,
     style: TextStyle = {},
-    padding = 8,
-    margin = 0
+    inset: number | ContentInsetSides = 8
   ): { width: number; height: number } {
     const fontSize = style.fontSize ?? 14;
     const fontFamily = style.fontFamily ?? 'sans-serif';
@@ -280,11 +300,10 @@ export class SvgExporter {
       maxWidth = longestLine.length * fontSize * 0.6;
     }
 
-    const resolvedPadding = Math.max(0, padding);
-    const resolvedMargin = Math.max(0, margin);
+    const ins = this.normalizeLabelInset(inset, 8);
     return {
-      width: maxWidth + resolvedPadding * 2 + resolvedMargin * 2,
-      height: lines.length * lineHeight + resolvedPadding * 2 + resolvedMargin * 2,
+      width: maxWidth + ins.left + ins.right,
+      height: lines.length * lineHeight + ins.top + ins.bottom,
     };
   }
 
@@ -452,9 +471,9 @@ export class SvgExporter {
     }
 
     const style = label.style;
-    const padding = Math.max(0, label.padding);
-    const margin = Math.max(0, label.margin);
+    const ins = this.normalizeLabelInset(label.inset, 8);
     const align = style.align ?? 'center';
+    const verticalAlign = style.verticalAlign ?? 'middle';
 
     const ctx = this.getMeasurementContext();
     let bounds: { x: number; y: number; width: number; height: number };
@@ -475,20 +494,30 @@ export class SvgExporter {
     }
 
     const inner = {
-      x: bounds.x + margin,
-      y: bounds.y + margin,
-      width: Math.max(0, bounds.width - margin * 2),
-      height: Math.max(0, bounds.height - margin * 2),
+      x: bounds.x + ins.left,
+      y: bounds.y + ins.top,
+      width: Math.max(0, bounds.width - ins.left - ins.right),
+      height: Math.max(0, bounds.height - ins.top - ins.bottom),
     };
 
     let x = inner.x + inner.width / 2;
     if (align === 'left') {
-      x = inner.x + padding;
+      x = inner.x;
     } else if (align === 'right') {
-      x = inner.x + inner.width - padding;
+      x = inner.x + inner.width;
     }
 
-    const y = inner.y + inner.height / 2;
+    const lineHeight = (style.fontSize ?? 14) * 1.2;
+    const totalHeight = lines.length * lineHeight;
+    // renderTextLabel expects point.y = center of text block
+    let y: number;
+    if (verticalAlign === 'top') {
+      y = inner.y + totalHeight / 2;
+    } else if (verticalAlign === 'bottom') {
+      y = inner.y + inner.height - totalHeight / 2;
+    } else {
+      y = inner.y + inner.height / 2;
+    }
 
     return this.renderTextLabel(lines.join('\n'), { x, y }, style);
   }
@@ -513,9 +542,15 @@ export class SvgExporter {
       return '';
     }
 
-    const iconBoxSize = this.getIconBoxSize(opts, iconSize);
-    const iconBounds = this.getIconBounds(nodeBounds, iconBoxSize, opts.placement ?? 'center');
-    const drawRect = this.getIconDrawRect(iconBounds, opts, iconSize);
+    const iconInset = icon.inset;
+    const iconBoxSize = this.getIconBoxSize(iconSize, iconInset);
+    const iconBounds = this.getIconBounds(
+      nodeBounds,
+      iconBoxSize,
+      opts.placement ?? 'center',
+      iconInset
+    );
+    const drawRect = this.getIconDrawRect(iconBounds, opts, iconSize, iconInset);
     if (drawRect.width <= 0 || drawRect.height <= 0) {
       return '';
     }
@@ -530,21 +565,20 @@ export class SvgExporter {
   }
 
   private getIconBoxSize(
-    opts: NodeImageOptions,
-    imageSize: { width: number; height: number }
+    imageSize: { width: number; height: number },
+    inset: number
   ): { width: number; height: number } {
-    const padding = opts.padding ?? 8;
-    const margin = Math.max(0, opts.margin ?? 0);
     return {
-      width: imageSize.width + padding * 2 + margin * 2,
-      height: imageSize.height + padding * 2 + margin * 2,
+      width: imageSize.width + inset * 2,
+      height: imageSize.height + inset * 2,
     };
   }
 
   private getIconBounds(
     bounds: { x: number; y: number; width: number; height: number },
     iconBoxSize: { width: number; height: number },
-    placement: NodeImagePlacement
+    placement: NodeImagePlacement,
+    inset: number
   ): { x: number; y: number; width: number; height: number } {
     switch (placement) {
       case 'top':
@@ -566,25 +600,30 @@ export class SvgExporter {
           height: bounds.height,
         };
       case 'top-left':
-        return { x: bounds.x, y: bounds.y, width: iconBoxSize.width, height: iconBoxSize.height };
+        return {
+          x: bounds.x + inset,
+          y: bounds.y + inset,
+          width: iconBoxSize.width,
+          height: iconBoxSize.height,
+        };
       case 'top-right':
         return {
-          x: bounds.x + bounds.width - iconBoxSize.width,
-          y: bounds.y,
+          x: bounds.x + bounds.width - iconBoxSize.width - inset,
+          y: bounds.y + inset,
           width: iconBoxSize.width,
           height: iconBoxSize.height,
         };
       case 'bottom-left':
         return {
-          x: bounds.x,
-          y: bounds.y + bounds.height - iconBoxSize.height,
+          x: bounds.x + inset,
+          y: bounds.y + bounds.height - iconBoxSize.height - inset,
           width: iconBoxSize.width,
           height: iconBoxSize.height,
         };
       case 'bottom-right':
         return {
-          x: bounds.x + bounds.width - iconBoxSize.width,
-          y: bounds.y + bounds.height - iconBoxSize.height,
+          x: bounds.x + bounds.width - iconBoxSize.width - inset,
+          y: bounds.y + bounds.height - iconBoxSize.height - inset,
           width: iconBoxSize.width,
           height: iconBoxSize.height,
         };
@@ -597,10 +636,9 @@ export class SvgExporter {
   private getIconDrawRect(
     bounds: { x: number; y: number; width: number; height: number },
     opts: NodeImageOptions,
-    imageSize: { width: number; height: number }
+    imageSize: { width: number; height: number },
+    inset: number
   ): { x: number; y: number; width: number; height: number } {
-    const padding = opts.padding ?? 8;
-    const margin = Math.max(0, opts.margin ?? 0);
     const fit = opts.fit ?? 'none';
     const scaleWithBounds = opts.scaleWithBounds ?? false;
     const align = opts.align ?? 'center';
@@ -609,13 +647,13 @@ export class SvgExporter {
     const offsetY = opts.offsetY ?? 0;
 
     const innerBounds = {
-      x: bounds.x + margin,
-      y: bounds.y + margin,
-      width: Math.max(0, bounds.width - margin * 2),
-      height: Math.max(0, bounds.height - margin * 2),
+      x: bounds.x + inset,
+      y: bounds.y + inset,
+      width: Math.max(0, bounds.width - inset * 2),
+      height: Math.max(0, bounds.height - inset * 2),
     };
-    const availableWidth = Math.max(0, innerBounds.width - padding * 2);
-    const availableHeight = Math.max(0, innerBounds.height - padding * 2);
+    const availableWidth = Math.max(0, innerBounds.width);
+    const availableHeight = Math.max(0, innerBounds.height);
 
     let drawWidth = opts.width ?? imageSize.width;
     let drawHeight = opts.height ?? imageSize.height;
@@ -636,19 +674,19 @@ export class SvgExporter {
     drawWidth = Math.min(Math.max(0, drawWidth), Math.max(0, availableWidth));
     drawHeight = Math.min(Math.max(0, drawHeight), Math.max(0, availableHeight));
 
-    let x = innerBounds.x + padding;
-    let y = innerBounds.y + padding;
+    let x = innerBounds.x;
+    let y = innerBounds.y;
 
     if (align === 'center') {
       x = innerBounds.x + (innerBounds.width - drawWidth) / 2;
     } else if (align === 'right') {
-      x = innerBounds.x + innerBounds.width - drawWidth - padding;
+      x = innerBounds.x + innerBounds.width - drawWidth;
     }
 
     if (verticalAlign === 'center') {
       y = innerBounds.y + (innerBounds.height - drawHeight) / 2;
     } else if (verticalAlign === 'bottom') {
-      y = innerBounds.y + innerBounds.height - drawHeight - padding;
+      y = innerBounds.y + innerBounds.height - drawHeight;
     }
 
     return {

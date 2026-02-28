@@ -223,13 +223,25 @@ export class Serializer {
     // Serialize label - full TextLabel if it has more than just text
     let label: string | SerializedTextLabel | undefined;
     if (node.label) {
-      const labelDefaults = { padding: 8, margin: 0, style: {}, maxWidth: undefined, styleClass: undefined };
+      const ins = node.label.inset;
+      const defaultInset = 8;
+      const insetAllDefault =
+        ins.top === defaultInset &&
+        ins.right === defaultInset &&
+        ins.bottom === defaultInset &&
+        ins.left === defaultInset;
+      const serializedInset = insetAllDefault
+        ? undefined
+        : ins.top === ins.right && ins.top === ins.bottom && ins.top === ins.left
+          ? ins.top
+          : { top: ins.top, right: ins.right, bottom: ins.bottom, left: ins.left };
+
+      const labelDefaults = { inset: undefined, style: {}, maxWidth: undefined, styleClass: undefined };
       const labelData = {
         text: node.label.text,
         style: node.label.style,
         maxWidth: node.label.maxWidth,
-        padding: node.label.padding,
-        margin: node.label.margin,
+        inset: serializedInset ?? undefined,
         styleClass: node.label.styleClass,
       };
       const hasExtendedOptions = hasNonDefaultValues(labelData, labelDefaults);
@@ -239,8 +251,7 @@ export class Serializer {
           text: node.label.text,
           style: Object.keys(node.label.style).length > 0 ? node.label.style : undefined,
           maxWidth: node.label.maxWidth,
-          padding: node.label.padding !== 8 ? node.label.padding : undefined,
-          margin: node.label.margin !== 0 ? node.label.margin : undefined,
+          inset: serializedInset,
           styleClass: node.label.styleClass,
         }) as SerializedTextLabel | undefined;
       } else {
@@ -254,22 +265,20 @@ export class Serializer {
       const opts = node.icon.options;
       const source = typeof opts.source === 'string' ? opts.source : undefined;
       if (source) {
-        icon = {
+        icon = omitEmptyValues({
           source,
           width: opts.width,
           height: opts.height,
           fit: opts.fit,
           placement: opts.placement,
           scaleWithBounds: opts.scaleWithBounds,
-          padding: opts.padding,
-          margin: opts.margin,
-          gap: opts.gap,
+          inset: node.icon.inset !== 6 ? node.icon.inset : undefined,
           opacity: opts.opacity,
           align: opts.align,
           verticalAlign: opts.verticalAlign,
           offsetX: opts.offsetX,
           offsetY: opts.offsetY,
-        };
+        }) as SerializedNodeIcon;
       }
     }
 
@@ -282,7 +291,14 @@ export class Serializer {
       anchorPoints = omitDefaultValues(anchorData, anchorDefaults);
     }
 
-    return {
+    const contentInset = node.contentInset;
+    const hasContentInset =
+      contentInset.top !== 0 ||
+      contentInset.right !== 0 ||
+      contentInset.bottom !== 0 ||
+      contentInset.left !== 0;
+
+    return omitEmptyValues({
       id: node.id,
       type: node.typeName,
       x: node.x,
@@ -293,12 +309,12 @@ export class Serializer {
       styleClass: node.styleClass,
       label,
       labelStyleClass: typeof label === 'string' ? node.label?.styleClass : undefined,
-      labelPlacement: node.labelPlacement !== 'auto' ? node.labelPlacement : undefined,
       icon,
+      contentInset: hasContentInset ? contentInset : undefined,
       anchorPoints,
       ports: ports.length > 0 ? ports : undefined,
       data: Object.keys(node.data).length > 0 ? node.data : undefined,
-    };
+    }) as SerializedNode;
   }
 
   private serializeEdge(edge: Edge): SerializedEdge {

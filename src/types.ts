@@ -128,6 +128,16 @@ export interface EdgeLabelBackground {
 }
 
 /**
+ * Content inset per side (for node content area)
+ */
+export interface ContentInsetSides {
+  top?: number;
+  right?: number;
+  bottom?: number;
+  left?: number;
+}
+
+/**
  * Style properties for text
  */
 export interface TextStyle {
@@ -139,6 +149,8 @@ export interface TextStyle {
   opacity?: number;
   align?: CanvasTextAlign;
   baseline?: CanvasTextBaseline;
+  /** Vertical alignment of text inside its bounds (innerBounds) */
+  verticalAlign?: 'top' | 'middle' | 'bottom';
 }
 
 /**
@@ -224,8 +236,13 @@ export interface SerializedNodeIcon {
   fit?: 'contain' | 'cover' | 'stretch' | 'none';
   placement?: 'center' | 'top' | 'bottom' | 'left' | 'right' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
   scaleWithBounds?: boolean;
-  padding?: number;
+  /** Single inset from edge of icon zone to image. When reading: inset ?? margin ?? padding ?? gap ?? 6 */
+  inset?: number;
+  /** @deprecated Use inset. Kept for backward compat when loading old files. */
   margin?: number;
+  /** @deprecated Use inset. Kept for backward compat when loading old files. */
+  padding?: number;
+  /** @deprecated Use inset. Kept for backward compat when loading old files. */
   gap?: number;
   opacity?: number;
   strokeColor?: string;
@@ -253,8 +270,12 @@ export interface SerializedTextLabel {
   text: string;
   style?: TextStyle;
   maxWidth?: number;
-  padding?: number;
+  /** Inset from bounds edge to text: number (all sides) or { top?, right?, bottom?, left? }. When reading: inset ?? margin ?? padding ?? 8 */
+  inset?: number | ContentInsetSides;
+  /** @deprecated Use inset. Kept for backward compat when loading old files. */
   margin?: number;
+  /** @deprecated Use inset. Kept for backward compat when loading old files. */
+  padding?: number;
   styleClass?: string;
 }
 
@@ -274,6 +295,8 @@ export interface SerializedNode {
   labelStyleClass?: string;
   labelPlacement?: LabelPlacement;
   icon?: SerializedNodeIcon;
+  /** Content area insets per side (default 0 = full bounds) */
+  contentInset?: number | ContentInsetSides;
   anchorPoints?: SerializedAnchorPoints;
   ports?: SerializedPort[];
   data?: Record<string, unknown>;

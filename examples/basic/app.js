@@ -73,6 +73,7 @@ const nodeFactory = (data) => {
         : data.label
       : undefined,
     icon: data.icon,
+    contentInset: data.contentInset,
     anchorPoints: data.anchorPoints,
     ports: data.ports?.map((port) => ({
       id: port.id,
@@ -151,6 +152,19 @@ const interactions = renderer.enableInteractions({
   }),
 });
 
+function changeNode(nodeId, apply) {
+  interactions.changeNodeProperties(nodeId, apply);
+  renderer.markDirty();
+}
+function changeEdge(edgeId, apply) {
+  interactions.changeEdgeProperties(edgeId, apply);
+  renderer.markDirty();
+}
+function changeGroup(groupId, apply) {
+  interactions.changeGroupProperties(groupId, apply);
+  renderer.markDirty();
+}
+
 // Search manager
 const searchManager = new SearchManager(renderer);
 
@@ -202,7 +216,7 @@ renderer.enableContextMenu({
             {
               label: 'Clear',
               action: () => {
-                interactions.changeNodeProperties(target.node.id, (node) => {
+                changeNode(target.node.id, (node) => {
                   node.styleClass = undefined;
                   if (node.label) node.label.styleClass = undefined;
                 });
@@ -249,11 +263,23 @@ renderer.enableContextMenu({
 });
 
 function applyNodeStyleClass(nodeId, className) {
-  interactions.changeNodeProperties(nodeId, (node) => {
+  changeNode(nodeId, (node) => {
     node.clearStyleOverrides();
     node.styleClass = className;
     if (node.label) node.label.styleClass = className;
   });
+  if (selectedNode?.id === nodeId) {
+    // Styles from StyleManager are applied during render cycle.
+    // Refresh panel on next frame to read the final merged style.
+    requestAnimationFrame(() => {
+      const node = renderer.getNode(nodeId);
+      if (node) {
+        selectedNode = node;
+        updateNodePanel(node);
+        showPanel(nodeStylePanel);
+      }
+    });
+  }
 }
 
 // Icon SVG
@@ -275,7 +301,7 @@ const nodeDefinitions = [
     options: {
       x: 100, y: 100,
       width: 120, height: 60,
-      label: { text: 'Start', padding: 6, margin: 3 },
+      label: { text: 'Start', inset: 6 },
       anchorPoints: { top: 3, right: 1, bottom: 3, left: 1 },
       style: { cornerRadius: 8, fillColor: '#e0f2fe', strokeColor: '#0284c7' },
     },
@@ -286,16 +312,14 @@ const nodeDefinitions = [
     options: {
       x: 300, y: 100,
       width: 140, height: 60,
-      label: { text: 'Process', padding: 6, margin: 4 },
+      label: { text: 'Process', inset: 8 },
       anchorPoints: { top: 3, right: 1, bottom: 3, left: 1 },
       style: { cornerRadius: 4 },
       icon: {
         source: iconSvg,
         placement: 'left',
         fit: 'contain',
-        padding: 8,
-        margin: 4,
-        gap: 10,
+        inset: 8,
       },
     },
   },
@@ -410,6 +434,56 @@ let selectedNode = null;
 let selectedEdge = null;
 let selectedGroup = null;
 
+function refreshSelectedPanel() {
+  if (selectedNode) {
+    const node = renderer.getNode(selectedNode.id);
+    if (node) {
+      selectedNode = node;
+      updateNodePanel(node);
+      showPanel(nodeStylePanel);
+    }
+    return;
+  }
+  if (selectedEdge) {
+    const edge = renderer.getEdge(selectedEdge.id);
+    if (edge) {
+      selectedEdge = edge;
+      updateEdgePanel(edge);
+      showPanel(edgeStylePanel);
+    }
+    return;
+  }
+  if (selectedGroup) {
+    const group = renderer.getGroup(selectedGroup.id);
+    if (group) {
+      selectedGroup = group;
+      updateGroupPanel(group);
+      showPanel(groupStylePanel);
+    }
+  }
+}
+
+function schedulePanelRefreshAfterLabelEdit() {
+  // Label editor commit updates model, then render applies style manager.
+  // Refresh panel one frame later to read final values.
+  requestAnimationFrame(() => requestAnimationFrame(refreshSelectedPanel));
+}
+
+document.addEventListener('keydown', (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLTextAreaElement)) return;
+  if (target.getAttribute('aria-label') !== 'Edit label') return;
+  if (event.key !== 'Enter' || event.shiftKey) return;
+  schedulePanelRefreshAfterLabelEdit();
+}, true);
+
+document.addEventListener('focusout', (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLTextAreaElement)) return;
+  if (target.getAttribute('aria-label') !== 'Edit label') return;
+  schedulePanelRefreshAfterLabelEdit();
+}, true);
+
 function showPanel(panel) {
   nodeStylePanel.classList.add('hidden');
   edgeStylePanel.classList.add('hidden');
@@ -434,8 +508,7 @@ function rebuildNodeLabel(node, patch = {}) {
     style: label.style,
     maxWidth: label.maxWidth,
     styleClass: label.styleClass,
-    padding: patch.padding ?? label.padding,
-    margin: patch.margin ?? label.margin,
+    inset: patch.inset ?? label.inset,
   });
 }
 
@@ -445,14 +518,32 @@ function updateNodePanel(node) {
   document.getElementById('nodeLabelColor').value = labelStyle.color || '#333333';
   document.getElementById('nodeLabelColorText').value = labelStyle.color || '#333333';
   document.getElementById('nodeLabelSize').value = labelStyle.fontSize || 12;
-  document.getElementById('nodeLabelPadding').value = node.label?.padding ?? 8;
-  document.getElementById('nodeLabelMargin').value = node.label?.margin ?? 0;
-  document.getElementById('nodeLabelPlacement').value = node.labelPlacement || 'auto';
+  const labelInset = node.label?.inset;
+  let liT = 8, liR = 8, liB = 8, liL = 8;
+  if (typeof labelInset === 'number' && Number.isFinite(labelInset)) {
+    liT = liR = liB = liL = labelInset;
+  } else if (typeof labelInset === 'object' && labelInset) {
+    liT = labelInset.top ?? 8; liR = labelInset.right ?? 8; liB = labelInset.bottom ?? 8; liL = labelInset.left ?? 8;
+  }
+  document.getElementById('nodeLabelInsetTop').value = liT;
+  document.getElementById('nodeLabelInsetRight').value = liR;
+  document.getElementById('nodeLabelInsetBottom').value = liB;
+  document.getElementById('nodeLabelInsetLeft').value = liL;
   document.getElementById('nodeLabelAlign').value = node.label?.style?.align || 'center';
+  document.getElementById('nodeLabelVerticalAlign').value = node.label?.style?.verticalAlign || 'middle';
   document.getElementById('nodeIconPlacement').value = node.icon?.placement ?? 'center';
-  document.getElementById('nodeIconPadding').value = node.icon?.options.padding ?? 8;
-  document.getElementById('nodeIconMargin').value = node.icon?.options.margin ?? 0;
-  document.getElementById('nodeIconGap').value = node.icon?.options.gap ?? 6;
+  document.getElementById('nodeIconInset').value = node.icon?.inset ?? 6;
+  const ci = node.contentInset;
+  let ciT = 0, ciR = 0, ciB = 0, ciL = 0;
+  if (typeof ci === 'object' && ci) {
+    ciT = ci.top ?? 0; ciR = ci.right ?? 0; ciB = ci.bottom ?? 0; ciL = ci.left ?? 0;
+  } else if (typeof ci === 'number' && Number.isFinite(ci)) {
+    ciT = ciR = ciB = ciL = ci;
+  }
+  document.getElementById('nodeContentInsetTop').value = ciT;
+  document.getElementById('nodeContentInsetRight').value = ciR;
+  document.getElementById('nodeContentInsetBottom').value = ciB;
+  document.getElementById('nodeContentInsetLeft').value = ciL;
   const style = node.style || {};
   document.getElementById('nodeFillColor').value = style.fillColor || '#ffffff';
   document.getElementById('nodeFillColorText').value = style.fillColor || '#ffffff';
@@ -529,20 +620,18 @@ renderer.on('select', (elementIds) => {
 // Event handlers for node panel
 document.getElementById('nodeLabel').addEventListener('input', (e) => {
   if (!selectedNode) return;
-  interactions.changeNodeProperties(selectedNode.id, (node) => {
+  changeNode(selectedNode.id, (node) => {
     if (e.target.value) {
       const fontSize = parseFloat(document.getElementById('nodeLabelSize').value);
       const color = document.getElementById('nodeLabelColor').value;
-      const padding = toNonNegativeNumber(document.getElementById('nodeLabelPadding').value, 8);
-      const margin = toNonNegativeNumber(document.getElementById('nodeLabelMargin').value, 0);
+      const inset = getLabelInsetFromPanel();
       if (node.label) {
         node.label.text = e.target.value;
       } else {
         node.label = new TextLabel({
           text: e.target.value,
           style: { color, fontSize },
-          padding,
-          margin,
+          inset,
         });
       }
     } else {
@@ -554,7 +643,7 @@ document.getElementById('nodeLabel').addEventListener('input', (e) => {
 document.getElementById('nodeLabelColor').addEventListener('input', (e) => {
   document.getElementById('nodeLabelColorText').value = e.target.value;
   if (selectedNode?.label) {
-    interactions.changeNodeProperties(selectedNode.id, (node) => {
+    changeNode(selectedNode.id, (node) => {
       if (node.label) node.label.style = { ...node.label.style, color: e.target.value };
     });
   }
@@ -562,45 +651,49 @@ document.getElementById('nodeLabelColor').addEventListener('input', (e) => {
 
 document.getElementById('nodeLabelSize').addEventListener('input', (e) => {
   if (selectedNode?.label) {
-    interactions.changeNodeProperties(selectedNode.id, (node) => {
+    changeNode(selectedNode.id, (node) => {
       if (node.label) node.label.style = { ...node.label.style, fontSize: parseFloat(e.target.value) };
-    });
-  }
-});
-
-document.getElementById('nodeLabelPlacement').addEventListener('change', (e) => {
-  if (selectedNode) {
-    interactions.changeNodeProperties(selectedNode.id, (node) => {
-      node.labelPlacement = e.target.value;
     });
   }
 });
 
 document.getElementById('nodeLabelAlign').addEventListener('change', (e) => {
   if (selectedNode?.label) {
-    interactions.changeNodeProperties(selectedNode.id, (node) => {
+    changeNode(selectedNode.id, (node) => {
       if (node.label) node.label.style = { ...node.label.style, align: e.target.value };
     });
   }
 });
 
-document.getElementById('nodeLabelPadding').addEventListener('input', (e) => {
-  if (!selectedNode?.label) return;
-  interactions.changeNodeProperties(selectedNode.id, (node) => {
-    rebuildNodeLabel(node, { padding: toNonNegativeNumber(e.target.value, node.label?.padding ?? 8) });
-  });
+document.getElementById('nodeLabelVerticalAlign').addEventListener('change', (e) => {
+  if (selectedNode?.label) {
+    changeNode(selectedNode.id, (node) => {
+      if (node.label) node.label.style = { ...node.label.style, verticalAlign: e.target.value };
+    });
+  }
 });
 
-document.getElementById('nodeLabelMargin').addEventListener('input', (e) => {
+function getLabelInsetFromPanel() {
+  return {
+    top: toNonNegativeNumber(document.getElementById('nodeLabelInsetTop').value, 8),
+    right: toNonNegativeNumber(document.getElementById('nodeLabelInsetRight').value, 8),
+    bottom: toNonNegativeNumber(document.getElementById('nodeLabelInsetBottom').value, 8),
+    left: toNonNegativeNumber(document.getElementById('nodeLabelInsetLeft').value, 8),
+  };
+}
+function applyLabelInsetFromPanel() {
   if (!selectedNode?.label) return;
-  interactions.changeNodeProperties(selectedNode.id, (node) => {
-    rebuildNodeLabel(node, { margin: toNonNegativeNumber(e.target.value, node.label?.margin ?? 0) });
+  changeNode(selectedNode.id, (node) => {
+    rebuildNodeLabel(node, { inset: getLabelInsetFromPanel() });
   });
+}
+['nodeLabelInsetTop', 'nodeLabelInsetRight', 'nodeLabelInsetBottom', 'nodeLabelInsetLeft'].forEach((id) => {
+  document.getElementById(id).addEventListener('input', applyLabelInsetFromPanel);
 });
 
 document.getElementById('nodeIconPlacement').addEventListener('change', (e) => {
   if (!selectedNode?.icon) return;
-  interactions.changeNodeProperties(selectedNode.id, (node) => {
+  changeNode(selectedNode.id, (node) => {
     if (!node.icon) return;
     node.icon.options = {
       ...node.icon.options,
@@ -609,43 +702,39 @@ document.getElementById('nodeIconPlacement').addEventListener('change', (e) => {
   });
 });
 
-document.getElementById('nodeIconPadding').addEventListener('input', (e) => {
+document.getElementById('nodeIconInset').addEventListener('input', (e) => {
   if (!selectedNode?.icon) return;
-  interactions.changeNodeProperties(selectedNode.id, (node) => {
+  changeNode(selectedNode.id, (node) => {
     if (!node.icon) return;
     node.icon.options = {
       ...node.icon.options,
-      padding: toNonNegativeNumber(e.target.value, node.icon.options.padding ?? 8),
+      inset: toNonNegativeNumber(e.target.value, node.icon.inset ?? 6),
     };
   });
 });
 
-document.getElementById('nodeIconMargin').addEventListener('input', (e) => {
-  if (!selectedNode?.icon) return;
-  interactions.changeNodeProperties(selectedNode.id, (node) => {
-    if (!node.icon) return;
-    node.icon.options = {
-      ...node.icon.options,
-      margin: toNonNegativeNumber(e.target.value, node.icon.options.margin ?? 0),
-    };
+function getContentInsetFromPanel() {
+  return {
+    top: toNonNegativeNumber(document.getElementById('nodeContentInsetTop').value, 0),
+    right: toNonNegativeNumber(document.getElementById('nodeContentInsetRight').value, 0),
+    bottom: toNonNegativeNumber(document.getElementById('nodeContentInsetBottom').value, 0),
+    left: toNonNegativeNumber(document.getElementById('nodeContentInsetLeft').value, 0),
+  };
+}
+function applyContentInsetFromPanel() {
+  if (!selectedNode) return;
+  changeNode(selectedNode.id, (node) => {
+    node.contentInset = getContentInsetFromPanel();
   });
-});
-
-document.getElementById('nodeIconGap').addEventListener('input', (e) => {
-  if (!selectedNode?.icon) return;
-  interactions.changeNodeProperties(selectedNode.id, (node) => {
-    if (!node.icon) return;
-    node.icon.options = {
-      ...node.icon.options,
-      gap: toNonNegativeNumber(e.target.value, node.icon.options.gap ?? 6),
-    };
-  });
+}
+['nodeContentInsetTop', 'nodeContentInsetRight', 'nodeContentInsetBottom', 'nodeContentInsetLeft'].forEach((id) => {
+  document.getElementById(id).addEventListener('input', applyContentInsetFromPanel);
 });
 
 document.getElementById('nodeFillColor').addEventListener('input', (e) => {
   document.getElementById('nodeFillColorText').value = e.target.value;
   if (selectedNode) {
-    interactions.changeNodeProperties(selectedNode.id, (node) => {
+    changeNode(selectedNode.id, (node) => {
       node.style = { ...node.style, fillColor: e.target.value };
     });
   }
@@ -654,7 +743,7 @@ document.getElementById('nodeFillColor').addEventListener('input', (e) => {
 document.getElementById('nodeStrokeColor').addEventListener('input', (e) => {
   document.getElementById('nodeStrokeColorText').value = e.target.value;
   if (selectedNode) {
-    interactions.changeNodeProperties(selectedNode.id, (node) => {
+    changeNode(selectedNode.id, (node) => {
       node.style = { ...node.style, strokeColor: e.target.value };
     });
   }
@@ -662,7 +751,7 @@ document.getElementById('nodeStrokeColor').addEventListener('input', (e) => {
 
 document.getElementById('nodeStrokeWidth').addEventListener('input', (e) => {
   if (selectedNode) {
-    interactions.changeNodeProperties(selectedNode.id, (node) => {
+    changeNode(selectedNode.id, (node) => {
       node.style = { ...node.style, strokeWidth: parseFloat(e.target.value) };
     });
   }
@@ -670,7 +759,7 @@ document.getElementById('nodeStrokeWidth').addEventListener('input', (e) => {
 
 document.getElementById('nodeCornerRadius').addEventListener('input', (e) => {
   if (selectedNode && 'cornerRadius' in selectedNode) {
-    interactions.changeNodeProperties(selectedNode.id, (node) => {
+    changeNode(selectedNode.id, (node) => {
       if ('cornerRadius' in node) node.cornerRadius = parseFloat(e.target.value);
     });
   }
@@ -678,7 +767,7 @@ document.getElementById('nodeCornerRadius').addEventListener('input', (e) => {
 
 document.getElementById('nodeOpacity').addEventListener('input', (e) => {
   if (selectedNode) {
-    interactions.changeNodeProperties(selectedNode.id, (node) => {
+    changeNode(selectedNode.id, (node) => {
       node.style = { ...node.style, opacity: parseFloat(e.target.value) };
     });
   }
@@ -687,7 +776,7 @@ document.getElementById('nodeOpacity').addEventListener('input', (e) => {
 // Edge panel handlers
 document.getElementById('edgeLabel').addEventListener('input', (e) => {
   if (!selectedEdge) return;
-  interactions.changeEdgeProperties(selectedEdge.id, (edge) => {
+  changeEdge(selectedEdge.id, (edge) => {
     if (e.target.value) {
       edge.label = edge.label ? { ...edge.label, text: e.target.value } : e.target.value;
     } else {
@@ -698,7 +787,7 @@ document.getElementById('edgeLabel').addEventListener('input', (e) => {
 
 document.getElementById('edgeType').addEventListener('change', (e) => {
   if (selectedEdge) {
-    interactions.changeEdgeProperties(selectedEdge.id, (edge) => {
+    changeEdge(selectedEdge.id, (edge) => {
       edge.type = e.target.value;
     });
   }
@@ -707,7 +796,7 @@ document.getElementById('edgeType').addEventListener('change', (e) => {
 document.getElementById('edgeStrokeColor').addEventListener('input', (e) => {
   document.getElementById('edgeStrokeColorText').value = e.target.value;
   if (selectedEdge) {
-    interactions.changeEdgeProperties(selectedEdge.id, (edge) => {
+    changeEdge(selectedEdge.id, (edge) => {
       edge.style = { ...edge.style, strokeColor: e.target.value };
     });
   }
@@ -715,7 +804,7 @@ document.getElementById('edgeStrokeColor').addEventListener('input', (e) => {
 
 document.getElementById('edgeStrokeWidth').addEventListener('input', (e) => {
   if (selectedEdge) {
-    interactions.changeEdgeProperties(selectedEdge.id, (edge) => {
+    changeEdge(selectedEdge.id, (edge) => {
       edge.style = { ...edge.style, strokeWidth: parseFloat(e.target.value) };
     });
   }
@@ -723,7 +812,7 @@ document.getElementById('edgeStrokeWidth').addEventListener('input', (e) => {
 
 document.getElementById('edgeLabelOffset').addEventListener('input', (e) => {
   if (selectedEdge) {
-    interactions.changeEdgeProperties(selectedEdge.id, (edge) => {
+    changeEdge(selectedEdge.id, (edge) => {
       edge.labelOffset = parseFloat(e.target.value) || 0;
     });
   }
@@ -735,7 +824,7 @@ function updateMarkers() {
   const endType = document.getElementById('edgeEndMarker').value;
   const startSize = parseFloat(document.getElementById('edgeStartMarkerSize').value) || 12;
   const endSize = parseFloat(document.getElementById('edgeEndMarkerSize').value) || 12;
-  interactions.changeEdgeProperties(selectedEdge.id, (edge) => {
+  changeEdge(selectedEdge.id, (edge) => {
     edge.startMarker = startType === 'none' ? undefined : { type: startType, size: startSize };
     edge.endMarker = endType === 'none' ? undefined : { type: endType, size: endSize };
   });
@@ -749,7 +838,7 @@ document.getElementById('edgeEndMarkerSize').addEventListener('input', updateMar
 // Group panel handlers
 document.getElementById('groupLabel').addEventListener('input', (e) => {
   if (selectedGroup) {
-    interactions.changeGroupProperties(selectedGroup.id, (group) => {
+    changeGroup(selectedGroup.id, (group) => {
       group.label = e.target.value || undefined;
     });
   }
@@ -757,7 +846,7 @@ document.getElementById('groupLabel').addEventListener('input', (e) => {
 
 document.getElementById('groupPadding').addEventListener('input', (e) => {
   if (selectedGroup) {
-    interactions.changeGroupProperties(selectedGroup.id, (group) => {
+    changeGroup(selectedGroup.id, (group) => {
       group.padding = parseFloat(e.target.value);
     });
   }
@@ -766,7 +855,7 @@ document.getElementById('groupPadding').addEventListener('input', (e) => {
 document.getElementById('groupFillColor').addEventListener('input', (e) => {
   document.getElementById('groupFillColorText').value = e.target.value;
   if (selectedGroup) {
-    interactions.changeGroupProperties(selectedGroup.id, (group) => {
+    changeGroup(selectedGroup.id, (group) => {
       group.style = { ...group.style, fillColor: e.target.value };
     });
   }
@@ -775,7 +864,7 @@ document.getElementById('groupFillColor').addEventListener('input', (e) => {
 document.getElementById('groupStrokeColor').addEventListener('input', (e) => {
   document.getElementById('groupStrokeColorText').value = e.target.value;
   if (selectedGroup) {
-    interactions.changeGroupProperties(selectedGroup.id, (group) => {
+    changeGroup(selectedGroup.id, (group) => {
       group.style = { ...group.style, strokeColor: e.target.value };
     });
   }

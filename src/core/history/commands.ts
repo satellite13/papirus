@@ -65,7 +65,9 @@ const snapshotLabel = (label?: TextLabel): LabelSnapshot | undefined => {
   return {
     text: label.text,
     editableText: label.editableText,
-    style: cloneValue(label.style),
+    // Keep only local text overrides; computed style contains theme/class values
+    // and would overwrite class text color on debounced history replay.
+    style: cloneValue(label.styleOverrides),
     styleClass: label.styleClass,
     maxWidth: label.maxWidth,
   };

@@ -1,19 +1,44 @@
-import type { Bounds, Point, TextStyle } from '@/types';
+import type { Bounds, ContentInsetSides, Point, TextStyle } from '@/types';
 import type { StyleManager } from '@/styles/StyleManager';
 import { shallowEqual } from '@/utils/style';
+
+const DEFAULT_INSET = 8;
+
+function normalizeTextInset(
+  value: number | ContentInsetSides | undefined,
+  fallback: number
+): Required<ContentInsetSides> {
+  const n = (v: number | undefined): number =>
+    v !== undefined && Number.isFinite(v) ? Math.max(0, v) : fallback;
+  if (value === undefined) {
+    return { top: fallback, right: fallback, bottom: fallback, left: fallback };
+  }
+  if (typeof value === 'number') {
+    const v = n(value);
+    return { top: v, right: v, bottom: v, left: v };
+  }
+  return {
+    top: n(value.top),
+    right: n(value.right),
+    bottom: n(value.bottom),
+    left: n(value.left),
+  };
+}
 
 export interface TextLabelOptions {
   text: string;
   editableText?: string;
   style?: TextStyle;
   maxWidth?: number;
+  /** Inset from bounds edge to text: number (all sides) or { top?, right?, bottom?, left? }. Backward compat: inset ?? margin ?? padding ?? 8 */
+  inset?: number | ContentInsetSides;
   padding?: number;
   margin?: number;
   styleClass?: string;
   onChange?: () => void;
 }
 
-const DEFAULT_STYLE: Required<TextStyle> = {
+const DEFAULT_STYLE: TextStyle & { align: CanvasTextAlign; baseline: CanvasTextBaseline } = {
   font: '14px sans-serif',
   fontSize: 14,
   fontFamily: 'sans-serif',
@@ -22,6 +47,7 @@ const DEFAULT_STYLE: Required<TextStyle> = {
   opacity: 1,
   align: 'center',
   baseline: 'middle',
+  verticalAlign: 'middle',
 };
 
 /**
@@ -34,8 +60,7 @@ export class TextLabel {
   private _localStyle: TextStyle;
   private _maxWidth?: number;
   private _autoMaxWidth?: number;
-  private _padding: number;
-  private _margin: number;
+  private _inset: Required<ContentInsetSides>;
   private _lines: string[] = [];
   private _measuredWidth = 0;
   private _measuredHeight = 0;
@@ -49,8 +74,10 @@ export class TextLabel {
     this._localStyle = { ...options.style };
     this._style = { ...DEFAULT_STYLE, ...options.style };
     this._maxWidth = options.maxWidth;
-    this._padding = options.padding ?? 8;
-    this._margin = Number.isFinite(options.margin) ? Math.max(0, options.margin ?? 0) : 0;
+    this._inset = normalizeTextInset(
+      options.inset ?? options.margin ?? options.padding,
+      DEFAULT_INSET
+    );
     this._styleClass = options.styleClass;
     this._onChange = options.onChange;
   }
@@ -103,6 +130,13 @@ export class TextLabel {
   }
 
   /**
+   * Raw text style overrides (without StyleManager merge)
+   */
+  get styleOverrides(): TextStyle {
+    return { ...this._localStyle };
+  }
+
+  /**
    * Style class name for StyleManager
    */
   get styleClass(): string | undefined {
@@ -148,33 +182,21 @@ export class TextLabel {
   }
 
   /**
-   * Label padding
+   * Inset from bounds edge to text (per side: top, right, bottom, left)
    */
-  get padding(): number {
-    return this._padding;
+  get inset(): Required<ContentInsetSides> {
+    return { ...this._inset };
   }
 
-  set padding(value: number) {
-    const next = Number.isFinite(value) ? Math.max(0, value) : this._padding;
-    if (this._padding !== next) {
-      this._padding = next;
-      this._lines = [];
-      this._measureDirty = true;
-      this._onChange?.();
-    }
-  }
-
-  /**
-   * Label margin
-   */
-  get margin(): number {
-    return this._margin;
-  }
-
-  set margin(value: number) {
-    const next = Number.isFinite(value) ? Math.max(0, value) : this._margin;
-    if (this._margin !== next) {
-      this._margin = next;
+  set inset(value: number | ContentInsetSides) {
+    const next = normalizeTextInset(value, DEFAULT_INSET);
+    if (
+      this._inset.top !== next.top ||
+      this._inset.right !== next.right ||
+      this._inset.bottom !== next.bottom ||
+      this._inset.left !== next.left
+    ) {
+      this._inset = next;
       this._lines = [];
       this._measureDirty = true;
       this._onChange?.();
@@ -212,7 +234,7 @@ export class TextLabel {
 
   /**
    * Get wrapped lines for export. Uses ctx to measure and wrap by words.
-   * Call with maxWidth = inner bounds width (e.g. bounds.width - margin*2).
+   * Call with maxWidth = inner bounds width (e.g. bounds.width - inset*2).
    */
   getWrappedLines(ctx: CanvasRenderingContext2D, maxWidth: number): string[] {
     this.setAutoMaxWidth(maxWidth);
@@ -239,8 +261,11 @@ export class TextLabel {
 
     const text = this._text ?? '';
     if (effectiveMaxWidth !== undefined) {
-      const maxWidth = Math.max(0, effectiveMaxWidth - this._margin * 2);
-      this._lines = this.wrapText(ctx, text, Math.max(0, maxWidth - this._padding * 2));
+      const maxWidth = Math.max(
+        0,
+        effectiveMaxWidth - this._inset.left - this._inset.right
+      );
+      this._lines = this.wrapText(ctx, text, maxWidth);
     } else {
       this._lines = text.split('\n');
     }
@@ -252,8 +277,9 @@ export class TextLabel {
       maxLineWidth = Math.max(maxLineWidth, metrics.width);
     }
 
-    this._measuredWidth = maxLineWidth + this._padding * 2 + this._margin * 2;
-    this._measuredHeight = this._lines.length * lineHeight + this._padding * 2 + this._margin * 2;
+    this._measuredWidth = maxLineWidth + this._inset.left + this._inset.right;
+    this._measuredHeight =
+      this._lines.length * lineHeight + this._inset.top + this._inset.bottom;
     this._measureDirty = false;
 
     return {
@@ -280,28 +306,51 @@ export class TextLabel {
     const lineHeight = (this._style.fontSize ?? 14) * 1.2;
     const totalHeight = this._lines.length * lineHeight;
 
-    const margin = this._margin;
     const innerBounds: Bounds = {
-      x: bounds.x + margin,
-      y: bounds.y + margin,
-      width: Math.max(0, bounds.width - margin * 2),
-      height: Math.max(0, bounds.height - margin * 2),
+      x: bounds.x + this._inset.left,
+      y: bounds.y + this._inset.top,
+      width: Math.max(
+        0,
+        bounds.width - this._inset.left - this._inset.right
+      ),
+      height: Math.max(
+        0,
+        bounds.height - this._inset.top - this._inset.bottom
+      ),
     };
 
-    // Calculate starting position based on alignment
+    // Horizontal position inside innerBounds
     let x: number;
     switch (align) {
       case 'left':
-        x = innerBounds.x + this._padding;
+        x = innerBounds.x;
         break;
       case 'right':
-        x = innerBounds.x + innerBounds.width - this._padding;
+        x = innerBounds.x + innerBounds.width;
         break;
       default:
         x = innerBounds.x + innerBounds.width / 2;
     }
 
-    const startY = innerBounds.y + (innerBounds.height - totalHeight) / 2 + lineHeight / 2;
+    const verticalAlign = this._style.verticalAlign ?? 'middle';
+    let startY: number;
+    switch (verticalAlign) {
+      case 'top':
+        startY = innerBounds.y + lineHeight / 2;
+        break;
+      case 'bottom':
+        startY =
+          innerBounds.y +
+          innerBounds.height -
+          totalHeight +
+          lineHeight / 2;
+        break;
+      default:
+        startY =
+          innerBounds.y +
+          (innerBounds.height - totalHeight) / 2 +
+          lineHeight / 2;
+    }
 
     ctx.fillStyle = this._style.color ?? '#000000';
 

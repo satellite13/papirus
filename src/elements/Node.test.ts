@@ -125,7 +125,6 @@ describe('Node', () => {
       width: 180,
       height: 70,
       label: { text: 'alpha beta gamma', margin: 0, padding: 4 },
-      labelPlacement: 'center',
       icon: {
         source: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"></svg>',
         placement: 'left',

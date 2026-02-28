@@ -57,9 +57,7 @@ describe('Serializer', () => {
           source: 'https://example.com/icon.png',
           fit: 'contain',
           placement: 'top',
-          padding: 10,
-          margin: 6,
-          gap: 8,
+          inset: 10,
         },
       });
       renderer.addNode(node);
@@ -76,9 +74,7 @@ describe('Serializer', () => {
       expect(serializedNode.icon?.source).toBe('https://example.com/icon.png');
       expect(serializedNode.icon?.fit).toBe('contain');
       expect(serializedNode.icon?.placement).toBe('top');
-      expect(serializedNode.icon?.padding).toBe(10);
-      expect(serializedNode.icon?.margin).toBe(6);
-      expect(serializedNode.icon?.gap).toBe(8);
+      expect(serializedNode.icon?.inset).toBe(10);
 
       renderer.destroy();
     });

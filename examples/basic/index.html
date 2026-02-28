@@ -86,24 +86,14 @@
               <label class="form-label">Size</label>
               <input type="number" class="form-input" id="nodeLabelSize" min="8" max="32" value="12">
             </div>
-            <div class="form-row">
-              <label class="form-label">Label Pad</label>
-              <input type="number" class="form-input" id="nodeLabelPadding" min="0" max="32" value="8">
-            </div>
-            <div class="form-row">
-              <label class="form-label">Label Margin</label>
-              <input type="number" class="form-input" id="nodeLabelMargin" min="0" max="32" value="0">
-            </div>
-            <div class="form-row">
-              <label class="form-label">Placement</label>
-              <select class="form-select" id="nodeLabelPlacement">
-                <option value="auto">Auto</option>
-                <option value="center">Center</option>
-                <option value="top">Top</option>
-                <option value="bottom">Bottom</option>
-                <option value="left">Left</option>
-                <option value="right">Right</option>
-              </select>
+            <div class="form-row form-row--sides">
+              <label class="form-label">Label Inset</label>
+              <div class="form-sides">
+                <input type="number" class="form-input form-input--side" id="nodeLabelInsetTop" min="0" max="32" value="8" title="Top">
+                <input type="number" class="form-input form-input--side" id="nodeLabelInsetRight" min="0" max="32" value="8" title="Right">
+                <input type="number" class="form-input form-input--side" id="nodeLabelInsetBottom" min="0" max="32" value="8" title="Bottom">
+                <input type="number" class="form-input form-input--side" id="nodeLabelInsetLeft" min="0" max="32" value="8" title="Left">
+              </div>
             </div>
             <div class="form-row">
               <label class="form-label">Text Align</label>
@@ -111,6 +101,14 @@
                 <option value="center">Center</option>
                 <option value="left">Left</option>
                 <option value="right">Right</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <label class="form-label">Vertical Align</label>
+              <select class="form-select" id="nodeLabelVerticalAlign">
+                <option value="middle">Middle</option>
+                <option value="top">Top</option>
+                <option value="bottom">Bottom</option>
               </select>
             </div>
             <div class="form-row">
@@ -128,16 +126,17 @@
               </select>
             </div>
             <div class="form-row">
-              <label class="form-label">Icon Pad</label>
-              <input type="number" class="form-input" id="nodeIconPadding" min="0" max="32" value="8">
+              <label class="form-label">Icon Inset</label>
+              <input type="number" class="form-input" id="nodeIconInset" min="0" max="40" value="6">
             </div>
-            <div class="form-row">
-              <label class="form-label">Icon Margin</label>
-              <input type="number" class="form-input" id="nodeIconMargin" min="0" max="32" value="0">
-            </div>
-            <div class="form-row">
-              <label class="form-label">Icon Gap</label>
-              <input type="number" class="form-input" id="nodeIconGap" min="0" max="40" value="6">
+            <div class="form-row form-row--sides">
+              <label class="form-label">Content Inset</label>
+              <div class="form-sides">
+                <input type="number" class="form-input form-input--side" id="nodeContentInsetTop" min="0" max="40" value="0" title="Top">
+                <input type="number" class="form-input form-input--side" id="nodeContentInsetRight" min="0" max="40" value="0" title="Right">
+                <input type="number" class="form-input form-input--side" id="nodeContentInsetBottom" min="0" max="40" value="0" title="Bottom">
+                <input type="number" class="form-input form-input--side" id="nodeContentInsetLeft" min="0" max="40" value="0" title="Left">
+              </div>
             </div>
             <div class="form-row">
               <label class="form-label">Fill</label>

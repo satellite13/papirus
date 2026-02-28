@@ -50,7 +50,7 @@ export type { HistoryEvents, HistoryManagerOptions } from './core/HistoryManager
 // Elements
 export { Element, generateId, resetIdCounter } from './elements/Element';
 export { Node } from './elements/Node';
-export type { NodeOptions, ResizeHandle, AnchorPointsConfig, LabelPlacement } from './elements/Node';
+export type { NodeOptions, ResizeHandle, AnchorPointsConfig } from './elements/Node';
 
 export { Port, resetPortIdCounter } from './elements/Port';
 export type { PortOptions } from './elements/Port';
@@ -132,6 +132,7 @@ export type {
   Point,
   Size,
   Bounds,
+  ContentInsetSides,
   ElementState,
   PortPosition,
   PortType,

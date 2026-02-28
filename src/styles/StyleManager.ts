@@ -69,18 +69,14 @@ const DEFAULT_THEME: Theme = {
       cornerRadius: 4,
     },
     selected: {
-      fillColor: '#ffffff',
-      strokeColor: '#333333',
+      strokeColor: '#3b82f6',
       strokeWidth: 2,
       opacity: 1,
-      cornerRadius: 4,
     },
     dragging: {
-      fillColor: '#f0f0f0',
       strokeColor: '#333333',
       strokeWidth: 2,
       opacity: 0.8,
-      cornerRadius: 4,
     },
   },
   edge: {
@@ -371,15 +367,16 @@ export class StyleManager {
   }
 
   private getBaseNodeStyle(state: ElementState): NodeStyle {
+    const d = this._theme.node.default;
     switch (state) {
       case 'hover':
-        return this._theme.node.hover;
+        return { ...d, ...this._theme.node.hover };
       case 'selected':
-        return this._theme.node.selected;
+        return { ...d, ...this._theme.node.selected };
       case 'dragging':
-        return this._theme.node.dragging;
+        return { ...d, ...this._theme.node.dragging };
       default:
-        return this._theme.node.default;
+        return d;
     }
   }
 
