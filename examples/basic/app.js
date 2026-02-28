@@ -397,15 +397,15 @@ const edgeDefinitions = [
   {
     from: 'check', to: 'end', type: 'polyline',
     endMarker: { type: 'open', size: 12 },
-    label: 'Yes',
-    labelBackground: { color: '#dcfce7', padding: 6, borderRadius: 4 },
+    label: { text: 'Yes', inset: { top: 6, right: 10, bottom: 6, left: 10 } },
+    labelBackground: { color: '#dcfce7', borderRadius: 4 },
   },
   {
     from: 'check', to: 'error', type: 'polyline',
     endMarker: { type: 'open', size: 12 },
-    label: 'No',
+    label: { text: 'No', inset: { top: 6, right: 10, bottom: 6, left: 10 } },
     labelOffset: 10,
-    labelBackground: { color: '#fee2e2', padding: 6, borderRadius: 4 },
+    labelBackground: { color: '#fee2e2', borderRadius: 4 },
   },
 ];
 
@@ -595,6 +595,21 @@ function updateEdgePanel(edge) {
   document.getElementById('edgeStrokeColorText').value = style.strokeColor || '#666666';
   document.getElementById('edgeStrokeWidth').value = style.strokeWidth || 2;
   document.getElementById('edgeLabelOffset').value = edge.labelOffset ?? 0;
+  const labelInset = edge.label?.inset;
+  let liT = 8, liR = 8, liB = 8, liL = 8;
+  if (typeof labelInset === 'number' && Number.isFinite(labelInset)) {
+    liT = liR = liB = liL = labelInset;
+  } else if (typeof labelInset === 'object' && labelInset) {
+    liT = labelInset.top ?? 8; liR = labelInset.right ?? 8; liB = labelInset.bottom ?? 8; liL = labelInset.left ?? 8;
+  }
+  document.getElementById('edgeLabelInsetTop').value = liT;
+  document.getElementById('edgeLabelInsetRight').value = liR;
+  document.getElementById('edgeLabelInsetBottom').value = liB;
+  document.getElementById('edgeLabelInsetLeft').value = liL;
+  document.getElementById('edgeLabelBgRadius').value = edge.labelBackground?.borderRadius ?? 2;
+  const edgeBgColor = edge.labelBackground?.color || '#ffffff';
+  document.getElementById('edgeLabelBgColor').value = edgeBgColor;
+  document.getElementById('edgeLabelBgColorText').value = edgeBgColor;
   document.getElementById('edgeStartMarker').value = edge.startMarker?.type || 'none';
   document.getElementById('edgeStartMarkerSize').value = edge.startMarker?.size || 12;
   document.getElementById('edgeEndMarker').value = edge.endMarker?.type || 'open';
@@ -810,8 +825,16 @@ document.getElementById('nodeOpacity').addEventListener('input', (e) => {
 document.getElementById('edgeLabel').addEventListener('input', (e) => {
   if (!selectedEdge) return;
   changeEdge(selectedEdge.id, (edge) => {
-    if (e.target.value) {
-      edge.label = edge.label ? { ...edge.label, text: e.target.value } : e.target.value;
+    const nextText = e.target.value;
+    if (nextText) {
+      if (edge.label) {
+        edge.label.text = nextText;
+      } else {
+        edge.label = new TextLabel({
+          text: nextText,
+          inset: getEdgeLabelInsetFromPanel(),
+        });
+      }
     } else {
       edge.label = undefined;
     }
@@ -849,6 +872,59 @@ document.getElementById('edgeLabelOffset').addEventListener('input', (e) => {
       edge.labelOffset = parseFloat(e.target.value) || 0;
     });
   }
+});
+
+function getEdgeLabelInsetFromPanel() {
+  return {
+    top: toNonNegativeNumber(document.getElementById('edgeLabelInsetTop').value, 8),
+    right: toNonNegativeNumber(document.getElementById('edgeLabelInsetRight').value, 8),
+    bottom: toNonNegativeNumber(document.getElementById('edgeLabelInsetBottom').value, 8),
+    left: toNonNegativeNumber(document.getElementById('edgeLabelInsetLeft').value, 8),
+  };
+}
+
+function applyEdgeLabelInsetFromPanel() {
+  if (!selectedEdge?.label) return;
+  changeEdge(selectedEdge.id, (edge) => {
+    if (!edge.label) return;
+    edge.label.inset = getEdgeLabelInsetFromPanel();
+  });
+}
+
+['edgeLabelInsetTop', 'edgeLabelInsetRight', 'edgeLabelInsetBottom', 'edgeLabelInsetLeft'].forEach((id) => {
+  document.getElementById(id).addEventListener('input', applyEdgeLabelInsetFromPanel);
+});
+
+document.getElementById('edgeLabelBgRadius').addEventListener('input', (e) => {
+  if (!selectedEdge) return;
+  changeEdge(selectedEdge.id, (edge) => {
+    edge.labelBackground = {
+      ...(edge.labelBackground || {}),
+      borderRadius: toNonNegativeNumber(e.target.value, edge.labelBackground?.borderRadius ?? 2),
+    };
+  });
+});
+
+document.getElementById('edgeLabelBgColor').addEventListener('input', (e) => {
+  document.getElementById('edgeLabelBgColorText').value = e.target.value;
+  if (!selectedEdge) return;
+  changeEdge(selectedEdge.id, (edge) => {
+    edge.labelBackground = {
+      ...(edge.labelBackground || {}),
+      color: e.target.value,
+    };
+  });
+});
+
+document.getElementById('edgeLabelBgColorText').addEventListener('input', (e) => {
+  document.getElementById('edgeLabelBgColor').value = e.target.value;
+  if (!selectedEdge) return;
+  changeEdge(selectedEdge.id, (edge) => {
+    edge.labelBackground = {
+      ...(edge.labelBackground || {}),
+      color: e.target.value,
+    };
+  });
 });
 
 function updateMarkers() {

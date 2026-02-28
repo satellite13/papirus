@@ -181,7 +181,7 @@ describe('Serializer', () => {
         to: { nodeId: nodeB.id },
         label: 'Test',
         labelOffset: 15,
-        labelBackground: { color: '#f0f0f0', padding: 8, borderRadius: 4 },
+        labelBackground: { color: '#f0f0f0', borderRadius: 4 },
       });
       renderer.addEdge(edge);
 
@@ -194,7 +194,7 @@ describe('Serializer', () => {
       const serializedEdge = data.edges[0]!;
 
       expect(serializedEdge.labelOffset).toBe(15);
-      expect(serializedEdge.labelBackground).toEqual({ color: '#f0f0f0', padding: 8, borderRadius: 4 });
+      expect(serializedEdge.labelBackground).toEqual({ color: '#f0f0f0', borderRadius: 4 });
 
       renderer.destroy();
     });

@@ -123,7 +123,6 @@ export interface EdgeStyle extends ElementStyle {
 export interface EdgeLabelBackground {
   color?: string;
   opacity?: number;
-  padding?: number;
   borderRadius?: number;
 }
 
@@ -247,10 +246,6 @@ export interface SerializedNodeIcon {
   opacity?: number;
   strokeColor?: string;
   fillColor?: string;
-  align?: 'left' | 'center' | 'right';
-  verticalAlign?: 'top' | 'center' | 'bottom';
-  offsetX?: number;
-  offsetY?: number;
 }
 
 /**

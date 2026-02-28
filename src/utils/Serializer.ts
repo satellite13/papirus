@@ -274,10 +274,6 @@ export class Serializer {
           scaleWithBounds: opts.scaleWithBounds,
           inset: node.icon.inset !== 6 ? node.icon.inset : undefined,
           opacity: opts.opacity,
-          align: opts.align,
-          verticalAlign: opts.verticalAlign,
-          offsetX: opts.offsetX,
-          offsetY: opts.offsetY,
         }) as SerializedNodeIcon;
       }
     }

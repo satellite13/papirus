@@ -5,7 +5,7 @@ import type { Node } from '@/elements/Node';
 import type { Group } from '@/elements/Group';
 import type { ArrowMarkerConfig, TextStyle } from '@/types';
 import type { NodeImageOptions, NodeImagePlacement } from '@/elements/NodeImage';
-import { EDGE_LABEL_BACKGROUND_PADDING, EDGE_LABEL_BACKGROUND_RADIUS } from '@/constants';
+import { EDGE_LABEL_BACKGROUND_RADIUS } from '@/constants';
 import { applyStyleManagerToElements } from './style';
 import { getContentBounds } from './contentBounds';
 import { downloadBlob } from './download';
@@ -233,15 +233,14 @@ export class SvgExporter {
     }
 
     const metrics = this.measureTextLabel(edge.label.text, edge.label.style, edge.label.inset);
-    const bgPadding = edge.labelBackground?.padding ?? EDGE_LABEL_BACKGROUND_PADDING;
     const bgColor = edge.labelBackground?.color ?? '#ffffff';
     const bgOpacity = edge.labelBackground?.opacity ?? 1;
     const bgRadius = edge.labelBackground?.borderRadius ?? EDGE_LABEL_BACKGROUND_RADIUS;
 
-    const x = point.x - metrics.width / 2 - bgPadding;
-    const y = point.y - metrics.height / 2 - bgPadding;
-    const width = metrics.width + bgPadding * 2;
-    const height = metrics.height + bgPadding * 2;
+    const x = point.x - metrics.width / 2;
+    const y = point.y - metrics.height / 2;
+    const width = metrics.width;
+    const height = metrics.height;
     const radius = Math.max(0, Math.min(bgRadius, width / 2, height / 2));
 
     if (radius <= 0) {
@@ -642,10 +641,6 @@ export class SvgExporter {
   ): { x: number; y: number; width: number; height: number } {
     const fit = opts.fit ?? 'none';
     const scaleWithBounds = opts.scaleWithBounds ?? false;
-    const align = opts.align ?? 'center';
-    const verticalAlign = opts.verticalAlign ?? 'center';
-    const offsetX = opts.offsetX ?? 0;
-    const offsetY = opts.offsetY ?? 0;
 
     const innerBounds = {
       x: bounds.x + inset,
@@ -678,21 +673,12 @@ export class SvgExporter {
     let x = innerBounds.x;
     let y = innerBounds.y;
 
-    if (align === 'center') {
-      x = innerBounds.x + (innerBounds.width - drawWidth) / 2;
-    } else if (align === 'right') {
-      x = innerBounds.x + innerBounds.width - drawWidth;
-    }
-
-    if (verticalAlign === 'center') {
-      y = innerBounds.y + (innerBounds.height - drawHeight) / 2;
-    } else if (verticalAlign === 'bottom') {
-      y = innerBounds.y + innerBounds.height - drawHeight;
-    }
+    x = innerBounds.x + (innerBounds.width - drawWidth) / 2;
+    y = innerBounds.y + (innerBounds.height - drawHeight) / 2;
 
     return {
-      x: x + offsetX,
-      y: y + offsetY,
+      x,
+      y,
       width: drawWidth,
       height: drawHeight,
     };

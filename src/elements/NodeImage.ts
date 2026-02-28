@@ -43,10 +43,6 @@ export interface NodeImageOptions {
   opacity?: number;
   strokeColor?: string;
   fillColor?: string;
-  align?: 'left' | 'center' | 'right';
-  verticalAlign?: 'top' | 'center' | 'bottom';
-  offsetX?: number;
-  offsetY?: number;
 }
 
 // LRU cache for fetched SVG content (limit 100 entries to prevent memory growth)
@@ -174,10 +170,6 @@ export class NodeImage {
     const fit = this._options.fit ?? 'none';
     const scaleWithBounds = this._options.scaleWithBounds ?? false;
     const opacity = this._options.opacity ?? 1;
-    const align = this._options.align ?? 'center';
-    const verticalAlign = this._options.verticalAlign ?? 'center';
-    const offsetX = this._options.offsetX ?? 0;
-    const offsetY = this._options.offsetY ?? 0;
 
     const innerBounds: Bounds = {
       x: bounds.x + ins,
@@ -212,21 +204,12 @@ export class NodeImage {
     let x = innerBounds.x;
     let y = innerBounds.y;
 
-    if (align === 'center') {
-      x = innerBounds.x + (innerBounds.width - drawWidth) / 2;
-    } else if (align === 'right') {
-      x = innerBounds.x + innerBounds.width - drawWidth;
-    }
-
-    if (verticalAlign === 'center') {
-      y = innerBounds.y + (innerBounds.height - drawHeight) / 2;
-    } else if (verticalAlign === 'bottom') {
-      y = innerBounds.y + innerBounds.height - drawHeight;
-    }
+    x = innerBounds.x + (innerBounds.width - drawWidth) / 2;
+    y = innerBounds.y + (innerBounds.height - drawHeight) / 2;
 
     ctx.save();
     ctx.globalAlpha = opacity;
-    ctx.drawImage(this._image, x + offsetX, y + offsetY, drawWidth, drawHeight);
+    ctx.drawImage(this._image, x, y, drawWidth, drawHeight);
     ctx.restore();
   }
 

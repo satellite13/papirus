@@ -24,7 +24,6 @@ import {
   ARROW_SIZE,
   ARROW_ANGLE,
   MARKER_SIZES,
-  EDGE_LABEL_BACKGROUND_PADDING,
   EDGE_LABEL_BACKGROUND_RADIUS,
   DEFAULT_SELECTION_COLOR,
   DEFAULT_HOVER_COLOR,
@@ -905,15 +904,14 @@ export class Edge extends Element {
     const labelWidth = this._label.measuredWidth;
     const labelHeight = this._label.measuredHeight;
 
-    const bgPadding = this._labelBackground?.padding ?? EDGE_LABEL_BACKGROUND_PADDING;
     const bgColor = this._labelBackground?.color ?? '#ffffff';
     const bgOpacity = this._labelBackground?.opacity ?? 1;
     const bgRadius = this._labelBackground?.borderRadius ?? EDGE_LABEL_BACKGROUND_RADIUS;
 
-    const bgX = labelPosition.x - labelWidth / 2 - bgPadding;
-    const bgY = labelPosition.y - labelHeight / 2 - bgPadding;
-    const bgWidth = labelWidth + bgPadding * 2;
-    const bgHeight = labelHeight + bgPadding * 2;
+    const bgX = labelPosition.x - labelWidth / 2;
+    const bgY = labelPosition.y - labelHeight / 2;
+    const bgWidth = labelWidth;
+    const bgHeight = labelHeight;
 
     ctx.fillStyle = bgColor;
     ctx.globalAlpha = bgOpacity;

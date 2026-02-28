@@ -18,7 +18,6 @@ export const MARKER_SIZES: Record<string, number> = {
 };
 
 // Edge label
-export const EDGE_LABEL_BACKGROUND_PADDING = 4;
 export const EDGE_LABEL_BACKGROUND_RADIUS = 2;
 
 // Resize handles

@@ -386,10 +386,10 @@ describe('Edge', () => {
         from: { nodeId: 'a' },
         to: { nodeId: 'b' },
         label: 'Test',
-        labelBackground: { color: '#f0f0f0', padding: 8, borderRadius: 4 },
+        labelBackground: { color: '#f0f0f0', borderRadius: 4 },
       });
 
-      expect(edge.labelBackground).toEqual({ color: '#f0f0f0', padding: 8, borderRadius: 4 });
+      expect(edge.labelBackground).toEqual({ color: '#f0f0f0', borderRadius: 4 });
     });
 
     it('can update label properties after creation', () => {

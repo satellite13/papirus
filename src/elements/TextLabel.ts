@@ -369,19 +369,16 @@ export class TextLabel {
       this.measure(ctx);
     }
 
-    this.applyStyle(ctx);
-
-    const lineHeight = (this._style.fontSize ?? 14) * 1.2;
-    const totalHeight = this._lines.length * lineHeight;
-    const startY = point.y - totalHeight / 2 + lineHeight / 2;
-
-    ctx.fillStyle = this._style.color ?? '#000000';
-
-    for (let i = 0; i < this._lines.length; i++) {
-      const line = this._lines[i]!;
-      const y = startY + i * lineHeight;
-      ctx.fillText(line, point.x, y);
-    }
+    // For edge labels, point is the visual center of the whole label bounds.
+    // Rendering through bounds keeps per-side inset semantics consistent with node labels:
+    // top/bottom and left/right act independently instead of collapsing into summed padding.
+    const bounds: Bounds = {
+      x: point.x - this._measuredWidth / 2,
+      y: point.y - this._measuredHeight / 2,
+      width: this._measuredWidth,
+      height: this._measuredHeight,
+    };
+    this.render(ctx, bounds);
   }
 
   private applyStyle(ctx: CanvasRenderingContext2D): void {
