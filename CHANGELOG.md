@@ -7,6 +7,11 @@
 
 ## [Unreleased]
 
+## [0.3.22] - 2025-02-28
+
+### Fixed
+- TextLabel: защита от `undefined` в `text` — при отсутствии или присвоении `undefined` (например из опций лейбла при десериализации) больше не возникает `TypeError: undefined is not an object (evaluating 'this._text.split')`. В конструкторе и сеттере используется `?? ''`, в `measure()` — безопасное разбиение по строкам.
+
 ## [0.3.21] - 2025-02-27
 
 ### Fixed
@@ -196,7 +201,8 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.3.21...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.3.22...HEAD
+[0.3.22]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.22
 [0.3.21]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.21
 [0.3.20]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.20
 [0.3.19]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.19
