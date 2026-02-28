@@ -65,7 +65,6 @@ renderer.enableInteractions();
 - [Утилиты](./docs/utils.md)
 - [Changelog](./CHANGELOG.ru.md)
 - [Политика безопасности](./SECURITY.md)
-- [Чеклист подготовки к Open Source](./docs/OPEN_SOURCE_PREPARATION.ru.md)
 
 ## Возможности
 

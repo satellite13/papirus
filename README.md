@@ -65,7 +65,6 @@ renderer.enableInteractions();
 - [Utils](./docs/utils.md)
 - [Changelog](./CHANGELOG.md)
 - [Security Policy](./SECURITY.md)
-- [Open Source Preparation](./docs/OPEN_SOURCE_PREPARATION.md)
 
 ## Features
 
