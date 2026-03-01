@@ -49,6 +49,8 @@ export interface InteractionManagerOptions {
   alignToNodes?: boolean;
   /** When true, edges can be attached anywhere on the shape outline (not just ports) */
   attachToOutline?: boolean;
+  /** When true, disable editing interactions and keep navigation/selection only */
+  navigationOnly?: boolean;
   keymap?: Partial<InteractionKeymap>;
 }
 
@@ -69,6 +71,7 @@ export class InteractionManager {
   private readonly navigationManager: NavigationManager;
   private readonly connectionManager: ConnectionManager;
   private readonly historyManager: HistoryManager;
+  private readonly navigationOnly: boolean;
   private keymap: InteractionKeymap;
   private overlayCleanup: (() => void) | null = null;
 
@@ -109,6 +112,7 @@ export class InteractionManager {
 
   constructor(options: InteractionManagerOptions) {
     this.renderer = options.renderer;
+    this.navigationOnly = options.navigationOnly ?? false;
     this.inputHandler = new InputHandler({
       canvas: this.renderer.getCanvas(),
       screenToWorld: (x, y): { x: number; y: number } => this.renderer.screenToWorld(x, y),
@@ -285,13 +289,15 @@ export class InteractionManager {
   private setupEvents(options: InteractionManagerOptions): void {
     this.overlayCleanup = this.renderer.addOverlayRenderer((ctx) => {
       this.selectionManager.renderSelectionRect(ctx);
-      this.dragManager.renderAlignmentGuides(ctx);
-      this.connectionManager.renderPreview(ctx);
-      this.connectionManager.renderHoverAnchors(ctx);
-      for (const id of this.selectionManager.selectedIds) {
-        const node = this.renderer.getNode(id);
-        if (node) {
-          node.renderResizeHandles(ctx);
+      if (!this.navigationOnly) {
+        this.dragManager.renderAlignmentGuides(ctx);
+        this.connectionManager.renderPreview(ctx);
+        this.connectionManager.renderHoverAnchors(ctx);
+        for (const id of this.selectionManager.selectedIds) {
+          const node = this.renderer.getNode(id);
+          if (node) {
+            node.renderResizeHandles(ctx);
+          }
         }
       }
     });
@@ -307,78 +313,80 @@ export class InteractionManager {
     this.inputHandler.on('keydown', (event) => this.handleKeyDown(event, options));
     this.inputHandler.on('keyup', (event) => this.handleKeyUp(event));
 
-    this.dragManager.on('dragstart', (nodeIds) => {
-      this.connectionManager.disableHover();
-      this.dragStartPositions.clear();
-      for (const id of nodeIds) {
-        const node = this.renderer.getNode(id);
-        if (node) {
-          this.dragStartPositions.set(id, { x: node.x, y: node.y });
-        }
-      }
-    });
-
-    this.dragManager.on('dragend', (nodeIds) => {
-      this.connectionManager.enableHover();
-
-      const nodePositions = new Map<
-        string,
-        { before: { x: number; y: number }; after: { x: number; y: number } }
-      >();
-      for (const id of nodeIds) {
-        const node = this.renderer.getNode(id);
-        const before = this.dragStartPositions.get(id);
-        if (!node || !before) continue;
-        const after = { x: node.x, y: node.y };
-        if (before.x !== after.x || before.y !== after.y) {
-          nodePositions.set(id, { before, after });
-        }
-      }
-
-      if (nodePositions.size > 0) {
-        this.historyManager.execute(
-          new MoveNodesCommand((id) => this.renderer.getNode(id), nodePositions)
-        );
-      }
-    });
-
-    this.connectionManager.on('edgeReconnectStart', (edge, endpoint, original) => {
-      this.reconnectOrigins.set(edge.id, { endpoint, original: { ...original } });
-    });
-
-    this.connectionManager.on('edgeReconnect', (edge, endpoint) => {
-      const origin = this.reconnectOrigins.get(edge.id);
-      if (!origin || origin.endpoint !== endpoint) {
-        return;
-      }
-
-      const before = origin.original;
-      const after = endpoint === 'start' ? edge.from : edge.to;
-      if (this.endpointsEqual(before, after)) {
-        this.reconnectOrigins.delete(edge.id);
-        return;
-      }
-
-      this.historyManager.execute({
-        execute: () => {
-          if (endpoint === 'start') {
-            edge.from = { ...after };
-          } else {
-            edge.to = { ...after };
+    if (!this.navigationOnly) {
+      this.dragManager.on('dragstart', (nodeIds) => {
+        this.connectionManager.disableHover();
+        this.dragStartPositions.clear();
+        for (const id of nodeIds) {
+          const node = this.renderer.getNode(id);
+          if (node) {
+            this.dragStartPositions.set(id, { x: node.x, y: node.y });
           }
-          this.renderer.markDirty();
-        },
-        undo: () => {
-          if (endpoint === 'start') {
-            edge.from = { ...before };
-          } else {
-            edge.to = { ...before };
-          }
-          this.renderer.markDirty();
-        },
+        }
       });
-      this.reconnectOrigins.delete(edge.id);
-    });
+
+      this.dragManager.on('dragend', (nodeIds) => {
+        this.connectionManager.enableHover();
+
+        const nodePositions = new Map<
+          string,
+          { before: { x: number; y: number }; after: { x: number; y: number } }
+        >();
+        for (const id of nodeIds) {
+          const node = this.renderer.getNode(id);
+          const before = this.dragStartPositions.get(id);
+          if (!node || !before) continue;
+          const after = { x: node.x, y: node.y };
+          if (before.x !== after.x || before.y !== after.y) {
+            nodePositions.set(id, { before, after });
+          }
+        }
+
+        if (nodePositions.size > 0) {
+          this.historyManager.execute(
+            new MoveNodesCommand((id) => this.renderer.getNode(id), nodePositions)
+          );
+        }
+      });
+
+      this.connectionManager.on('edgeReconnectStart', (edge, endpoint, original) => {
+        this.reconnectOrigins.set(edge.id, { endpoint, original: { ...original } });
+      });
+
+      this.connectionManager.on('edgeReconnect', (edge, endpoint) => {
+        const origin = this.reconnectOrigins.get(edge.id);
+        if (!origin || origin.endpoint !== endpoint) {
+          return;
+        }
+
+        const before = origin.original;
+        const after = endpoint === 'start' ? edge.from : edge.to;
+        if (this.endpointsEqual(before, after)) {
+          this.reconnectOrigins.delete(edge.id);
+          return;
+        }
+
+        this.historyManager.execute({
+          execute: () => {
+            if (endpoint === 'start') {
+              edge.from = { ...after };
+            } else {
+              edge.to = { ...after };
+            }
+            this.renderer.markDirty();
+          },
+          undo: () => {
+            if (endpoint === 'start') {
+              edge.from = { ...before };
+            } else {
+              edge.to = { ...before };
+            }
+            this.renderer.markDirty();
+          },
+        });
+        this.reconnectOrigins.delete(edge.id);
+      });
+    }
 
     this.historyManager.on('change', () => {
       this.renderer.markDirty();
@@ -389,14 +397,16 @@ export class InteractionManager {
     this.handledScrollbarMouseDown = false;
     this.handledOverlayMouseDown = false;
 
-    if (this.resizeManager.handleMouseDown(event)) {
-      return;
-    }
-    if (this.connectionManager.tryStartReconnection(event)) {
-      return;
-    }
-    if (this.connectionManager.tryStartConnectionAtPoint(event)) {
-      return;
+    if (!this.navigationOnly) {
+      if (this.resizeManager.handleMouseDown(event)) {
+        return;
+      }
+      if (this.connectionManager.tryStartReconnection(event)) {
+        return;
+      }
+      if (this.connectionManager.tryStartConnectionAtPoint(event)) {
+        return;
+      }
     }
 
     const overlayDrag = this.renderer.beginOverlayDrag(event.screenX, event.screenY);
@@ -434,6 +444,10 @@ export class InteractionManager {
     }
 
     if (this.navigationManager.handleMouseDown(event)) {
+      return;
+    }
+
+    if (this.navigationOnly) {
       return;
     }
 
@@ -492,16 +506,18 @@ export class InteractionManager {
       return;
     }
 
-    if (this.resizeManager.handleMouseMove(event)) {
-      return;
-    }
+    if (!this.navigationOnly) {
+      if (this.resizeManager.handleMouseMove(event)) {
+        return;
+      }
 
-    if (this.connectionManager.handleMouseMove(event)) {
-      return;
-    }
+      if (this.connectionManager.handleMouseMove(event)) {
+        return;
+      }
 
-    if (this.dragManager.handleMouseMove(event)) {
-      return;
+      if (this.dragManager.handleMouseMove(event)) {
+        return;
+      }
     }
 
     if (this.selectionManager.selectionRectangle !== null) {
@@ -525,16 +541,18 @@ export class InteractionManager {
       return;
     }
 
-    if (this.resizeManager.handleMouseUp()) {
-      return;
-    }
+    if (!this.navigationOnly) {
+      if (this.resizeManager.handleMouseUp()) {
+        return;
+      }
 
-    if (this.connectionManager.handleMouseUp(event)) {
-      return;
-    }
+      if (this.connectionManager.handleMouseUp(event)) {
+        return;
+      }
 
-    if (this.dragManager.handleMouseUp(event)) {
-      return;
+      if (this.dragManager.handleMouseUp(event)) {
+        return;
+      }
     }
 
     if (this.selectionManager.selectionRectangle !== null) {
@@ -573,6 +591,10 @@ export class InteractionManager {
       this.resizeManager.handledMouseDown ||
       this.connectionManager.connecting
     ) {
+      return;
+    }
+
+    if (this.navigationOnly) {
       return;
     }
 
@@ -657,17 +679,21 @@ export class InteractionManager {
       ? event.code.slice(3).toLowerCase()
       : event.key.toLowerCase();
 
+    this.navigationManager.handleKeyDown(event);
+
+    if (this.handleViewportNavigationKey(event)) {
+      return;
+    }
+
+    if (this.navigationOnly) {
+      return;
+    }
+
     if (isCtrlOrMeta && (key === 'z' || key === 'y')) {
       this.flushPendingPropertyChanges();
     }
 
     if (this.historyManager.handleKeyDown(event)) {
-      return;
-    }
-
-    this.navigationManager.handleKeyDown(event);
-
-    if (this.handleViewportNavigationKey(event)) {
       return;
     }
 

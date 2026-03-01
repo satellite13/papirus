@@ -27,6 +27,20 @@ describe('InteractionManager', () => {
     expect(renderer.getNode(node.id)).toBeUndefined();
   });
 
+  it('does not delete selected nodes in navigationOnly mode', () => {
+    const canvas = document.createElement('canvas');
+    const renderer = new DiagramRenderer(canvas, { width: 200, height: 100, retina: false });
+    const interaction = new InteractionManager({ renderer, navigationOnly: true });
+
+    const node = new RectangleNode({ x: 10, y: 10, width: 20, height: 20 });
+    renderer.addNode(node);
+
+    interaction.selection.select(node.id);
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete' }));
+
+    expect(renderer.getNode(node.id)).toBeDefined();
+  });
+
   it('drags selected node and updates position', () => {
     const canvas = document.createElement('canvas');
     vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({
@@ -73,6 +87,54 @@ describe('InteractionManager', () => {
 
     expect(node.x).toBe(90);
     expect(node.y).toBe(100);
+  });
+
+  it('does not drag selected node in navigationOnly mode', () => {
+    const canvas = document.createElement('canvas');
+    vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 300,
+      height: 200,
+      right: 300,
+      bottom: 200,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+    const renderer = new DiagramRenderer(canvas, { width: 300, height: 200, retina: false });
+    const interaction = new InteractionManager({ renderer, navigationOnly: true });
+
+    const node = new RectangleNode({ x: 50, y: 50, width: 60, height: 40 });
+    renderer.addNode(node);
+    interaction.selection.select(node.id);
+
+    const centerX = 50 + 60 / 2;
+    const centerY = 50 + 40 / 2;
+
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', { clientX: centerX, clientY: centerY, button: 0, bubbles: true })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mousemove', {
+        clientX: centerX + 40,
+        clientY: centerY + 50,
+        button: 0,
+        buttons: 1,
+        bubbles: true,
+      })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mouseup', {
+        clientX: centerX + 40,
+        clientY: centerY + 50,
+        button: 0,
+        bubbles: true,
+      })
+    );
+
+    expect(node.x).toBe(50);
+    expect(node.y).toBe(50);
   });
 
   it('drags two nodes with editable-polyline: control points follow delta', () => {
