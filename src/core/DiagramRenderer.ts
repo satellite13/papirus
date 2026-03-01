@@ -26,6 +26,7 @@ export interface DiagramEvents {
   nodeRemove: [node: Node];
   edgeAdd: [edge: Edge];
   edgeRemove: [edge: Edge];
+  nodeBadgeClick: [nodeId: string, badgeId: string];
 }
 
 export interface DiagramPlugin {
@@ -669,6 +670,31 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
     }
 
     return undefined;
+  }
+
+  /**
+   * Update badge hover state and canvas cursor based on pointer position.
+   * Call from mousemove to show hover highlight and pointer cursor over badges.
+   */
+  updateBadgeHover(worldPoint: Point): void {
+    const element = this.getElementAtPoint(worldPoint);
+    let hoveredNodeId: string | null = null;
+    let hoveredIndex = -1;
+    const node = element as Node;
+    if (element && typeof node.getBadgeAtPoint === 'function') {
+      const badge = node.getBadgeAtPoint(worldPoint);
+      if (badge !== null) {
+        hoveredNodeId = node.id;
+        hoveredIndex = badge.index;
+      }
+    }
+    const cursor = hoveredNodeId !== null ? 'pointer' : '';
+    if (this.canvas.style.cursor !== cursor) {
+      this.canvas.style.cursor = cursor;
+    }
+    for (const n of this._nodes.values()) {
+      n.setBadgeHover(n.id === hoveredNodeId ? hoveredIndex : -1);
+    }
   }
 
   /**

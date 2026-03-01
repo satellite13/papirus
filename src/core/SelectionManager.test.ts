@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { DiagramRenderer } from './DiagramRenderer';
 import { SelectionManager } from './SelectionManager';
 import { RectangleNode } from '../elements/nodes/RectangleNode';

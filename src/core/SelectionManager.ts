@@ -1,5 +1,6 @@
 import { EventEmitter } from '@/events/EventEmitter';
 import type { DiagramRenderer } from './DiagramRenderer';
+import type { Node } from '@/elements/Node';
 import type { InputEvent } from '@/events/InputHandler';
 import type { Bounds, Point } from '@/types';
 import { rectsIntersect } from '@/utils/geometry';
@@ -126,6 +127,15 @@ export class SelectionManager extends EventEmitter<SelectionEvents> {
         this.clearSelection();
       }
       return;
+    }
+
+    const node = element as Node;
+    if (typeof node.getBadgeAtPoint === 'function') {
+      const badge = node.getBadgeAtPoint(point);
+      if (badge !== null) {
+        this.renderer.emit('nodeBadgeClick', element.id, badge.id);
+        return;
+      }
     }
 
     if (event.ctrlKey || event.metaKey) {

@@ -475,6 +475,10 @@ export class InteractionManager {
 
     const overScrollbar = this.renderer.updateScrollbarHover(event.screenX, event.screenY);
 
+    this.renderer.updateBadgeHover(
+      overScrollbar ? { x: -1e9, y: -1e9 } : { x: event.worldX, y: event.worldY }
+    );
+
     if (this.overlayDragSession) {
       const moved = this.renderer.updateOverlayDrag(
         this.overlayDragSession,

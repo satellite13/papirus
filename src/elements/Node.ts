@@ -18,6 +18,16 @@ import {
   RESIZE_HANDLE_SIZE,
 } from '@/constants';
 
+/** Badge shown in top-left corner of node (e.g. interactive property indicator) */
+export interface NodeBadgeOption {
+  id: string;
+  iconUrl: string;
+}
+
+const BADGE_SIZE = 15;
+const BADGE_OFFSET = 4;
+const BADGE_GAP = 4;
+
 export interface NodeOptions {
   id?: string;
   x: number;
@@ -34,6 +44,8 @@ export interface NodeOptions {
   showPortsAlways?: boolean;
   anchorPoints?: AnchorPointsConfig;
   resizeHandlesEnabled?: boolean;
+  /** Optional badges drawn in top-left corner of content area */
+  badges?: NodeBadgeOption[];
 }
 
 export type ResizeHandle = 'nw' | 'ne' | 'se' | 'sw';
@@ -67,6 +79,7 @@ export abstract class Node extends Element {
   protected _ports: Port[] = [];
   protected _label?: TextLabel;
   protected _icon?: NodeImage;
+  protected _badges: NodeBadgeOption[] = [];
   protected _nodeStyle: NodeStyle;
   protected _showPortsAlways: boolean;
   protected _anchorPoints: Required<AnchorPointsConfig>;
@@ -75,6 +88,8 @@ export abstract class Node extends Element {
   protected _contentInset: Required<ContentInsetSides>;
   private _attachToOutlineGetter?: () => boolean;
   private _anchorCache: { id: AnchorId; point: Point }[] | null = null;
+  private _badgeImageCache = new Map<string, { img: HTMLImageElement; loaded: boolean }>();
+  private _hoveredBadgeIndex = -1;
 
   protected constructor(options: NodeOptions) {
     super({
@@ -113,6 +128,11 @@ export abstract class Node extends Element {
       for (const portOptions of options.ports) {
         this.addPort(portOptions);
       }
+    }
+
+    if (options.badges !== undefined && options.badges.length > 0) {
+      this._badges = options.badges.map((b) => ({ id: b.id, iconUrl: b.iconUrl }));
+      this.ensureBadgeImagesLoaded();
     }
   }
 
@@ -188,6 +208,55 @@ export abstract class Node extends Element {
       this._icon = new NodeImage(value, () => this.markDirty());
     }
     this.markDirty();
+  }
+
+  /**
+   * Badges shown in top-left corner of node (e.g. interactive property icons)
+   */
+  get badges(): NodeBadgeOption[] {
+    return this._badges;
+  }
+
+  set badges(value: NodeBadgeOption[]) {
+    this._badges = Array.isArray(value) ? value.map((b) => ({ id: b.id, iconUrl: b.iconUrl })) : [];
+    this.ensureBadgeImagesLoaded();
+    this.markDirty();
+  }
+
+  /**
+   * Set which badge index is under the pointer (-1 for none). Used for hover highlight and cursor.
+   */
+  setBadgeHover(index: number): void {
+    if (this._hoveredBadgeIndex === index) return;
+    this._hoveredBadgeIndex = index;
+    this.markDirty();
+  }
+
+  /**
+   * Return badge at world point, or null if point is not over a badge.
+   */
+  getBadgeAtPoint(worldPoint: Point): { id: string; index: number } | null {
+    if (this._badges.length === 0) {
+      return null;
+    }
+    const bounds = this.getBounds();
+    const contentBounds = this.getLabelContainerBounds(bounds);
+    const localX = worldPoint.x - (contentBounds.x + BADGE_OFFSET);
+    const localY = worldPoint.y - (contentBounds.y + BADGE_OFFSET);
+    for (let i = 0; i < this._badges.length; i++) {
+      const badge = this._badges[i];
+      if (badge === undefined) continue;
+      const x = i * (BADGE_SIZE + BADGE_GAP);
+      if (
+        localX >= x &&
+        localX <= x + BADGE_SIZE &&
+        localY >= 0 &&
+        localY <= BADGE_SIZE
+      ) {
+        return { id: badge.id, index: i };
+      }
+    }
+    return null;
   }
 
   /**
@@ -456,6 +525,7 @@ export abstract class Node extends Element {
     ctx.lineDashOffset = 0;
 
     let bounds = this.getBounds();
+    this.renderBadges(ctx, bounds);
     const iconBoxSize = this._icon ? this.getIconBoxSize() : undefined;
 
     if (this._label) {
@@ -484,6 +554,69 @@ export abstract class Node extends Element {
 
     this.renderLabel(ctx, labelBounds);
     this.renderPorts(ctx);
+  }
+
+  private ensureBadgeImagesLoaded(): void {
+    for (const badge of this._badges) {
+      const url = badge.iconUrl;
+      if (!url || this._badgeImageCache.has(url)) {
+        continue;
+      }
+      const img = new Image();
+      img.decoding = 'async';
+      this._badgeImageCache.set(url, { img, loaded: false });
+      img.onload = (): void => {
+        const entry = this._badgeImageCache.get(url);
+        if (entry) {
+          entry.loaded = true;
+          this.markDirty();
+        }
+      };
+      img.onerror = (): void => {
+        this.markDirty();
+      };
+      img.src = url;
+    }
+  }
+
+  private renderBadges(ctx: CanvasRenderingContext2D, bounds: Bounds): void {
+    if (this._badges.length === 0) {
+      return;
+    }
+    const contentBounds = this.getLabelContainerBounds(bounds);
+    const x0 = contentBounds.x + BADGE_OFFSET;
+    const y0 = contentBounds.y + BADGE_OFFSET;
+    const radius = 2;
+    for (let i = 0; i < this._badges.length; i++) {
+      const badge = this._badges[i];
+      if (badge === undefined) continue;
+      const x = x0 + i * (BADGE_SIZE + BADGE_GAP);
+      const isHovered = this._hoveredBadgeIndex === i;
+      if (isHovered) {
+        ctx.save();
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.08)';
+        ctx.beginPath();
+        ctx.roundRect(x, y0, BADGE_SIZE, BADGE_SIZE, radius);
+        ctx.fill();
+        ctx.restore();
+      }
+      const entry = this._badgeImageCache.get(badge.iconUrl);
+      if (entry?.loaded && entry.img.naturalWidth > 0) {
+        ctx.save();
+        const img = entry.img;
+        const sw = img.naturalWidth;
+        const sh = img.naturalHeight;
+        const scale = Math.min(BADGE_SIZE / sw, BADGE_SIZE / sh, 1);
+        const dw = sw * scale;
+        const dh = sh * scale;
+        const dx = x + (BADGE_SIZE - dw) / 2;
+        const dy = y0 + (BADGE_SIZE - dh) / 2;
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, sw, sh, dx, dy, dw, dh);
+        ctx.restore();
+      }
+    }
   }
 
   /**
