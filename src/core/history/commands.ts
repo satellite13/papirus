@@ -37,6 +37,7 @@ export interface EdgeSnapshot {
   label?: LabelSnapshot;
   labelOffset: number;
   labelBackground?: EdgeLabelBackground;
+  labelLineGap: boolean;
   startMarker?: ArrowMarkerConfig;
   endMarker?: ArrowMarkerConfig;
   arrowType: ArrowType;
@@ -116,6 +117,7 @@ export const createEdgeSnapshot = (edge: Edge): EdgeSnapshot => {
     label: snapshotLabel(edge.label),
     labelOffset: edge.labelOffset,
     labelBackground: cloneValue(edge.labelBackground),
+    labelLineGap: edge.labelLineGap,
     startMarker: cloneValue(edge.startMarker),
     endMarker: cloneValue(edge.endMarker),
     arrowType: edge.arrowType,
@@ -328,6 +330,7 @@ export class ChangeEdgePropertiesCommand implements Command {
     edge.endMarker = cloneValue(this.after.endMarker);
     edge.labelOffset = this.after.labelOffset;
     edge.labelBackground = cloneValue(this.after.labelBackground);
+    edge.labelLineGap = this.after.labelLineGap;
     edge.style = cloneValue(this.after.style ?? {});
     edge.styleClass = this.after.styleClass;
     edge.label = applyLabelSnapshot(edge.label, this.after.label);
@@ -345,6 +348,7 @@ export class ChangeEdgePropertiesCommand implements Command {
     edge.endMarker = cloneValue(this.before.endMarker);
     edge.labelOffset = this.before.labelOffset;
     edge.labelBackground = cloneValue(this.before.labelBackground);
+    edge.labelLineGap = this.before.labelLineGap;
     edge.style = cloneValue(this.before.style ?? {});
     edge.styleClass = this.before.styleClass;
     edge.label = applyLabelSnapshot(edge.label, this.before.label);

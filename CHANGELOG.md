@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-03-03
+
+### Added
+- Edge option `labelLineGap`: when `true` and the edge has a label, the line is not drawn through the label bounds (gap at label). Supported in serialization, history, and clipboard. New geometry helper `segmentRectIntersections` in `utils/geometry`.
+
+### Changed
+- Docs: edge options (`labelOffset`, `labelLineGap`) and example in `docs/elements.md`; `docs/README.md` mentions `labelLineGap`.
+
 ## [0.5.1] - 2026-03-03
 
 ### Changed
@@ -232,7 +240,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Edge animations (flow effect)
 - Context menu and search/filter
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.5.1...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.5.2...HEAD
+[0.5.2]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.2
 [0.5.1]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.1
 [0.5.0]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.0
 [0.4.0]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.4.0

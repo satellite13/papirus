@@ -1018,6 +1018,7 @@ export class InteractionManager {
           labelStyleClass: edge.label?.styleClass,
           labelOffset: edge.labelOffset !== 0 ? edge.labelOffset : undefined,
           labelBackground: edge.labelBackground,
+          labelLineGap: edge.labelLineGap ? true : undefined,
           data: Object.keys(edge.data).length > 0 ? edge.data : undefined,
         });
       }

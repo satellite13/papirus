@@ -106,7 +106,8 @@ const node = new RectangleNode({
 
 - тип пути (`type`: `straight | polyline | bezier | editable-polyline`)
 - стрелки (`arrowType`, `startMarker`, `endMarker`)
-- подпись (`label`) и фон подписи (`labelBackground`)
+- подпись (`label`), смещение подписи от центра пути (`labelOffset`) и фон подписи (`labelBackground`)
+- **разрыв линии под меткой** (`labelLineGap`): если `true` и задана метка, линия ребра не рисуется на участке, пересекающем прямоугольник метки — рисуются два отрезка (до метки и после), так что линия визуально «обрывается» под подписью
 - кастомные контрольные точки (`controlPoints`) для кривых
 - анимированный поток через `style.flowSpeed`
 
@@ -118,6 +119,8 @@ const edge = new Edge({
   to: { nodeId: nodeB.id },
   type: 'bezier',
   label: 'Flow',
+  labelOffset: 0,
+  labelLineGap: true,  // линия не идёт под меткой
   labelBackground: { color: '#fff', padding: 6, borderRadius: 6 },
   controlPoints: [
     { x: 200, y: 120 },

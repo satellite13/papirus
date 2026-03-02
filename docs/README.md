@@ -26,7 +26,7 @@
 
 - Группы (`Group`) и иерархия элементов.
 - Иконки в узлах (`NodeImage` через `icon`).
-- Фон подписи ребра (`labelBackground`).
+- Фон подписи ребра (`labelBackground`) и разрыв линии под меткой (`labelLineGap`).
 - `zoomToSelection()` и управление снаппингом через `drag.setSnapToGrid()`.
 - Линейки в `ports`-примере — это встроенный оверлей `RulersOverlay`, подключаемый через `renderer.use(...)`.
 

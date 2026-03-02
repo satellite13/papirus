@@ -80,6 +80,93 @@ export function rectUnion(a: Bounds, b: Bounds): Bounds {
 }
 
 /**
+ * Intersection of a segment with a rectangle boundary.
+ * Returns intersections ordered by parameter t along the segment (0 = start, 1 = end).
+ */
+export interface SegmentRectIntersection {
+  t: number;
+  point: Point;
+}
+
+export function segmentRectIntersections(
+  segStart: Point,
+  segEnd: Point,
+  rect: Bounds
+): SegmentRectIntersection[] {
+  const results: SegmentRectIntersection[] = [];
+
+  const rectRight = rect.x + rect.width;
+  const rectBottom = rect.y + rect.height;
+
+  const edges: [Point, Point][] = [
+    // Top
+    [
+      { x: rect.x, y: rect.y },
+      { x: rectRight, y: rect.y },
+    ],
+    // Right
+    [
+      { x: rectRight, y: rect.y },
+      { x: rectRight, y: rectBottom },
+    ],
+    // Bottom
+    [
+      { x: rectRight, y: rectBottom },
+      { x: rect.x, y: rectBottom },
+    ],
+    // Left
+    [
+      { x: rect.x, y: rectBottom },
+      { x: rect.x, y: rect.y },
+    ],
+  ];
+
+  const cross = (a: Point, b: Point): number => a.x * b.y - a.y * b.x;
+
+  const r: Point = { x: segEnd.x - segStart.x, y: segEnd.y - segStart.y };
+
+  const epsilon = 1e-9;
+
+  for (const [q0, q1] of edges) {
+    const s: Point = { x: q1.x - q0.x, y: q1.y - q0.y };
+    const denom = cross(r, s);
+    if (Math.abs(denom) < epsilon) {
+      continue;
+    }
+
+    const q0MinusP0: Point = { x: q0.x - segStart.x, y: q0.y - segStart.y };
+    const t = cross(q0MinusP0, s) / denom;
+    const u = cross(q0MinusP0, r) / denom;
+
+    if (t < -epsilon || t > 1 + epsilon || u < -epsilon || u > 1 + epsilon) {
+      continue;
+    }
+
+    const clampedT = Math.max(0, Math.min(1, t));
+
+    const point: Point = {
+      x: segStart.x + clampedT * r.x,
+      y: segStart.y + clampedT * r.y,
+    };
+
+    // Deduplicate intersections at rectangle corners
+    let exists = false;
+    for (const existing of results) {
+      if (Math.abs(existing.point.x - point.x) < 1e-6 && Math.abs(existing.point.y - point.y) < 1e-6) {
+        exists = true;
+        break;
+      }
+    }
+    if (!exists) {
+      results.push({ t: clampedT, point });
+    }
+  }
+
+  results.sort((a, b) => a.t - b.t);
+  return results;
+}
+
+/**
  * Check if a point is inside an ellipse
  */
 export function pointInEllipse(point: Point, center: Point, radiusX: number, radiusY: number): boolean {

@@ -3,6 +3,7 @@ import { TextLabel, type TextLabelOptions } from './TextLabel';
 import type {
   ArrowType,
   ArrowMarkerConfig,
+  Bounds,
   EdgeEndpoint,
   EdgePathType,
   EdgeStyle,
@@ -11,7 +12,12 @@ import type {
 } from '@/types';
 import type { StyleManager } from '@/styles/StyleManager';
 import { shallowEqual } from '@/utils/style';
-import { bezierPoint, drawRoundedRectPath } from '@/utils/geometry';
+import {
+  bezierPoint,
+  drawRoundedRectPath,
+  segmentRectIntersections,
+  distance,
+} from '@/utils/geometry';
 import {
   type PathStrategy,
   type PathStrategyOptions,
@@ -44,6 +50,7 @@ export interface EdgeOptions {
   labelOffset?: number;
   labelBackground?: EdgeLabelBackground;
   lockAnchors?: boolean;
+  labelLineGap?: boolean;
 }
 
 const DEFAULT_EDGE_STYLE: EdgeStyle = {
@@ -68,6 +75,7 @@ export class Edge extends Element {
   private _label?: TextLabel;
   private _labelOffset: number;
   private _labelBackground?: EdgeLabelBackground;
+  private _labelLineGap: boolean;
   private _path: Point[] = [];
   private _pathStrategy: PathStrategy;
   private _autoUpdateEndpoints = true;
@@ -104,6 +112,7 @@ export class Edge extends Element {
     this._lockAnchors = options.lockAnchors ?? true;
     this._labelOffset = options.labelOffset ?? 0;
     this._labelBackground = options.labelBackground;
+    this._labelLineGap = options.labelLineGap ?? false;
 
     if (options.label !== undefined) {
       if (typeof options.label === 'string') {
@@ -221,6 +230,20 @@ export class Edge extends Element {
   set labelBackground(value: EdgeLabelBackground | undefined) {
     this._labelBackground = value;
     this.markDirty();
+  }
+
+  /**
+   * Whether to create a gap in the edge line under the label.
+   */
+  get labelLineGap(): boolean {
+    return this._labelLineGap;
+  }
+
+  set labelLineGap(value: boolean) {
+    if (this._labelLineGap !== value) {
+      this._labelLineGap = value;
+      this.markDirty();
+    }
   }
 
   /**
@@ -570,39 +593,245 @@ export class Edge extends Element {
         ? this.getMarkerLength(this._endMarker)
         : 0;
 
-    // Get shortened start point
-    const start = path[0]!;
-    const startNext = path[1]!;
-    const startAngle = Math.atan2(startNext.y - start.y, startNext.x - start.x);
-    const shortenedStart = {
-      x: start.x + startOffset * Math.cos(startAngle),
-      y: start.y + startOffset * Math.sin(startAngle),
+    // Helper to build a polyline representation of the path
+    const buildPolyline = (): Point[] => {
+      if (this._type === 'bezier' && path.length >= 4) {
+        const samples: Point[] = [];
+        const steps = 20;
+        for (let i = 1; i + 2 < path.length; i += 3) {
+          const p0 = path[i - 1]!;
+          const p1 = path[i]!;
+          const p2 = path[i + 1]!;
+          const p3 = path[i + 2]!;
+          for (let s = 0; s <= steps; s++) {
+            const t = s / steps;
+            if (samples.length > 0 && t === 0) {
+              continue;
+            }
+            samples.push(bezierPoint(p0, p1, p2, p3, t));
+          }
+        }
+        return samples;
+      }
+      return path.map((p) => ({ ...p }));
     };
 
-    // Get shortened end point
-    const end = path[path.length - 1]!;
-    const endPrev = path[path.length - 2]!;
-    const endAngle = Math.atan2(end.y - endPrev.y, end.x - endPrev.x);
-    const shortenedEnd = {
-      x: end.x - endOffset * Math.cos(endAngle),
-      y: end.y - endOffset * Math.sin(endAngle),
+    // Shorten polyline at both ends by given offsets (for markers)
+    const shortenPolyline = (points: Point[], start: number, end: number): Point[] => {
+      if (points.length < 2) {
+        return points;
+      }
+
+      const totalLength = (): number => {
+        let len = 0;
+        for (let i = 1; i < points.length; i++) {
+          len += distance(points[i - 1]!, points[i]!);
+        }
+        return len;
+      };
+
+      let pts = points;
+      let remainingStart = Math.max(0, start);
+      let remainingEnd = Math.max(0, end);
+      const total = totalLength();
+      if (remainingStart + remainingEnd >= total) {
+        const mid = points[0]!;
+        return [mid];
+      }
+
+      // Shorten from start
+      if (remainingStart > 0) {
+        const newPoints: Point[] = [];
+        let accumulated = 0;
+        for (let i = 0; i < pts.length - 1; i++) {
+          const p0 = pts[i]!;
+          const p1 = pts[i + 1]!;
+          const segLen = distance(p0, p1);
+          if (accumulated + segLen >= remainingStart) {
+            const t = (remainingStart - accumulated) / segLen;
+            const newStart: Point = {
+              x: p0.x + (p1.x - p0.x) * t,
+              y: p0.y + (p1.y - p0.y) * t,
+            };
+            newPoints.push(newStart);
+            for (let j = i + 1; j < pts.length; j++) {
+              newPoints.push({ ...pts[j]! });
+            }
+            pts = newPoints;
+            break;
+          }
+          accumulated += segLen;
+        }
+      }
+
+      // Shorten from end
+      if (remainingEnd > 0 && pts.length > 1) {
+        const newPoints: Point[] = [];
+        let accumulated = 0;
+        for (let i = pts.length - 1; i > 0; i--) {
+          const p0 = pts[i - 1]!;
+          const p1 = pts[i]!;
+          const segLen = distance(p0, p1);
+          if (accumulated + segLen >= remainingEnd) {
+            const t = (remainingEnd - accumulated) / segLen;
+            const newEnd: Point = {
+              x: p1.x + (p0.x - p1.x) * t,
+              y: p1.y + (p0.y - p1.y) * t,
+            };
+            newPoints.push(newEnd);
+            for (let j = i - 1; j >= 0; j--) {
+              newPoints.push({ ...pts[j]! });
+            }
+            pts = newPoints.reverse();
+            break;
+          }
+          accumulated += segLen;
+        }
+      }
+
+      return pts;
     };
+
+    const shouldCreateGap = this._label !== undefined && this._labelLineGap;
+
+    if (!shouldCreateGap) {
+      // Legacy behavior without gaps
+      const start = path[0]!;
+      const startNext = path[1]!;
+      const startAngle = Math.atan2(startNext.y - start.y, startNext.x - start.x);
+      const shortenedStart = {
+        x: start.x + startOffset * Math.cos(startAngle),
+        y: start.y + startOffset * Math.sin(startAngle),
+      };
+
+      const end = path[path.length - 1]!;
+      const endPrev = path[path.length - 2]!;
+      const endAngle = Math.atan2(end.y - endPrev.y, end.x - endPrev.x);
+      const shortenedEnd = {
+        x: end.x - endOffset * Math.cos(endAngle),
+        y: end.y - endOffset * Math.sin(endAngle),
+      };
+
+      ctx.beginPath();
+      ctx.moveTo(shortenedStart.x, shortenedStart.y);
+
+      if (this._type === 'bezier' && path.length >= 4) {
+        for (let i = 1; i + 2 < path.length; i += 3) {
+          const cp1 = path[i]!;
+          const cp2 = path[i + 1]!;
+          const segmentEnd = i + 2 === path.length - 1 ? shortenedEnd : path[i + 2]!;
+          ctx.bezierCurveTo(cp1.x, cp1.y, cp2.x, cp2.y, segmentEnd.x, segmentEnd.y);
+        }
+      } else {
+        for (let i = 1; i < path.length - 1; i++) {
+          ctx.lineTo(path[i]!.x, path[i]!.y);
+        }
+        ctx.lineTo(shortenedEnd.x, shortenedEnd.y);
+      }
+
+      ctx.stroke();
+      return;
+    }
+
+    // Build shortened polyline for gap calculation and rendering
+    let polyline = buildPolyline();
+    polyline = shortenPolyline(polyline, startOffset, endOffset);
+    if (polyline.length < 2) {
+      return;
+    }
+
+    // Compute label bounds (center from path midpoint + offset, size from measured label)
+    this._label!.measure(ctx);
+    const labelCenter = this.getLabelPosition();
+    if (!labelCenter) {
+      return;
+    }
+
+    const labelWidth = this._label!.measuredWidth;
+    const labelHeight = this._label!.measuredHeight;
+
+    const labelRect: Bounds = {
+      x: labelCenter.x - labelWidth / 2,
+      y: labelCenter.y - labelHeight / 2,
+      width: labelWidth,
+      height: labelHeight,
+    };
+
+    type SegmentIntersection = { segIndex: number; t: number; point: Point };
+    const segmentIntersections: SegmentIntersection[] = [];
+
+    for (let i = 0; i < polyline.length - 1; i++) {
+      const p0 = polyline[i]!;
+      const p1 = polyline[i + 1]!;
+      const intersections = segmentRectIntersections(p0, p1, labelRect);
+      for (const inter of intersections) {
+        segmentIntersections.push({
+          segIndex: i,
+          t: inter.t,
+          point: inter.point,
+        });
+      }
+    }
+
+    if (segmentIntersections.length < 2) {
+      // No meaningful intersection with label rect: draw as single polyline
+      ctx.beginPath();
+      ctx.moveTo(polyline[0]!.x, polyline[0]!.y);
+      for (let i = 1; i < polyline.length; i++) {
+        ctx.lineTo(polyline[i]!.x, polyline[i]!.y);
+      }
+      ctx.stroke();
+      return;
+    }
+
+    segmentIntersections.sort((a, b) => {
+      if (a.segIndex === b.segIndex) {
+        return a.t - b.t;
+      }
+      return a.segIndex - b.segIndex;
+    });
 
     ctx.beginPath();
-    ctx.moveTo(shortenedStart.x, shortenedStart.y);
+    ctx.moveTo(polyline[0]!.x, polyline[0]!.y);
 
-    if (this._type === 'bezier' && path.length >= 4) {
-      for (let i = 1; i + 2 < path.length; i += 3) {
-        const cp1 = path[i]!;
-        const cp2 = path[i + 1]!;
-        const end = i + 2 === path.length - 1 ? shortenedEnd : path[i + 2]!;
-        ctx.bezierCurveTo(cp1.x, cp1.y, cp2.x, cp2.y, end.x, end.y);
+    let entered = false;
+    let exited = false;
+
+    for (let i = 0; i < polyline.length - 1; i++) {
+      const p1 = polyline[i + 1]!;
+
+      const currentIntersections = segmentIntersections.filter((it) => it.segIndex === i);
+
+      if (!entered && currentIntersections.length > 0) {
+        // First time we meet an intersection: entry into label rect
+        const first = currentIntersections[0]!;
+        ctx.lineTo(first.point.x, first.point.y);
+        entered = true;
+
+        const maybeExit = currentIntersections.length > 1 ? currentIntersections[1]! : undefined;
+        if (maybeExit) {
+          // Enter and exit on the same segment
+          ctx.moveTo(maybeExit.point.x, maybeExit.point.y);
+          exited = true;
+          // Draw remainder of the segment after exit
+          ctx.lineTo(p1.x, p1.y);
+        }
+        continue;
       }
-    } else {
-      for (let i = 1; i < path.length - 1; i++) {
-        ctx.lineTo(path[i]!.x, path[i]!.y);
+
+      if (entered && !exited && currentIntersections.length > 0) {
+        // We are leaving the label rect on this segment
+        const lastOnSegment = currentIntersections[currentIntersections.length - 1]!;
+        ctx.moveTo(lastOnSegment.point.x, lastOnSegment.point.y);
+        exited = true;
+        ctx.lineTo(p1.x, p1.y);
+        continue;
       }
-      ctx.lineTo(shortenedEnd.x, shortenedEnd.y);
+
+      if (!entered || exited) {
+        ctx.lineTo(p1.x, p1.y);
+      }
+      // While inside gap (entered && !exited), skip drawing
     }
 
     ctx.stroke();

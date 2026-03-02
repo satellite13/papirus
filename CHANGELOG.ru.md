@@ -9,6 +9,14 @@
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-03-03
+
+### Добавлено
+- Опция ребра `labelLineGap`: при `true` и наличии метки линия не рисуется в области метки (разрыв под подписью). Поддержка в сериализации, истории и буфере обмена. В `utils/geometry` добавлена функция `segmentRectIntersections`.
+
+### Изменено
+- Документация: опции ребра (`labelOffset`, `labelLineGap`) и пример в `docs/elements.md`; в `docs/README.md` упомянут `labelLineGap`.
+
 ## [0.5.1] - 2026-03-03
 
 ### Изменено
@@ -239,7 +247,8 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.5.1...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.5.2...HEAD
+[0.5.2]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.2
 [0.5.1]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.1
 [0.5.0]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.0
 [0.4.0]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.4.0
