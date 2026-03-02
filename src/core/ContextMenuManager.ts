@@ -57,6 +57,11 @@ export interface ContextMenuOptions {
   className?: string;
   minWidth?: number;
   closeOnSelect?: boolean;
+  /**
+   * If set, string icons (icon names) are rendered as <img src={iconToUrl(name)}>.
+   * Use when the host app uses SVG icons instead of Material Symbols font.
+   */
+  iconToUrl?: (iconName: string) => string;
 }
 
 export interface ContextMenuEvents {
@@ -64,7 +69,10 @@ export interface ContextMenuEvents {
   close: [];
 }
 
-const DEFAULT_OPTIONS: Required<Omit<ContextMenuOptions, 'menu'>> = {
+const DEFAULT_OPTIONS: Pick<
+  ContextMenuOptions,
+  'container' | 'className' | 'minWidth' | 'closeOnSelect'
+> = {
   container: document.body,
   className: '',
   minWidth: 180,
@@ -345,6 +353,7 @@ export class ContextMenuManager extends EventEmitter<ContextMenuEvents> {
     iconEl.style.alignItems = 'center';
     iconEl.style.justifyContent = 'center';
     iconEl.style.textAlign = 'center';
+    iconEl.style.flexShrink = '0';
 
     if (!icon) {
       iconEl.textContent = '';
@@ -354,6 +363,14 @@ export class ContextMenuManager extends EventEmitter<ContextMenuEvents> {
     if (typeof icon === 'string') {
       if (this.isSvgString(icon)) {
         iconEl.innerHTML = icon;
+      } else if (this.options.iconToUrl) {
+        const img = document.createElement('img');
+        img.src = this.options.iconToUrl(icon);
+        img.alt = '';
+        img.style.width = '16px';
+        img.style.height = '16px';
+        img.style.objectFit = 'contain';
+        iconEl.appendChild(img);
       } else {
         iconEl.classList.add('material-symbols-outlined');
         iconEl.style.fontSize = '16px';
@@ -364,6 +381,14 @@ export class ContextMenuManager extends EventEmitter<ContextMenuEvents> {
 
     if (icon.type === 'svg' || icon.type === 'html') {
       iconEl.innerHTML = icon.value;
+    } else if (this.options.iconToUrl) {
+      const img = document.createElement('img');
+      img.src = this.options.iconToUrl(icon.value);
+      img.alt = '';
+      img.style.width = '16px';
+      img.style.height = '16px';
+      img.style.objectFit = 'contain';
+      iconEl.appendChild(img);
     } else {
       iconEl.classList.add('material-symbols-outlined');
       iconEl.style.fontSize = '16px';
