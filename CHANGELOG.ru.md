@@ -9,6 +9,15 @@
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-03-03
+
+### Добавлено
+- Опция `alignmentScreenTolerance` в `enableInteractions()`: расстояние в пикселях экрана, в пределах которого при перетаскивании срабатывают направляющие выравнивания. Если не задана, используется значение по умолчанию из `ALIGNMENT_SCREEN_TOLERANCE` (8). Позволяет приложению (например warchi) задать большее значение (например 80) для удобства выравнивания.
+
+### Изменено
+- Константа `ALIGNMENT_SCREEN_TOLERANCE` снова 8; переопределение через опции при необходимости.
+- Документация: опция `alignmentScreenTolerance` описана в `docs/interactions.md`.
+
 ## [0.5.2] - 2026-03-03
 
 ### Добавлено
@@ -248,6 +257,7 @@
 - Контекстное меню и поиск/фильтрация
 
 [Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.5.2...HEAD
+[0.5.3]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.3
 [0.5.2]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.2
 [0.5.1]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.1
 [0.5.0]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.0

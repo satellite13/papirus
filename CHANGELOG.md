@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-03-03
+
+### Added
+- `enableInteractions()` option `alignmentScreenTolerance`: screen distance (px) within which alignment guides snap when dragging. When not set, the default from `ALIGNMENT_SCREEN_TOLERANCE` (8) is used. Allows host apps (e.g. warchi) to use a larger value (e.g. 80) for easier alignment.
+
+### Changed
+- Default `ALIGNMENT_SCREEN_TOLERANCE` in constants is 8 again; override via options when needed.
+- Docs: `alignmentScreenTolerance` described in `docs/interactions.md`.
+
 ## [0.5.2] - 2026-03-03
 
 ### Added
@@ -241,6 +250,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Context menu and search/filter
 
 [Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.5.2...HEAD
+[0.5.3]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.3
 [0.5.2]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.2
 [0.5.1]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.1
 [0.5.0]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.0

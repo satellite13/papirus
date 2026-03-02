@@ -47,7 +47,7 @@ export const DEFAULT_HOVER_COLOR = '#6366f1';
 // Drag
 /** Minimum distance (world units) to start a drag */
 export const DRAG_START_THRESHOLD = 3;
-/** Screen tolerance for alignment guides when dragging */
+/** Screen tolerance for alignment guides when dragging (default when not overridden by enableInteractions options) */
 export const ALIGNMENT_SCREEN_TOLERANCE = 8;
 
 // Editable polyline

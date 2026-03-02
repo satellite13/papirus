@@ -29,6 +29,8 @@ export interface DragManagerOptions {
   snapToGrid?: boolean;
   gridSize?: number;
   alignToNodes?: boolean;
+  /** Screen distance (px) for alignment guides; when set, overrides ALIGNMENT_SCREEN_TOLERANCE. */
+  alignmentScreenTolerance?: number;
 }
 
 /**
@@ -40,6 +42,7 @@ export class DragManager extends EventEmitter<DragEvents> {
   private snapToGrid: boolean;
   private gridSize: number;
   private alignToNodes: boolean;
+  private alignmentScreenTolerance: number;
 
   private isDragging = false;
   private draggedNodes: Node[] = [];
@@ -65,6 +68,8 @@ export class DragManager extends EventEmitter<DragEvents> {
     this.snapToGrid = options.snapToGrid ?? false;
     this.gridSize = options.gridSize ?? 20;
     this.alignToNodes = options.alignToNodes ?? true;
+    this.alignmentScreenTolerance =
+      options.alignmentScreenTolerance ?? ALIGNMENT_SCREEN_TOLERANCE;
   }
 
   /**
@@ -526,7 +531,7 @@ export class DragManager extends EventEmitter<DragEvents> {
       return totalDelta;
     }
 
-    const tolerance = ALIGNMENT_SCREEN_TOLERANCE / Math.max(this.renderer.zoom, 0.0001);
+    const tolerance = this.alignmentScreenTolerance / Math.max(this.renderer.zoom, 0.0001);
     const draggedIds = new Set(this.draggedNodes.map((node) => node.id));
     const searchPadding = tolerance * 2;
     const searchBounds: Bounds = {

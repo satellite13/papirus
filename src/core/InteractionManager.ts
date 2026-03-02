@@ -47,6 +47,8 @@ export interface InteractionManagerOptions {
   snapToGrid?: boolean;
   gridSize?: number;
   alignToNodes?: boolean;
+  /** Screen distance (px) within which alignment guides snap when dragging. Overrides default from constants. */
+  alignmentScreenTolerance?: number;
   /** When true, edges can be attached anywhere on the shape outline (not just ports) */
   attachToOutline?: boolean;
   /** When true, disable editing interactions and keep navigation/selection only */
@@ -125,6 +127,7 @@ export class InteractionManager {
       snapToGrid: options.snapToGrid ?? this.renderer.snapToGrid,
       gridSize: options.gridSize ?? 20,
       alignToNodes: options.alignToNodes ?? true,
+      alignmentScreenTolerance: options.alignmentScreenTolerance,
     });
     this.resizeManager = new ResizeManager({
       renderer: this.renderer,
