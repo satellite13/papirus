@@ -9,6 +9,11 @@
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-03-03
+
+### Изменено
+- ContextMenuManager: расширены опции отображения иконок в пунктах контекстного меню.
+
 ## [0.5.0] - 2026-03-02
 
 ### Добавлено
@@ -234,7 +239,8 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.5.0...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.5.1...HEAD
+[0.5.1]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.1
 [0.5.0]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.0
 [0.4.0]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.4.0
 [0.3.23]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.23
