@@ -70,11 +70,13 @@ function tintSvg(svgText: string, strokeColor?: string, fillColor?: string): str
   const all = [root, ...Array.from(root.querySelectorAll('*'))] as Element[];
   for (const el of all) {
     const stroke = el.getAttribute('stroke');
-    if (strokeColor && stroke !== null && stroke.toLowerCase() !== 'none') {
+    const fill = el.getAttribute('fill');
+    // Apply strokeColor when element has stroke or has no stroke (SVG default can draw with stroke)
+    if (strokeColor && (stroke === null || stroke.toLowerCase() !== 'none')) {
       el.setAttribute('stroke', strokeColor);
     }
-    const fill = el.getAttribute('fill');
-    if (fillColor && fill !== null && fill.toLowerCase() !== 'none') {
+    // Apply fillColor when element has fill or has no fill (SVG default is black for path/shape)
+    if (fillColor && (fill === null || fill.toLowerCase() !== 'none')) {
       el.setAttribute('fill', fillColor);
     }
     const style = el.getAttribute('style');
