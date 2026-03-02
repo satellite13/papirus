@@ -9,6 +9,11 @@
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-03-02
+
+### Добавлено
+- Интерактивные свойства узлов: редактирование пользовательских свойств в панели выделения (feature/interactive-properties).
+
 ## [0.4.0] - 2026-03-01
 
 ### Добавлено
@@ -229,7 +234,8 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.4.0...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.5.0...HEAD
+[0.5.0]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.0
 [0.4.0]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.4.0
 [0.3.23]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.23
 [0.3.22]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.3.22
