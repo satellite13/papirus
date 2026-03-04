@@ -436,14 +436,21 @@ export class InteractionManager {
     const point = { x: event.worldX, y: event.worldY };
     const hitElement = this.renderer.getElementAtPoint(point);
 
-    if (hitElement === undefined && event.button === 0) {
-      if (event.ctrlKey || event.metaKey) {
-        this.selectionManager.startSelectionRect(point);
+    if (event.button === 0) {
+      if (this.navigationOnly) {
+        this.selectionManager.clearSelection();
+        this.navigationManager.startPan(event);
         return;
       }
-      this.selectionManager.clearSelection();
-      this.navigationManager.startPan(event);
-      return;
+      if (hitElement === undefined) {
+        if (event.ctrlKey || event.metaKey) {
+          this.selectionManager.startSelectionRect(point);
+          return;
+        }
+        this.selectionManager.clearSelection();
+        this.navigationManager.startPan(event);
+        return;
+      }
     }
 
     if (this.navigationManager.handleMouseDown(event)) {
