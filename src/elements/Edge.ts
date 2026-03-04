@@ -631,8 +631,8 @@ export class Edge extends Element {
       };
 
       let pts = points;
-      let remainingStart = Math.max(0, start);
-      let remainingEnd = Math.max(0, end);
+      const remainingStart = Math.max(0, start);
+      const remainingEnd = Math.max(0, end);
       const total = totalLength();
       if (remainingStart + remainingEnd >= total) {
         const mid = points[0]!;
