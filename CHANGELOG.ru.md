@@ -9,6 +9,11 @@
 
 ## [Unreleased]
 
+## [0.5.4] - 2026-03-04
+
+### Изменено
+- InteractionManager: рефакторинг обработки mouse down; в режиме `navigationOnly` приоритет у навигации (panning), а не выделения; упрощены условия запуска прямоугольника выделения и сброса выделения.
+
 ## [0.5.3] - 2026-03-03
 
 ### Добавлено
@@ -256,7 +261,8 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.5.2...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.5.4...HEAD
+[0.5.4]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.4
 [0.5.3]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.3
 [0.5.2]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.2
 [0.5.1]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.1

@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.4] - 2026-03-04
+
+### Changed
+- InteractionManager: refactored mouse down event handling; in `navigationOnly` mode, navigation (panning) takes priority over selection; simplified conditions for starting selection rectangle and clearing selections.
+
 ## [0.5.3] - 2026-03-03
 
 ### Added
@@ -249,7 +254,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Edge animations (flow effect)
 - Context menu and search/filter
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.5.2...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.5.4...HEAD
+[0.5.4]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.4
 [0.5.3]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.3
 [0.5.2]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.2
 [0.5.1]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.1
