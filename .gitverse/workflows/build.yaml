@@ -8,10 +8,16 @@ jobs:
     steps:
       - name: APT Update
         run: apt-get update
-      - name: Install Node.js and npm
-        run: apt-get install -y nodejs npm
+      - name: Install prerequisites
+        run: apt-get install -y curl ca-certificates gnupg
+      - name: Setup Node.js 22
+        run: curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+      - name: Install Node.js
+        run: apt-get install -y nodejs
       - name: Clone repo
         run: git clone https://${{ gitverse.token }}@gitverse.ru/${{ gitverse.repository }}.git .
+      - name: Print tool versions
+        run: node -v && npm -v
       - name: Install dependencies
         run: npm ci
       - name: Build
