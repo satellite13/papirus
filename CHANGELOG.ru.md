@@ -9,6 +9,11 @@
 
 ## [Unreleased]
 
+## [0.5.5] - 2026-03-15
+
+### Изменено
+- Уточнена и стандартизирована внутренняя документация по workflow релиза для мейнтейнеров.
+
 ## [0.5.4] - 2026-03-04
 
 ### Изменено
@@ -261,7 +266,8 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.5.4...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.5.5...HEAD
+[0.5.5]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.5
 [0.5.4]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.4
 [0.5.3]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.3
 [0.5.2]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.2
