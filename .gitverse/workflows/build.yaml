@@ -5,19 +5,27 @@ jobs:
     name: Build application
     runs-on: ubuntu-latest
     steps:
-      - name: APT Update
-        run: apt-get update
-      - name: Install prerequisites
-        run: apt-get install -y curl ca-certificates gnupg
-      - name: Setup Node.js 22
-        run: curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-      - name: Install Node.js
-        run: apt-get install -y nodejs
       - name: Clone repo
         run: git clone https://${{ gitverse.token }}@gitverse.ru/${{ gitverse.repository }}.git .
+      - name: Install Node.js 22.12.0 (portable)
+        run: |
+          set -e
+          NODE_VERSION=22.12.0
+          curl -fsSLO "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz"
+          mkdir -p "$HOME/.local/node-${NODE_VERSION}"
+          tar -xJf "node-v${NODE_VERSION}-linux-x64.tar.xz" -C "$HOME/.local/node-${NODE_VERSION}" --strip-components=1
+          "$HOME/.local/node-${NODE_VERSION}/bin/node" -v
+          "$HOME/.local/node-${NODE_VERSION}/bin/npm" -v
       - name: Print tool versions
-        run: node -v && npm -v
+        run: |
+          NODE_VERSION=22.12.0
+          "$HOME/.local/node-${NODE_VERSION}/bin/node" -v
+          "$HOME/.local/node-${NODE_VERSION}/bin/npm" -v
       - name: Install dependencies
-        run: npm ci
+        run: |
+          NODE_VERSION=22.12.0
+          "$HOME/.local/node-${NODE_VERSION}/bin/npm" ci
       - name: Build
-        run: npm run build
+        run: |
+          NODE_VERSION=22.12.0
+          "$HOME/.local/node-${NODE_VERSION}/bin/npm" run build
