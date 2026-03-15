@@ -1,6 +1,5 @@
 name: Build Papirus
-on:
- push:
+on: [push]
 jobs:
   build:
     name: Build application
