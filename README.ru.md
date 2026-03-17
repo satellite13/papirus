@@ -78,7 +78,11 @@ renderer.enableInteractions();
 - Smart-align к другим фигурам при перетаскивании (с направляющими)
 
 ```ts
-const interactions = renderer.enableInteractions({ gridSize: 20, snapToGrid: true });
+const interactions = renderer.enableInteractions({
+  gridSize: 20,
+  snapToGrid: true,
+  previewPathType: 'straight', // 'straight' | 'bezier'
+});
 interactions.navigation.fitToView();
 interactions.drag.setAlignmentEnabled(true);
 ```

@@ -113,4 +113,63 @@ describe('ConnectionManager', () => {
 
     expect(interaction.connection.reconnecting).toBe(true);
   });
+
+  it('supports configurable connection preview path type', () => {
+    const canvas = createCanvas(400, 220);
+    const renderer = new DiagramRenderer(canvas, { width: 400, height: 220, retina: false });
+    const nodeA = new RectangleNode({ x: 50, y: 80, width: 60, height: 40 });
+    const nodeB = new RectangleNode({ x: 250, y: 80, width: 60, height: 40 });
+    renderer.addNode(nodeA);
+    renderer.addNode(nodeB);
+
+    const ctx = renderer.getContext() as unknown as {
+      bezierCurveTo: ReturnType<typeof vi.fn>;
+      lineTo: ReturnType<typeof vi.fn>;
+    };
+
+    const startX = 110;
+    const startY = 100;
+    const endX = 250;
+    const endY = 100;
+
+    renderer.enableInteractions({ previewPathType: 'straight' });
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', { clientX: startX, clientY: startY, button: 0, bubbles: true })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mousemove', {
+        clientX: endX,
+        clientY: endY,
+        button: 0,
+        buttons: 1,
+        bubbles: true,
+      })
+    );
+    renderer.render();
+    expect(ctx.lineTo).toHaveBeenCalled();
+    expect(ctx.bezierCurveTo).not.toHaveBeenCalled();
+
+    canvas.dispatchEvent(
+      new MouseEvent('mouseup', { clientX: endX, clientY: endY, button: 0, bubbles: true })
+    );
+    ctx.lineTo.mockClear();
+    ctx.bezierCurveTo.mockClear();
+
+    renderer.disableInteractions();
+    renderer.enableInteractions({ previewPathType: 'bezier' });
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', { clientX: startX, clientY: startY, button: 0, bubbles: true })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mousemove', {
+        clientX: endX,
+        clientY: endY,
+        button: 0,
+        buttons: 1,
+        bubbles: true,
+      })
+    );
+    renderer.render();
+    expect(ctx.bezierCurveTo).toHaveBeenCalled();
+  });
 });

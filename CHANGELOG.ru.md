@@ -9,6 +9,15 @@
 
 ## [Unreleased]
 
+## [0.5.6] - 2026-03-17
+
+### Добавлено
+- Опция `previewPathType` в `enableInteractions()` для настройки типа превью-связи при протягивании новой стрелки: `'bezier'` (по умолчанию) или `'straight'`.
+
+### Изменено
+- Обновлены docs и примеры в README для `previewPathType`.
+- Добавлены тесты для обоих режимов превью связи.
+
 ## [0.5.5] - 2026-03-15
 
 ### Изменено
@@ -266,7 +275,8 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.5.5...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.5.6...HEAD
+[0.5.6]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.6
 [0.5.5]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.5
 [0.5.4]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.4
 [0.5.3]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.3

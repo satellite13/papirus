@@ -31,6 +31,7 @@ export interface ConnectionEvents {
 }
 
 export type ConnectionValidator = (sourceNodeId: string, targetNodeId: string) => boolean;
+export type ConnectionPreviewPathType = 'straight' | 'bezier';
 
 export interface ConnectionManagerOptions {
   renderer: DiagramRenderer;
@@ -40,6 +41,8 @@ export interface ConnectionManagerOptions {
   gridSize?: number;
   /** When true, edges can be attached anywhere on the shape outline (not just ports) */
   attachToOutline?: boolean;
+  /** Connection preview path type while dragging a new edge */
+  previewPathType?: ConnectionPreviewPathType;
 }
 
 /**
@@ -76,6 +79,7 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
   private snapToGrid: boolean;
   private gridSize: number;
   private attachToOutline: boolean;
+  private previewPathType: ConnectionPreviewPathType;
 
   constructor(options: ConnectionManagerOptions) {
     super();
@@ -85,6 +89,7 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     this.snapToGrid = options.snapToGrid ?? false;
     this.gridSize = options.gridSize ?? 20;
     this.attachToOutline = options.attachToOutline ?? false;
+    this.previewPathType = options.previewPathType ?? 'bezier';
   }
 
   /**
@@ -714,21 +719,26 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     const start = this.sourcePoint!;
     const end = this.previewEndpoint;
 
-    const fromDir =
-      this.sourceOutlineParam !== null
-        ? this.getDirectionFromOutlineParam(this.sourceOutlineParam, this.sourceNode!)
-        : this.sourceAnchorId?.split(':')[0];
-    const toDir =
-      this.previewTargetOutlineParam !== null
-        ? this.getDirectionFromOutlineParam(this.previewTargetOutlineParam, this.sourceNode!)
-        : this.previewTargetAnchorId?.split(':')[0];
-
     ctx.strokeStyle = '#3b82f6';
     ctx.lineWidth = 2;
     ctx.setLineDash([6, 4]);
 
-    // Draw bezier curve for preview
-    this.drawBezierPreview(ctx, start, end, fromDir, toDir);
+    if (this.previewPathType === 'straight') {
+      ctx.beginPath();
+      ctx.moveTo(start.x, start.y);
+      ctx.lineTo(end.x, end.y);
+      ctx.stroke();
+    } else {
+      const fromDir =
+        this.sourceOutlineParam !== null
+          ? this.getDirectionFromOutlineParam(this.sourceOutlineParam, this.sourceNode!)
+          : this.sourceAnchorId?.split(':')[0];
+      const toDir =
+        this.previewTargetOutlineParam !== null
+          ? this.getDirectionFromOutlineParam(this.previewTargetOutlineParam, this.sourceNode!)
+          : this.previewTargetAnchorId?.split(':')[0];
+      this.drawBezierPreview(ctx, start, end, fromDir, toDir);
+    }
 
     ctx.setLineDash([]);
 
@@ -737,11 +747,16 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     }
   }
 
+  private isCompatibleTarget(_node: Node): boolean {
+    // Self-loop edges are allowed.
+    return true;
+  }
+
   /**
    * Get control point offset based on direction
    */
-  private getDirectionOffset(dir: string | undefined, distance: number): Point {
-    const offset = Math.min(distance * 0.5, BEZIER_MAX_OFFSET);
+  private getDirectionOffset(dir: string | undefined, dist: number): Point {
+    const offset = Math.min(dist * 0.5, BEZIER_MAX_OFFSET);
     switch (dir) {
       case 'top':
         return { x: 0, y: -offset };
@@ -757,7 +772,7 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
   }
 
   /**
-   * Draw a Bézier curve preview between two points
+   * Draw a Bezier curve preview between two points
    */
   private drawBezierPreview(
     ctx: CanvasRenderingContext2D,
@@ -808,11 +823,6 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     }
 
     ctx.stroke();
-  }
-
-  private isCompatibleTarget(_node: Node): boolean {
-    // Self-loop edges are allowed.
-    return true;
   }
 
   private setCursor(cursor: string): void {

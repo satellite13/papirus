@@ -77,7 +77,11 @@ Built-in `InteractionManager` includes:
 - Smart alignment to other nodes while dragging (with guide lines)
 
 ```ts
-const interactions = renderer.enableInteractions({ gridSize: 20, snapToGrid: true });
+const interactions = renderer.enableInteractions({
+  gridSize: 20,
+  snapToGrid: true,
+  previewPathType: 'straight', // 'straight' | 'bezier'
+});
 interactions.navigation.fitToView();
 interactions.drag.setAlignmentEnabled(true);
 ```

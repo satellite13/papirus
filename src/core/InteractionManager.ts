@@ -11,6 +11,7 @@ import { DragManager } from './DragManager';
 import { ResizeManager } from './ResizeManager';
 import { NavigationManager } from './NavigationManager';
 import { ConnectionManager } from './ConnectionManager';
+import type { ConnectionPreviewPathType } from './ConnectionManager';
 import {
   ChangeEdgePropertiesCommand,
   ChangeGroupPropertiesCommand,
@@ -51,6 +52,8 @@ export interface InteractionManagerOptions {
   alignmentScreenTolerance?: number;
   /** When true, edges can be attached anywhere on the shape outline (not just ports) */
   attachToOutline?: boolean;
+  /** Preview path type while creating a new connection */
+  previewPathType?: ConnectionPreviewPathType;
   /** When true, disable editing interactions and keep navigation/selection only */
   navigationOnly?: boolean;
   keymap?: Partial<InteractionKeymap>;
@@ -150,6 +153,7 @@ export class InteractionManager {
       snapToGrid: options.snapToGrid ?? this.renderer.snapToGrid,
       gridSize: options.gridSize ?? 20,
       attachToOutline,
+      previewPathType: options.previewPathType,
       addEdge: (edge): void => {
         this.historyManager.execute({
           execute: (): void => this.renderer.addEdge(edge),

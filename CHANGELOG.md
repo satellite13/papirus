@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.6] - 2026-03-17
+
+### Added
+- `enableInteractions()` option `previewPathType` to configure the connection preview path while dragging a new edge: `'bezier'` (default) or `'straight'`.
+
+### Changed
+- Interaction docs and README examples updated for `previewPathType`.
+- Added tests covering both connection preview modes.
+
 ## [0.5.5] - 2026-03-15
 
 ### Changed
@@ -259,7 +268,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Edge animations (flow effect)
 - Context menu and search/filter
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.5.5...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.5.6...HEAD
+[0.5.6]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.6
 [0.5.5]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.5
 [0.5.4]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.4
 [0.5.3]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.3
