@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.7] - 2026-03-25
+
+### Changed
+- Documentation and README examples aligned with the current public API and maintainer guidance (AGENTS, renderer and utils docs).
+
 ## [0.5.6] - 2026-03-17
 
 ### Added
