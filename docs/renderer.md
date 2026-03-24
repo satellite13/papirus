@@ -124,6 +124,7 @@ const removeUnderlay = renderer.addUnderlayRenderer((ctx) => {
 - `select`
 - `nodeAdd`, `nodeRemove`
 - `edgeAdd`, `edgeRemove`
+- `nodeBadgeClick` — клик по бейджу узла (`nodeId`, `badgeId`)
 
 ```ts
 renderer.on('zoom', (value) => {

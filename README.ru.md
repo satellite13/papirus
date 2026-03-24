@@ -64,7 +64,7 @@ renderer.enableInteractions();
 - [Оверлеи](./docs/overlays.md)
 - [Утилиты](./docs/utils.md)
 - [Changelog](./CHANGELOG.ru.md)
-- [Политика безопасности](./SECURITY.md)
+- [Политика безопасности](./SECURITY.ru.md)
 
 ## Возможности
 
@@ -193,7 +193,7 @@ const imageExporter = new ImageExporter(renderer);
 await imageExporter.download('diagram.png', { scale: 2 });
 
 const svgExporter = new SvgExporter(renderer);
-await svgExporter.download('diagram.svg');
+svgExporter.download('diagram.svg');
 ```
 
 ### Оверлеи

@@ -16,7 +16,7 @@ This file provides essential information for AI coding agents working with the P
 - **Language**: TypeScript 5.9+ with strict mode enabled
 - **Build Tool**: Vite 7.3+ with ES modules output
 - **Testing**: Vitest 4.0+ with jsdom environment, coverage via v8
-- **Linting**: ESLint 10+ with typescript-eslint
+- **Linting**: ESLint 9.x with typescript-eslint
 - **Formatting**: Prettier 3.8+
 - **Target**: ES2020, DOM APIs
 
@@ -101,7 +101,7 @@ npm run typecheck        # TypeScript check without emit
 # Testing
 npm run test             # Run tests once
 npm run test:watch       # Run tests in watch mode
-npm run test:coverage    # Run with coverage (80% threshold)
+npm run test:coverage    # Run with coverage (thresholds from vitest.config.ts: lines 48, functions 48, branches 39, statements 48)
 
 # Code Quality
 npm run lint             # ESLint on src/
@@ -224,7 +224,7 @@ npx vitest run src/utils/Serializer.test.ts
 npm run test:watch
 
 # Coverage report
-npm run test:coverage  # 80% threshold on lines/functions/branches/statements
+npm run test:coverage  # thresholds from vitest.config.ts: lines 48, functions 48, branches 39, statements 48
 ```
 
 ### Test Environment
@@ -288,7 +288,7 @@ The build produces:
 
 ## Framework Integration
 
-Papirus is framework-agnostic. For Vue 3 integration, see `packages/vue/` (if exists).
+Papirus is framework-agnostic and can be integrated into Vue/React/Svelte/vanilla apps from the application side.
 
 ## Documentation
 

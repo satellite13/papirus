@@ -146,7 +146,7 @@ renderer.addGroup(group);
 
 `Port` задаёт точки подключения на узлах:
 
-- `type`: `input | output | bidirectional`
+- `type`: `input | output`
 - `position`: `top | bottom | left | right` или `Point`
 - `styleClass` позволяет применять тему
 

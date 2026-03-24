@@ -192,7 +192,7 @@ const imageExporter = new ImageExporter(renderer);
 await imageExporter.download('diagram.png', { scale: 2 });
 
 const svgExporter = new SvgExporter(renderer);
-await svgExporter.download('diagram.svg');
+svgExporter.download('diagram.svg');
 ```
 
 ### Overlays

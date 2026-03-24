@@ -75,8 +75,10 @@ distributeNodes(nodes, 'horizontal');
 
 ## Геометрия
 
-В `utils/geometry.ts` доступны функции для hit-test и геометрии:
+В `utils/geometry.ts` доступны функции для hit-test и геометрии. Ниже — часто используемые (не исчерпывающий список):
 
 - `pointInRect`, `rectsIntersect`, `rectIntersection`, `rectUnion`
 - `distance`, `distanceToSegment`, `angle`, `rotatePoint`, `lerp`
 - `calculateBezierControlPoints`, `bezierPoint`, `expandBounds`, `boundsCenter`
+
+Полный перечень доступен в `src/utils/geometry.ts` и через публичный реэкспорт из `src/index.ts`.

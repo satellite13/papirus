@@ -58,4 +58,4 @@
 
 ## Типы
 
-Экспортируются основные типы: `Point`, `Size`, `Bounds`, `ContentInsetSides` (отступы по сторонам: используется в `contentInset` узла и в `label.inset`), `ElementStyle`, `NodeStyle`, `EdgeStyle`, `TextStyle` (в т.ч. `align`, `verticalAlign`), `DiagramOptions`, `DiagramData`, а также сериализованные формы (`SerializedNode`, `SerializedEdge`, `SerializedGroup`, `SerializedPort`, `SerializedNodeIcon`, `SerializedTextLabel`) и др.
+Экспортируются основные типы: `Point`, `Size`, `Bounds`, `ContentInsetSides` (отступы по сторонам: используется в `contentInset` узла и в `label.inset`), `ElementStyle`, `NodeStyle`, `EdgeStyle`, `TextStyle` (в т.ч. `align`, `verticalAlign`), `DiagramOptions`, `DiagramData`, а также сериализованные формы (`SerializedNode`, `SerializedEdge`, `SerializedGroup`, `SerializedPort`) и др.
