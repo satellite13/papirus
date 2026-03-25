@@ -1,5 +1,5 @@
 import type { DiagramPlugin, DiagramRenderer } from '../DiagramRenderer';
-import type { Bounds } from '@/types';
+import type { Bounds, Point } from '@/types';
 import { getContentBounds } from '@/utils/contentBounds';
 
 export type MiniMapAnchor = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
@@ -30,10 +30,9 @@ interface MiniMapLayout {
   viewRect: Bounds;
 }
 
-interface MiniMapDragPayload {
-  pointerOffsetX: number;
-  pointerOffsetY: number;
-}
+type MiniMapDragPayload =
+  | { kind: 'viewport'; pointerOffsetX: number; pointerOffsetY: number }
+  | { kind: 'block' };
 
 export class MiniMap implements DiagramPlugin {
   private readonly options: Required<MiniMapOptions>;
@@ -54,7 +53,7 @@ export class MiniMap implements DiagramPlugin {
   }
 
   install(renderer: DiagramRenderer): void {
-    this.removeOverlay = renderer.addOverlayRenderer((ctx) => {
+    this.removeOverlay = renderer.addTopOverlayRenderer((ctx) => {
       if (!this.options.enabled) return;
       const layout = this.computeLayout(renderer);
       if (!layout) return;
@@ -132,31 +131,37 @@ export class MiniMap implements DiagramPlugin {
     screenX: number,
     screenY: number
   ): MiniMapDragPayload | null {
-    if (!this.options.enabled) {
+    const hit = this.hitTestMiniMap(renderer, screenX, screenY);
+    if (!hit) {
       return null;
     }
-    const layout = this.computeLayout(renderer);
-    if (!layout) {
-      return null;
-    }
-    const point = renderer.screenToCanvas(screenX, screenY);
-    if (!point) {
-      return null;
-    }
+    const { layout, canvasPoint: point } = hit;
 
+    const vr = layout.viewRect;
+    const viewportOk = vr.width >= 0 && vr.height >= 0;
     const insideViewport =
-      point.x >= layout.viewRect.x &&
-      point.x <= layout.viewRect.x + layout.viewRect.width &&
-      point.y >= layout.viewRect.y &&
-      point.y <= layout.viewRect.y + layout.viewRect.height;
-    if (!insideViewport) {
-      return null;
+      viewportOk &&
+      point.x >= vr.x &&
+      point.x <= vr.x + vr.width &&
+      point.y >= vr.y &&
+      point.y <= vr.y + vr.height;
+    if (insideViewport) {
+      return {
+        kind: 'viewport',
+        pointerOffsetX: point.x - vr.x,
+        pointerOffsetY: point.y - vr.y,
+      };
     }
 
-    return {
-      pointerOffsetX: point.x - layout.viewRect.x,
-      pointerOffsetY: point.y - layout.viewRect.y,
-    };
+    return { kind: 'block' };
+  }
+
+  blocksDiagramPointerAtScreen(
+    renderer: DiagramRenderer,
+    screenX: number,
+    screenY: number
+  ): boolean {
+    return this.hitTestMiniMap(renderer, screenX, screenY) !== null;
   }
 
   updateOverlayDrag(
@@ -168,15 +173,16 @@ export class MiniMap implements DiagramPlugin {
     if (!this.options.enabled) {
       return false;
     }
-    if (
-      typeof payload !== 'object' ||
-      payload === null ||
-      !('pointerOffsetX' in payload) ||
-      !('pointerOffsetY' in payload)
-    ) {
+    if (typeof payload !== 'object' || payload === null || !('kind' in payload)) {
       return false;
     }
     const dragPayload = payload as MiniMapDragPayload;
+    if (dragPayload.kind === 'block') {
+      return true;
+    }
+    if (dragPayload.kind !== 'viewport') {
+      return false;
+    }
     const layout = this.computeLayout(renderer);
     if (!layout) {
       return false;
@@ -204,6 +210,34 @@ export class MiniMap implements DiagramPlugin {
     renderer.offsetX = -clampedViewportX * renderer.zoom;
     renderer.offsetY = -clampedViewportY * renderer.zoom;
     return true;
+  }
+
+  private hitTestMiniMap(
+    renderer: DiagramRenderer,
+    screenX: number,
+    screenY: number
+  ): { layout: MiniMapLayout; canvasPoint: Point } | null {
+    if (!this.options.enabled) {
+      return null;
+    }
+    const layout = this.computeLayout(renderer);
+    if (!layout) {
+      return null;
+    }
+    const canvasPoint = renderer.screenToCanvas(screenX, screenY);
+    if (!canvasPoint) {
+      return null;
+    }
+    const { x, y, width, height } = layout;
+    if (
+      canvasPoint.x < x ||
+      canvasPoint.x > x + width ||
+      canvasPoint.y < y ||
+      canvasPoint.y > y + height
+    ) {
+      return null;
+    }
+    return { layout, canvasPoint };
   }
 
   private getViewportBounds(renderer: DiagramRenderer): Bounds {

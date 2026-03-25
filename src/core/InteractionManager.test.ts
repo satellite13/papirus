@@ -557,6 +557,81 @@ describe('InteractionManager', () => {
     expect(renderer.offsetX).toBeLessThan(0);
   });
 
+  it('does not select node when clicking minimap over its thumbnail', () => {
+    const canvas = document.createElement('canvas');
+    vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 400,
+      height: 220,
+      right: 400,
+      bottom: 220,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+
+    const renderer = new DiagramRenderer(canvas, { width: 400, height: 220, retina: false });
+    renderer.use(new MiniMap({ width: 160, height: 96, padding: 10 }));
+    const interaction = new InteractionManager({ renderer });
+    const node = new RectangleNode({ x: 280, y: 140, width: 120, height: 80 });
+    renderer.addNode(node);
+
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', { clientX: 300, clientY: 160, button: 0, bubbles: true })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mouseup', { clientX: 300, clientY: 160, button: 0, bubbles: true })
+    );
+
+    expect(interaction.selection.selectedIds.has(node.id)).toBe(false);
+  });
+
+  it('does not select edge when clicking minimap over its path', () => {
+    const canvas = document.createElement('canvas');
+    vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 400,
+      height: 220,
+      right: 400,
+      bottom: 220,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+
+    const renderer = new DiagramRenderer(canvas, { width: 400, height: 220, retina: false });
+    renderer.use(new MiniMap({ width: 160, height: 96, padding: 10 }));
+    const interaction = new InteractionManager({ renderer });
+
+    const nodeA = new RectangleNode({ x: 260, y: 130, width: 20, height: 20 });
+    const nodeB = new RectangleNode({ x: 400, y: 150, width: 20, height: 20 });
+    renderer.addNode(nodeA);
+    renderer.addNode(nodeB);
+    const edge = new Edge({
+      from: { nodeId: nodeA.id },
+      to: { nodeId: nodeB.id },
+      type: 'straight',
+    });
+    renderer.addEdge(edge);
+    edge.updateEndpoints({ x: 275, y: 155 }, { x: 355, y: 165 });
+
+    expect(renderer.getElementAtPoint({ x: 300, y: 160 })).toBe(edge);
+
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', { clientX: 300, clientY: 160, button: 0, bubbles: true })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mouseup', { clientX: 300, clientY: 160, button: 0, bubbles: true })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('click', { clientX: 300, clientY: 160, button: 0, bubbles: true })
+    );
+
+    expect(interaction.selection.selectedIds.has(edge.id)).toBe(false);
+  });
+
   it('undo restores deleted node', () => {
     const canvas = document.createElement('canvas');
     const renderer = new DiagramRenderer(canvas, { width: 200, height: 100, retina: false });

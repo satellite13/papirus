@@ -141,7 +141,7 @@ export class DragManager extends EventEmitter<DragEvents> {
     this._handledMouseDown = false;
 
     const point = { x: event.worldX, y: event.worldY };
-    const element = this.renderer.getElementAtPoint(point);
+    const element = this.renderer.getInteractableElementAtPoint(point, event.screenX, event.screenY);
 
     if (element === undefined) {
       return false;

@@ -77,6 +77,11 @@ interface OverlayDragPlugin extends DiagramPlugin {
   endOverlayDrag?(renderer: DiagramRenderer, payload: unknown): void;
 }
 
+/** Оверлей, который перехватывает указатель в экранных координатах (миникарта и т.п.). */
+interface OverlayPointerBlocker extends DiagramPlugin {
+  blocksDiagramPointerAtScreen?(renderer: DiagramRenderer, screenX: number, screenY: number): boolean;
+}
+
 export interface OverlayDragSession {
   plugin: OverlayDragPlugin;
   payload: unknown;
@@ -115,6 +120,8 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
   private styleManager?: StyleManager;
   private underlayRenderers = new Set<(ctx: CanvasRenderingContext2D) => void>();
   private overlayRenderers = new Set<(ctx: CanvasRenderingContext2D) => void>();
+  /** Оверлеи поверх обычных (превью связей, рамка выделения): миникарта, чтобы не перекрывалась «стрелками» и UI взаимодействия. */
+  private topOverlayRenderers = new Set<(ctx: CanvasRenderingContext2D) => void>();
   private interactionManager: InteractionManager | null = null;
   private contextMenuManager: ContextMenuManager | null = null;
   private readonly animationManager: AnimationManager;
@@ -425,6 +432,19 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
   }
 
   /**
+   * Верхний оверлей: после обычных оверлеев (превью связи, направляющие, рамка выделения), до скроллбаров.
+   * Для миникарты и прочего «хрома» поверх рёбер и интерактивного UI.
+   */
+  addTopOverlayRenderer(renderer: (ctx: CanvasRenderingContext2D) => void): () => void {
+    this.topOverlayRenderers.add(renderer);
+    this.markDirty();
+    return () => {
+      this.topOverlayRenderers.delete(renderer);
+      this.markDirty();
+    };
+  }
+
+  /**
    * Convert screen coordinates to world coordinates
    */
   screenToWorld(screenX: number, screenY: number): Point {
@@ -673,6 +693,17 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
   }
 
   /**
+   * Элемент в точке worldPoint, если курсор (screen) не над оверлеем вроде миникарты.
+   * Иначе undefined — взаимодействие как с пустым местом (стрелка под миникартой не выделяется).
+   */
+  getInteractableElementAtPoint(worldPoint: Point, screenX: number, screenY: number): Node | Edge | Group | undefined {
+    if (this.blocksDiagramPointerAtScreen(screenX, screenY)) {
+      return undefined;
+    }
+    return this.getElementAtPoint(worldPoint);
+  }
+
+  /**
    * Update badge hover state and canvas cursor based on pointer position.
    * Call from mousemove to show hover highlight and pointer cursor over badges.
    */
@@ -897,7 +928,7 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
       }
     }
 
-    // Render edge handles (topmost layer)
+    // Ручки концов рёбер (над линиями; выше — оверлеи взаимодействия и topOverlay, напр. миникарта)
     for (const edge of this._edges.values()) {
       if (edge.visible) {
         edge.renderHandles(ctx);
@@ -906,6 +937,10 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
 
     for (const overlayRenderer of this.overlayRenderers) {
       overlayRenderer(ctx);
+    }
+
+    for (const topOverlay of this.topOverlayRenderers) {
+      topOverlay(ctx);
     }
 
     this.renderScrollbars(ctx);
@@ -1484,6 +1519,19 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
       }
     }
     return null;
+  }
+
+  /**
+   * Точка (client / screen) попадает в оверлей, который не должен «пробрасывать» hit-test в диаграмму.
+   */
+  blocksDiagramPointerAtScreen(screenX: number, screenY: number): boolean {
+    for (const plugin of this.plugins) {
+      const blocker = plugin as OverlayPointerBlocker;
+      if (blocker.blocksDiagramPointerAtScreen?.(this, screenX, screenY)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   updateOverlayDrag(session: OverlayDragSession, screenX: number, screenY: number): boolean {

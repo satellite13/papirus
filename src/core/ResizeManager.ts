@@ -83,6 +83,10 @@ export class ResizeManager extends EventEmitter<ResizeEvents> {
   handleMouseDown(event: InputEvent): boolean {
     this._handledMouseDown = false;
 
+    if (this.renderer.blocksDiagramPointerAtScreen(event.screenX, event.screenY)) {
+      return false;
+    }
+
     const selectedIds = Array.from(this.selectionManager.selectedIds);
     if (selectedIds.length !== 1) {
       return false;

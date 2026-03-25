@@ -120,7 +120,7 @@ export class SelectionManager extends EventEmitter<SelectionEvents> {
    */
   handleClick(event: InputEvent): void {
     const point = { x: event.worldX, y: event.worldY };
-    const element = this.renderer.getElementAtPoint(point);
+    const element = this.renderer.getInteractableElementAtPoint(point, event.screenX, event.screenY);
 
     if (element === undefined) {
       if (!event.ctrlKey && !event.metaKey) {

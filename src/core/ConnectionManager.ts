@@ -128,6 +128,27 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
   }
 
   /**
+   * Перетаскивание опорной точки полилинии рёбра
+   */
+  get isEditingEdgeControlPoint(): boolean {
+    return this.activeControlPointDrag !== null;
+  }
+
+  /**
+   * Сброс hover портов/якорей (курсор над миникартой и т.п., без вызова updateHover).
+   */
+  clearPointerHover(): void {
+    if (this.hoverDisabled) {
+      return;
+    }
+    if (this.hoverNodeId !== null || this.hoverAnchorId !== null) {
+      this.hoverNodeId = null;
+      this.hoverAnchorId = null;
+      this.renderer.markDirty();
+    }
+  }
+
+  /**
    * Check if currently reconnecting an edge
    */
   get reconnecting(): boolean {
@@ -173,6 +194,9 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
    * Otherwise: requires clicking on an anchor/port so that node drag still works.
    */
   tryStartConnectionAtPoint(event: InputEvent): boolean {
+    if (this.renderer.blocksDiagramPointerAtScreen(event.screenX, event.screenY)) {
+      return false;
+    }
     const point = { x: event.worldX, y: event.worldY };
     const node = this.getNodeAtPoint(point, false);
     if (!node) {
@@ -218,6 +242,9 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
    * Try to start edge reconnection from handle
    */
   tryStartReconnection(event: InputEvent): boolean {
+    if (this.renderer.blocksDiagramPointerAtScreen(event.screenX, event.screenY)) {
+      return false;
+    }
     if (this.tryStartEditableControlInteraction(event)) {
       return true;
     }

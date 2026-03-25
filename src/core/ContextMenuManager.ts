@@ -114,9 +114,14 @@ export class ContextMenuManager extends EventEmitter<ContextMenuEvents> {
       event.preventDefault();
       event.stopPropagation();
 
+      if (this.renderer.blocksDiagramPointerAtScreen(event.clientX, event.clientY)) {
+        this.close();
+        return;
+      }
+
       const screenPoint: Point = { x: event.clientX, y: event.clientY };
       const worldPoint = this.renderer.screenToWorld(screenPoint.x, screenPoint.y);
-      const hit = this.renderer.getElementAtPoint(worldPoint);
+      const hit = this.renderer.getInteractableElementAtPoint(worldPoint, event.clientX, event.clientY);
 
       let target: ContextMenuTarget;
       if (hit && 'typeName' in hit) {

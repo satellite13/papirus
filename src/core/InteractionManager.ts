@@ -404,6 +404,13 @@ export class InteractionManager {
     this.handledScrollbarMouseDown = false;
     this.handledOverlayMouseDown = false;
 
+    const overlayDrag = this.renderer.beginOverlayDrag(event.screenX, event.screenY);
+    if (overlayDrag) {
+      this.overlayDragSession = overlayDrag;
+      this.handledOverlayMouseDown = true;
+      return;
+    }
+
     if (!this.navigationOnly) {
       if (this.resizeManager.handleMouseDown(event)) {
         return;
@@ -414,13 +421,6 @@ export class InteractionManager {
       if (this.connectionManager.tryStartConnectionAtPoint(event)) {
         return;
       }
-    }
-
-    const overlayDrag = this.renderer.beginOverlayDrag(event.screenX, event.screenY);
-    if (overlayDrag) {
-      this.overlayDragSession = overlayDrag;
-      this.handledOverlayMouseDown = true;
-      return;
     }
 
     const scrollbarHit = this.renderer.hitTestScrollbarThumb(event.screenX, event.screenY);
@@ -438,7 +438,7 @@ export class InteractionManager {
     }
 
     const point = { x: event.worldX, y: event.worldY };
-    const hitElement = this.renderer.getElementAtPoint(point);
+    const hitElement = this.renderer.getInteractableElementAtPoint(point, event.screenX, event.screenY);
 
     if (event.button === 0) {
       if (this.navigationOnly) {
@@ -488,9 +488,15 @@ export class InteractionManager {
     }
 
     const overScrollbar = this.renderer.updateScrollbarHover(event.screenX, event.screenY);
+    const overOverlayPointerSink = this.renderer.blocksDiagramPointerAtScreen(
+      event.screenX,
+      event.screenY
+    );
 
     this.renderer.updateBadgeHover(
-      overScrollbar ? { x: -1e9, y: -1e9 } : { x: event.worldX, y: event.worldY }
+      overScrollbar || overOverlayPointerSink
+        ? { x: -1e9, y: -1e9 }
+        : { x: event.worldX, y: event.worldY }
     );
 
     if (this.overlayDragSession) {
@@ -520,7 +526,24 @@ export class InteractionManager {
       this.scrollbarDragState = null;
     }
 
-    if (overScrollbar) {
+    const blockDiagramRoutesUnderOverlay =
+      overOverlayPointerSink &&
+      !this.navigationManager.panning &&
+      !this.connectionManager.connecting &&
+      !this.connectionManager.isEditingEdgeControlPoint &&
+      !this.resizeManager.resizing &&
+      !this.dragManager.dragging &&
+      this.selectionManager.selectionRectangle === null;
+
+    if (
+      overOverlayPointerSink &&
+      !this.connectionManager.connecting &&
+      !this.connectionManager.isEditingEdgeControlPoint
+    ) {
+      this.connectionManager.clearPointerHover();
+    }
+
+    if (overScrollbar || blockDiagramRoutesUnderOverlay) {
       return;
     }
 
@@ -592,6 +615,10 @@ export class InteractionManager {
       return;
     }
 
+    if (this.renderer.blocksDiagramPointerAtScreen(event.screenX, event.screenY)) {
+      return;
+    }
+
     if (
       this.dragManager.handledMouseDown ||
       this.resizeManager.handledMouseDown ||
@@ -604,6 +631,10 @@ export class InteractionManager {
   }
 
   private handleDoubleClick(event: InputEvent): void {
+    if (this.renderer.blocksDiagramPointerAtScreen(event.screenX, event.screenY)) {
+      return;
+    }
+
     if (
       this.dragManager.handledMouseDown ||
       this.resizeManager.handledMouseDown ||
@@ -628,7 +659,7 @@ export class InteractionManager {
       return;
     }
 
-    const hitElement = this.renderer.getElementAtPoint(point);
+    const hitElement = this.renderer.getInteractableElementAtPoint(point, event.screenX, event.screenY);
     if (!hitElement) {
       this.labelEditor.finish(true, (kind, id, value) => this.handleLabelCommit(kind, id, value));
       return;
@@ -679,14 +710,23 @@ export class InteractionManager {
   }
 
   private handleWheel(event: WheelInputEvent): void {
+    if (this.renderer.blocksDiagramPointerAtScreen(event.screenX, event.screenY)) {
+      return;
+    }
     this.navigationManager.handleWheel(event);
   }
 
   private handlePan(event: PanInputEvent): void {
+    if (this.renderer.blocksDiagramPointerAtScreen(event.screenX, event.screenY)) {
+      return;
+    }
     this.navigationManager.handlePanGesture(event);
   }
 
   private handlePinch(event: PinchInputEvent): void {
+    if (this.renderer.blocksDiagramPointerAtScreen(event.screenX, event.screenY)) {
+      return;
+    }
     this.navigationManager.handlePinch(event);
   }
 
