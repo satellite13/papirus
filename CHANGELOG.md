@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.9] - 2026-03-25
+
+### Fixed
+- `SvgExporter`: edge SVG export no longer draws a legacy end arrow when `startMarker` / `endMarker` are set explicitly but one or both ends are `none` (aligned with canvas `Edge` rendering). Added regression tests.
+
 ## [0.5.8] - 2026-03-25
 
 ### Added
@@ -283,7 +288,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Edge animations (flow effect)
 - Context menu and search/filter
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.5.8...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.5.9...HEAD
+[0.5.9]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.9
 [0.5.8]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.8
 [0.5.7]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.7
 [0.5.6]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.6

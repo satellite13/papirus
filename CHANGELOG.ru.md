@@ -9,6 +9,11 @@
 
 ## [Unreleased]
 
+## [0.5.9] - 2026-03-25
+
+### Исправлено
+- `SvgExporter`: при экспорте связи в SVG больше не рисуется лишняя концевая стрелка из legacy `arrowType`, если заданы явные `startMarker` / `endMarker`, а на одном или обоих концах указано `none` (поведение согласовано с отрисовкой на canvas). Добавлены регрессионные тесты.
+
 ## [0.5.8] - 2026-03-25
 
 ### Добавлено
@@ -290,7 +295,8 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.5.8...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.5.9...HEAD
+[0.5.9]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.9
 [0.5.8]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.8
 [0.5.7]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.7
 [0.5.6]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.6

@@ -307,9 +307,11 @@ export class SvgExporter {
   }
 
   private resolveMarkerConfig(edge: Edge, side: 'start' | 'end'): ArrowMarkerConfig | null {
-    const marker = side === 'start' ? edge.startMarker : edge.endMarker;
-    if (marker && marker.type !== 'none') {
-      return marker;
+    const usesExplicitMarkers = edge.startMarker !== undefined || edge.endMarker !== undefined;
+
+    if (usesExplicitMarkers) {
+      const marker = side === 'start' ? edge.startMarker : edge.endMarker;
+      return marker && marker.type !== 'none' ? marker : null;
     }
 
     if (side === 'end') {
