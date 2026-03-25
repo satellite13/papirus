@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.8] - 2026-03-25
+
+### Added
+- Diagram plugin hooks for overlay pointer ownership: optional `beginOverlayDrag` / `updateOverlayDrag` / `endOverlayDrag` and `blocksDiagramPointerAtScreen` on `DiagramPlugin` (used by `MiniMap` and routed through `DiagramRenderer`).
+- `ConnectionManager` events `controlPointDragStart` and `controlPointDragEnd` when dragging polyline/bezier control points (for host apps such as collaborative editing).
+
+### Changed
+- `InteractionManager`, `ConnectionManager`, `ResizeManager`, `SelectionManager`, and `ContextMenuManager` respect overlay pointer blocking so minimap and similar overlays receive drags and clicks predictably.
+- `MiniMap`: implements overlay drag sessions and screen hit-testing via the new plugin contract.
+
 ## [0.5.7] - 2026-03-25
 
 ### Changed
@@ -273,7 +283,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Edge animations (flow effect)
 - Context menu and search/filter
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.5.6...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.5.8...HEAD
+[0.5.8]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.8
+[0.5.7]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.7
 [0.5.6]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.6
 [0.5.5]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.5
 [0.5.4]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.4

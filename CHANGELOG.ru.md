@@ -9,6 +9,16 @@
 
 ## [Unreleased]
 
+## [0.5.8] - 2026-03-25
+
+### Добавлено
+- Хуки плагинов диаграммы для перехвата указателя оверлеями: опциональные `beginOverlayDrag` / `updateOverlayDrag` / `endOverlayDrag` и `blocksDiagramPointerAtScreen` у `DiagramPlugin` (используются в `MiniMap` и проходят через `DiagramRenderer`).
+- События `ConnectionManager`: `controlPointDragStart` и `controlPointDragEnd` при перетаскивании контрольных точек полилинии/безье (для хост-приложений, например совместного редактирования).
+
+### Изменено
+- `InteractionManager`, `ConnectionManager`, `ResizeManager`, `SelectionManager` и `ContextMenuManager` учитывают блокировку указателя оверлеями, чтобы миникарта и аналогичные оверлеи стабильно получали клики и перетаскивания.
+- `MiniMap`: реализованы сессии overlay-drag и проверка попадания в экранных координатах по новому контракту плагина.
+
 ## [0.5.7] - 2026-03-25
 
 ### Изменено
@@ -280,7 +290,9 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.5.6...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.5.8...HEAD
+[0.5.8]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.8
+[0.5.7]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.7
 [0.5.6]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.6
 [0.5.5]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.5
 [0.5.4]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.4
