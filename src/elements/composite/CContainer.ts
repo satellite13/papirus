@@ -137,11 +137,21 @@ export class CContainer implements CComponent {
 
   measure(ctx: CanvasRenderingContext2D): Size {
     const flexChildren = this.buildFlexChildren(ctx);
-    // Layout at infinite size to get natural content size
+    // Layout at infinite size to get natural content size.
+    // Override alignItems to 'start' so stretch doesn't inflate cross-axis to infinity.
+    const measureConfig = {
+      ...this.getFlexConfig(),
+      alignItems: 'start' as const,
+    };
+    // Also override any child alignSelf: 'stretch' → 'start' for measurement
+    const measureChildren = flexChildren.map((c) => ({
+      ...c,
+      alignSelf: c.alignSelf === 'stretch' ? ('start' as const) : c.alignSelf,
+    }));
     const result = flexLayout(
       { width: 100000, height: 100000 },
-      this.getFlexConfig(),
-      flexChildren
+      measureConfig,
+      measureChildren
     );
     return result.contentSize;
   }

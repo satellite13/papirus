@@ -131,6 +131,11 @@ export class CompositeNode extends Node {
   }
 
   render(ctx: CanvasRenderingContext2D): void {
+    // Auto-size BEFORE drawing shape so bounds are correct
+    if (this._autoSize) {
+      this.applyAutoSize(ctx);
+    }
+
     const { x, y, width, height } = this.getBounds();
     const style = this.style;
     const baseOpacity = style.opacity ?? 1;
@@ -226,11 +231,6 @@ export class CompositeNode extends Node {
   protected override renderContents(ctx: CanvasRenderingContext2D): void {
     ctx.setLineDash([]);
     ctx.lineDashOffset = 0;
-
-    // Auto-size before rendering content
-    if (this._autoSize) {
-      this.applyAutoSize(ctx);
-    }
 
     const contentBounds = this.getContentBounds();
     this._content.render(ctx, contentBounds);
