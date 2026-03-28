@@ -143,7 +143,7 @@ export class CContainer implements CComponent {
   debugMeasure(ctx: CanvasRenderingContext2D, depth = 0): Size {
     const indent = '  '.repeat(depth);
     const flexChildren = this.buildFlexChildren(ctx);
-    const measureConfig = { ...this.getFlexConfig(), alignItems: 'start' as const };
+    const measureConfig = { ...this.getFlexConfig(), justifyContent: 'start' as const, alignItems: 'start' as const };
     const measureChildren = flexChildren.map((c) => ({
       ...c,
       flexGrow: 0,
@@ -179,11 +179,13 @@ export class CContainer implements CComponent {
   measure(ctx: CanvasRenderingContext2D): Size {
     const flexChildren = this.buildFlexChildren(ctx);
     // For measurement, override all properties that depend on container size:
+    // - justifyContent → 'start' (prevents main-axis offset from center/end/space-*)
     // - alignItems → 'start' (prevents cross-axis inflation from stretch/center/end)
     // - alignSelf → 'start' (same, per-child)
     // - flexGrow → 0 (prevents main-axis inflation into free space)
     const measureConfig = {
       ...this.getFlexConfig(),
+      justifyContent: 'start' as const,
       alignItems: 'start' as const,
     };
     const measureChildren = flexChildren.map((c) => ({

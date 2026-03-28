@@ -53,7 +53,7 @@ function createBpmnTask(x, y) {
     x, y, width: 180, height: 80,
     shapeType: 'rectangle',
     cornerRadius: 10,
-    autoSize: false,
+    autoSize: true,
     style: { fillColor: '#fff9e6', strokeColor: '#e6a817', strokeWidth: 2 },
     contentInset: 4,
     content: container({
@@ -106,7 +106,6 @@ function createArchiElement(x, y) {
   return new CompositeNode({
     x, y, width: 180, height: 60,
     shapeType: 'rectangle',
-    autoSize: false,
     style: { fillColor: '#e8f4fd', strokeColor: '#3498db', strokeWidth: 1.5 },
     contentInset: 4,
     content: container({
@@ -142,7 +141,6 @@ function createC4Container(x, y) {
   nodeCounter++;
   return new CompositeNode({
     x, y, width: 220, height: 110,
-    autoSize: false,
     shapeType: 'rectangle',
     cornerRadius: 6,
     style: { fillColor: '#438DD5', strokeColor: '#2b6cb0', strokeWidth: 1.5 },
