@@ -106,6 +106,7 @@ function createArchiElement(x, y) {
   return new CompositeNode({
     x, y, width: 180, height: 60,
     shapeType: 'rectangle',
+    autoSize: true,
     style: { fillColor: '#e8f4fd', strokeColor: '#3498db', strokeWidth: 1.5 },
     contentInset: 4,
     content: container({
@@ -141,6 +142,7 @@ function createC4Container(x, y) {
   nodeCounter++;
   return new CompositeNode({
     x, y, width: 220, height: 110,
+    autoSize: true,
     shapeType: 'rectangle',
     cornerRadius: 6,
     style: { fillColor: '#438DD5', strokeColor: '#2b6cb0', strokeWidth: 1.5 },
@@ -244,15 +246,6 @@ const bpmn2 = createBpmnTask(280, 40);
 renderer.addNode(bpmn1);
 renderer.addNode(bpmn2);
 
-// Debug: trace measure chain
-requestAnimationFrame(() => {
-  const ctx = renderer.getCanvas().getContext('2d');
-  if (ctx) {
-    console.log('=== BPMN1 measure trace ===');
-    const size = bpmn1.content.debugMeasure(ctx);
-    console.log('Final contentSize:', size);
-  }
-});
 
 renderer.addEdge(new Edge({
   from: { nodeId: bpmn1.id }, to: { nodeId: bpmn2.id },

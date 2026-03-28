@@ -136,46 +136,6 @@ export class CContainer implements CComponent {
     });
   }
 
-  /**
-   * Debug: trace measure chain with detailed logging.
-   * Call on root container to see why contentSize is inflated.
-   */
-  debugMeasure(ctx: CanvasRenderingContext2D, depth = 0): Size {
-    const indent = '  '.repeat(depth);
-    const flexChildren = this.buildFlexChildren(ctx);
-    const measureConfig = { ...this.getFlexConfig(), justifyContent: 'start' as const, alignItems: 'start' as const };
-    const measureChildren = flexChildren.map((c) => ({
-      ...c,
-      flexGrow: 0,
-      alignSelf: 'start' as const,
-    }));
-
-    // Log each child's measured size
-    for (let i = 0; i < this._children.length; i++) {
-      const child = this._children[i]!;
-      const measured = flexChildren[i]!.measure;
-      console.log(`${indent}child[${i}] type=${child.type} id=${child.id ?? '-'} measure=${JSON.stringify(measured)}`);
-      if (child.type === 'container') {
-        (child as CContainer).debugMeasure(ctx, depth + 1);
-      }
-      if (child.type === 'shape') {
-        const content = (child as { content?: CContainer }).content;
-        if (content) {
-          console.log(`${indent}  shape.content:`);
-          (content as CContainer).debugMeasure(ctx, depth + 2);
-        }
-      }
-    }
-
-    const result = flexLayout(
-      { width: 100000, height: 100000 },
-      measureConfig,
-      measureChildren
-    );
-    console.log(`${indent}=> container dir=${this._direction} contentSize=${JSON.stringify(result.contentSize)} childBounds=${JSON.stringify(result.childBounds)}`);
-    return result.contentSize;
-  }
-
   measure(ctx: CanvasRenderingContext2D): Size {
     const flexChildren = this.buildFlexChildren(ctx);
     // For measurement, override all properties that depend on container size:
