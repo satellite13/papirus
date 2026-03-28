@@ -53,6 +53,7 @@ function createBpmnTask(x, y) {
     x, y, width: 180, height: 80,
     shapeType: 'rectangle',
     cornerRadius: 10,
+    autoSize: false,
     style: { fillColor: '#fff9e6', strokeColor: '#e6a817', strokeWidth: 2 },
     contentInset: 4,
     content: container({
@@ -105,6 +106,7 @@ function createArchiElement(x, y) {
   return new CompositeNode({
     x, y, width: 180, height: 60,
     shapeType: 'rectangle',
+    autoSize: false,
     style: { fillColor: '#e8f4fd', strokeColor: '#3498db', strokeWidth: 1.5 },
     contentInset: 4,
     content: container({
@@ -242,6 +244,16 @@ const bpmn1 = createBpmnTask(40, 40);
 const bpmn2 = createBpmnTask(280, 40);
 renderer.addNode(bpmn1);
 renderer.addNode(bpmn2);
+
+// Debug: log measured sizes after first render
+requestAnimationFrame(() => {
+  const canvas = renderer.getCanvas();
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    console.log('BPMN1 debug:', bpmn1.debugMeasure(ctx));
+    console.log('BPMN1 actual size:', bpmn1.width, bpmn1.height);
+  }
+});
 renderer.addEdge(new Edge({
   from: { nodeId: bpmn1.id }, to: { nodeId: bpmn2.id },
   type: 'polyline',

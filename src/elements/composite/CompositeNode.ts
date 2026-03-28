@@ -252,12 +252,26 @@ export class CompositeNode extends Node {
       contentSize.height + inset.top + inset.bottom
     );
 
+    // Only grow, never shrink
     if (neededWidth > this._width) {
       this._width = neededWidth;
     }
     if (neededHeight > this._height) {
       this._height = neededHeight;
     }
+  }
+
+  /** Debug: get measured content size (call with canvas context). */
+  debugMeasure(ctx: CanvasRenderingContext2D): {
+    contentSize: { width: number; height: number };
+    nodeSize: { width: number; height: number };
+    inset: { top: number; right: number; bottom: number; left: number };
+  } {
+    return {
+      contentSize: this._content.measure(ctx),
+      nodeSize: { width: this._width, height: this._height },
+      inset: this.contentInset,
+    };
   }
 
   // --- Outline methods for connections (delegate based on shapeType) ---
