@@ -239,6 +239,92 @@ function createUmlClass(x, y) {
   });
 }
 
+function createSwimlane(x, y) {
+  nodeCounter++;
+  return new CompositeNode({
+    x, y, width: 40, height: 200,
+    shapeType: 'rectangle',
+    autoSize: false,
+    style: { fillColor: '#f0f4ff', strokeColor: '#6366f1', strokeWidth: 1.5 },
+    content: container({
+      direction: 'row',
+      children: [
+        text({
+          id: 'name',
+          text: `Lane ${nodeCounter}`,
+          fontSize: 13,
+          fontWeight: 'bold',
+          color: '#312e81',
+          rotation: -90,
+          role: 'name',
+          style: { flexGrow: 1, alignSelf: 'center' },
+        }),
+      ],
+    }),
+  });
+}
+
+function createStatusCard(x, y) {
+  nodeCounter++;
+  return new CompositeNode({
+    x, y, width: 200, height: 70,
+    shapeType: 'rectangle',
+    cornerRadius: 6,
+    autoSize: true,
+    style: { fillColor: '#ffffff', strokeColor: '#d1d5db', strokeWidth: 1 },
+    content: container({
+      direction: 'row',
+      children: [
+        container({
+          direction: 'column',
+          padding: 10,
+          gap: 4,
+          style: { flexGrow: 1 },
+          children: [
+            text({
+              id: 'name',
+              text: `Server ${nodeCounter}`,
+              fontSize: 13,
+              fontWeight: 'bold',
+              color: '#111827',
+              align: 'left',
+              role: 'name',
+            }),
+            text({
+              id: 'status',
+              text: 'Production / Active',
+              fontSize: 10,
+              color: '#6b7280',
+              align: 'left',
+            }),
+          ],
+        }),
+        container({
+          direction: 'column',
+          children: [
+            shape({
+              backgroundColor: '#22c55e',
+              style: { flexGrow: 1 },
+              content: container({ children: [] }),
+            }),
+            shape({
+              backgroundColor: '#eab308',
+              style: { flexGrow: 1 },
+              content: container({ children: [] }),
+            }),
+            shape({
+              backgroundColor: '#ef4444',
+              style: { flexGrow: 1 },
+              content: container({ children: [] }),
+            }),
+          ],
+          style: { flexBasis: 16 },
+        }),
+      ],
+    }),
+  });
+}
+
 // --- Create initial demo elements ---
 
 const bpmn1 = createBpmnTask(40, 40);
@@ -268,6 +354,12 @@ renderer.addNode(c4);
 
 const uml = createUmlClass(520, 200);
 renderer.addNode(uml);
+
+const swimlane = createSwimlane(780, 40);
+renderer.addNode(swimlane);
+
+const statusCard = createStatusCard(520, 400);
+renderer.addNode(statusCard);
 
 // --- componentClick event ---
 
@@ -304,6 +396,16 @@ document.getElementById('addC4')?.addEventListener('click', () => {
 document.getElementById('addUml')?.addEventListener('click', () => {
   const { x, y } = nextPos();
   renderer.addNode(createUmlClass(x, y));
+});
+
+document.getElementById('addSwimlane')?.addEventListener('click', () => {
+  const { x, y } = nextPos();
+  renderer.addNode(createSwimlane(x, y));
+});
+
+document.getElementById('addStatus')?.addEventListener('click', () => {
+  const { x, y } = nextPos();
+  renderer.addNode(createStatusCard(x, y));
 });
 
 document.getElementById('fitView')?.addEventListener('click', () => {
