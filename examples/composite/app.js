@@ -35,8 +35,8 @@ window.addEventListener('resize', syncCanvasSize);
 const svgExporter = new SvgExporter(renderer);
 
 // Grid
-const gridOverlay = new GridOverlay(renderer, { visible: false });
-renderer.installPlugin(gridOverlay);
+const gridOverlay = new GridOverlay({ visible: false });
+renderer.use(gridOverlay);
 
 // Interactions
 const interactionManager = renderer.enableInteractions({
