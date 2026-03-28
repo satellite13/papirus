@@ -201,6 +201,82 @@ describe('InteractionManager', () => {
     expect(edge.controlPoints![1]).toEqual({ x: 230, y: 100 });
   });
 
+  it('undo restores nodes and editable-polyline control points after drag', () => {
+    const canvas = document.createElement('canvas');
+    vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 400,
+      height: 200,
+      right: 400,
+      bottom: 200,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+    const renderer = new DiagramRenderer(canvas, { width: 400, height: 200, retina: false });
+    const interaction = renderer.enableInteractions({ alignToNodes: false });
+
+    const nodeA = new RectangleNode({ x: 50, y: 80, width: 60, height: 40 });
+    const nodeB = new RectangleNode({ x: 250, y: 80, width: 60, height: 40 });
+    renderer.addNode(nodeA);
+    renderer.addNode(nodeB);
+
+    const edge = new Edge({
+      from: { nodeId: nodeA.id },
+      to: { nodeId: nodeB.id },
+      type: 'editable-polyline',
+      controlPoints: [{ x: 150, y: 50 }, { x: 200, y: 120 }],
+    });
+    renderer.addEdge(edge);
+    edge.updateEndpoints({ x: 110, y: 100 }, { x: 250, y: 100 });
+
+    const cpBefore = [
+      { x: edge.controlPoints![0]!.x, y: edge.controlPoints![0]!.y },
+      { x: edge.controlPoints![1]!.x, y: edge.controlPoints![1]!.y },
+    ];
+    const posBeforeA = { x: nodeA.x, y: nodeA.y };
+
+    interaction.selection.select(nodeA.id);
+    interaction.selection.addToSelection(nodeB.id);
+
+    const startX = 80;
+    const startY = 100;
+    const deltaX = 30;
+    const deltaY = -20;
+
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', { clientX: startX, clientY: startY, button: 0, bubbles: true })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mousemove', {
+        clientX: startX + deltaX,
+        clientY: startY + deltaY,
+        button: 0,
+        buttons: 1,
+        bubbles: true,
+      })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mouseup', {
+        clientX: startX + deltaX,
+        clientY: startY + deltaY,
+        button: 0,
+        bubbles: true,
+      })
+    );
+
+    expect(nodeA.x).not.toBe(posBeforeA.x);
+    expect(edge.controlPoints![0]!.x).not.toBe(cpBefore[0]!.x);
+
+    interaction.history.undo();
+
+    expect(nodeA.x).toBe(posBeforeA.x);
+    expect(nodeA.y).toBe(posBeforeA.y);
+    expect(edge.controlPoints![0]).toEqual(cpBefore[0]);
+    expect(edge.controlPoints![1]).toEqual(cpBefore[1]);
+  });
+
   it('edits node label on double click', () => {
     const canvas = document.createElement('canvas');
     vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({
@@ -768,5 +844,77 @@ describe('InteractionManager', () => {
 
     interaction.destroy();
     expect(endOverlayDragSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('undo restores host-moved follower nodes when recordAdditionalDragStartPositions is used', () => {
+    const canvas = document.createElement('canvas');
+    vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 400,
+      height: 300,
+      right: 400,
+      bottom: 300,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+    const renderer = new DiagramRenderer(canvas, { width: 400, height: 300, retina: false });
+    const interaction = new InteractionManager({ renderer });
+
+    const leader = new RectangleNode({ x: 0, y: 0, width: 200, height: 200 });
+    const follower = new RectangleNode({ x: 50, y: 50, width: 40, height: 40 });
+    renderer.addNode(leader);
+    renderer.addNode(follower);
+    interaction.selection.select(leader.id);
+
+    let leaderInitial = { x: leader.x, y: leader.y };
+    let followerInitial = { x: follower.x, y: follower.y };
+
+    interaction.drag.on('dragstart', (ids: string[]) => {
+      if (ids.length === 1 && ids[0] === leader.id) {
+        leaderInitial = { x: leader.x, y: leader.y };
+        followerInitial = { x: follower.x, y: follower.y };
+        interaction.recordAdditionalDragStartPositions([follower.id]);
+      }
+    });
+    interaction.drag.on('drag', () => {
+      follower.x = followerInitial.x + (leader.x - leaderInitial.x);
+      follower.y = followerInitial.y + (leader.y - leaderInitial.y);
+    });
+
+    // Hit leader only (follower sits on top at 50,50 — avoid stacking order picking the inner node)
+    const startX = 20;
+    const startY = 20;
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', { clientX: startX, clientY: startY, button: 0, bubbles: true })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mousemove', {
+        clientX: startX + 25,
+        clientY: startY + 15,
+        button: 0,
+        buttons: 1,
+        bubbles: true,
+      })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mouseup', {
+        clientX: startX + 25,
+        clientY: startY + 15,
+        button: 0,
+        bubbles: true,
+      })
+    );
+
+    expect(leader.x).not.toBe(leaderInitial.x);
+    expect(follower.x).toBe(followerInitial.x + (leader.x - leaderInitial.x));
+
+    interaction.history.undo();
+
+    expect(leader.x).toBe(leaderInitial.x);
+    expect(leader.y).toBe(leaderInitial.y);
+    expect(follower.x).toBe(followerInitial.x);
+    expect(follower.y).toBe(followerInitial.y);
   });
 });

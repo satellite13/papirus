@@ -14,6 +14,7 @@ import type {
   Point,
   TextStyle,
 } from '@/types';
+import { clonePoints } from '@/utils/geometry';
 
 export interface LabelSnapshot {
   text: string;
@@ -172,6 +173,45 @@ export class MoveNodesCommand implements Command {
       if (node !== undefined) {
         node.x = pos.before.x;
         node.y = pos.before.y;
+      }
+    }
+  }
+}
+
+/**
+ * Restores editable-polyline control points on undo (used with node drag composite).
+ */
+export class ChangeEditablePolylineControlPointsCommand implements Command {
+  private readonly changes: Map<string, { before: Point[]; after: Point[] }>;
+  private readonly getEdge: (id: string) => Edge | undefined;
+
+  constructor(
+    getEdge: (id: string) => Edge | undefined,
+    changes: Map<string, { before: Point[]; after: Point[] }>
+  ) {
+    this.getEdge = getEdge;
+    this.changes = new Map(
+      Array.from(changes.entries()).map(([id, v]) => [
+        id,
+        { before: clonePoints(v.before), after: clonePoints(v.after) },
+      ])
+    );
+  }
+
+  execute(): void {
+    for (const [id, { after }] of this.changes) {
+      const edge = this.getEdge(id);
+      if (edge?.isEditablePolyline()) {
+        edge.controlPoints = clonePoints(after);
+      }
+    }
+  }
+
+  undo(): void {
+    for (const [id, { before }] of this.changes) {
+      const edge = this.getEdge(id);
+      if (edge?.isEditablePolyline()) {
+        edge.controlPoints = clonePoints(before);
       }
     }
   }

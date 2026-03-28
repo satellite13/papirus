@@ -49,7 +49,13 @@ export { AnimationManager } from './core/AnimationManager';
 export type { AnimationState } from './core/AnimationManager';
 
 export { HistoryManager } from './core/HistoryManager';
-export { MoveNodesCommand, AddNodeCommand, RemoveNodeCommand, CompositeCommand } from './core/history/commands';
+export {
+  MoveNodesCommand,
+  AddNodeCommand,
+  RemoveNodeCommand,
+  CompositeCommand,
+  ChangeEditablePolylineControlPointsCommand,
+} from './core/history/commands';
 export type { HistoryEvents, HistoryManagerOptions } from './core/HistoryManager';
 
 // Elements

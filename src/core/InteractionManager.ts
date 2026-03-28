@@ -27,10 +27,14 @@ import type { Bounds, EdgeEndpoint, Point, SerializedEdge, SerializedNode } from
 import { Edge } from '@/elements/Edge';
 import type { Group } from '@/elements/Group';
 import type { Node } from '@/elements/Node';
-import { CompositeCommand } from './history/commands';
+import {
+  ChangeEditablePolylineControlPointsCommand,
+  CompositeCommand,
+} from './history/commands';
 import { LabelEditor } from './LabelEditor';
 import { shallowEqual } from '@/utils/style';
-import { mergeBounds } from '@/utils/geometry';
+import { clonePoints, mergeBounds } from '@/utils/geometry';
+import type { Command } from '@/types';
 
 export interface InteractionKeymap {
   deleteKeys: string[];
@@ -81,6 +85,7 @@ export class InteractionManager {
   private overlayCleanup: (() => void) | null = null;
 
   private dragStartPositions = new Map<string, { x: number; y: number }>();
+  private dragStartEditablePolylinePoints = new Map<string, Point[]>();
   private reconnectOrigins = new Map<
     string,
     { endpoint: 'start' | 'end'; original: EdgeEndpoint }
@@ -189,6 +194,55 @@ export class InteractionManager {
 
   get history(): HistoryManager {
     return this.historyManager;
+  }
+
+  /**
+   * Records drag-start positions for node IDs moved together with the selection by the host app
+   * (e.g. contained nodes while Papirus only reports the container in drag events).
+   * Call from a `dragstart` listener after the default handler; skips IDs already captured.
+   * Also snapshots editable-polyline control points for edges incident to those nodes (for undo).
+   */
+  recordAdditionalDragStartPositions(nodeIds: string[]): void {
+    for (const id of nodeIds) {
+      if (this.dragStartPositions.has(id)) {
+        continue;
+      }
+      const node = this.renderer.getNode(id);
+      if (node !== undefined) {
+        this.dragStartPositions.set(id, { x: node.x, y: node.y });
+      }
+    }
+    this.snapshotEditablePolylineControlPointsForEdgesTouchingNodes(nodeIds);
+  }
+
+  private snapshotEditablePolylineControlPointsForEdgesTouchingNodes(nodeIds: Iterable<string>): void {
+    const idSet = new Set(nodeIds);
+    for (const edge of this.renderer.edges.values()) {
+      if (!edge.hasEditableControlPoints()) {
+        continue;
+      }
+      if (!idSet.has(edge.from.nodeId) && !idSet.has(edge.to.nodeId)) {
+        continue;
+      }
+      if (this.dragStartEditablePolylinePoints.has(edge.id)) {
+        continue;
+      }
+      this.dragStartEditablePolylinePoints.set(edge.id, clonePoints(edge.controlPoints!));
+    }
+  }
+
+  private editablePolylinePointsEqual(a: Point[], b: Point[]): boolean {
+    if (a.length !== b.length) {
+      return false;
+    }
+    for (let i = 0; i < a.length; i++) {
+      const p = a[i]!;
+      const q = b[i]!;
+      if (p.x !== q.x || p.y !== q.y) {
+        return false;
+      }
+    }
+    return true;
   }
 
   changeNodeProperties(nodeId: string, apply: (node: Node) => void): void {
@@ -324,22 +378,24 @@ export class InteractionManager {
       this.dragManager.on('dragstart', (nodeIds) => {
         this.connectionManager.disableHover();
         this.dragStartPositions.clear();
+        this.dragStartEditablePolylinePoints.clear();
         for (const id of nodeIds) {
           const node = this.renderer.getNode(id);
           if (node) {
             this.dragStartPositions.set(id, { x: node.x, y: node.y });
           }
         }
+        this.snapshotEditablePolylineControlPointsForEdgesTouchingNodes(nodeIds);
       });
 
-      this.dragManager.on('dragend', (nodeIds) => {
+      this.dragManager.on('dragend', () => {
         this.connectionManager.enableHover();
 
         const nodePositions = new Map<
           string,
           { before: { x: number; y: number }; after: { x: number; y: number } }
         >();
-        for (const id of nodeIds) {
+        for (const id of this.dragStartPositions.keys()) {
           const node = this.renderer.getNode(id);
           const before = this.dragStartPositions.get(id);
           if (!node || !before) continue;
@@ -349,10 +405,41 @@ export class InteractionManager {
           }
         }
 
-        if (nodePositions.size > 0) {
-          this.historyManager.execute(
-            new MoveNodesCommand((id) => this.renderer.getNode(id), nodePositions)
+        const polylineChanges = new Map<string, { before: Point[]; after: Point[] }>();
+        for (const edge of this.renderer.edges.values()) {
+          if (!edge.hasEditableControlPoints()) {
+            continue;
+          }
+          const beforePts = this.dragStartEditablePolylinePoints.get(edge.id);
+          if (beforePts === undefined) {
+            continue;
+          }
+          const afterPts = clonePoints(edge.controlPoints!);
+          if (!this.editablePolylinePointsEqual(beforePts, afterPts)) {
+            polylineChanges.set(edge.id, {
+              before: clonePoints(beforePts),
+              after: afterPts,
+            });
+          }
+        }
+
+        const parts: Command[] = [];
+        if (polylineChanges.size > 0) {
+          parts.push(
+            new ChangeEditablePolylineControlPointsCommand(
+              (id) => this.renderer.getEdge(id),
+              polylineChanges
+            )
           );
+        }
+        if (nodePositions.size > 0) {
+          parts.push(new MoveNodesCommand((id) => this.renderer.getNode(id), nodePositions));
+        }
+
+        if (parts.length === 1) {
+          this.historyManager.execute(parts[0]!);
+        } else if (parts.length > 1) {
+          this.historyManager.execute(new CompositeCommand(parts));
         }
       });
 
