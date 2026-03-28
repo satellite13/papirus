@@ -53,7 +53,6 @@ function createBpmnTask(x, y) {
     x, y, width: 180, height: 80,
     shapeType: 'rectangle',
     cornerRadius: 10,
-    autoSize: false,
     style: { fillColor: '#fff9e6', strokeColor: '#e6a817', strokeWidth: 2 },
     contentInset: 4,
     content: container({
@@ -106,7 +105,6 @@ function createArchiElement(x, y) {
   return new CompositeNode({
     x, y, width: 180, height: 60,
     shapeType: 'rectangle',
-    autoSize: false,
     style: { fillColor: '#e8f4fd', strokeColor: '#3498db', strokeWidth: 1.5 },
     contentInset: 4,
     content: container({
@@ -314,7 +312,7 @@ document.getElementById('addUml')?.addEventListener('click', () => {
 });
 
 document.getElementById('fitView')?.addEventListener('click', () => {
-  renderer.fitToContent({ padding: 40, animate: true });
+  interactionManager.navigation.fitToView();
 });
 
 document.getElementById('toggleGrid')?.addEventListener('click', () => {

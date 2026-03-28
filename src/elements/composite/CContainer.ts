@@ -137,9 +137,10 @@ export class CContainer implements CComponent {
 
   measure(ctx: CanvasRenderingContext2D): Size {
     const flexChildren = this.buildFlexChildren(ctx);
-    // For measurement, override properties that would inflate to container size:
-    // - alignItems/alignSelf: 'stretch' → 'start' (prevents cross-axis inflation)
-    // - flexGrow: 0 (prevents main-axis inflation into free space)
+    // For measurement, override all properties that depend on container size:
+    // - alignItems → 'start' (prevents cross-axis inflation from stretch/center/end)
+    // - alignSelf → 'start' (same, per-child)
+    // - flexGrow → 0 (prevents main-axis inflation into free space)
     const measureConfig = {
       ...this.getFlexConfig(),
       alignItems: 'start' as const,
@@ -147,7 +148,7 @@ export class CContainer implements CComponent {
     const measureChildren = flexChildren.map((c) => ({
       ...c,
       flexGrow: 0,
-      alignSelf: c.alignSelf === 'stretch' ? ('start' as const) : c.alignSelf,
+      alignSelf: 'start' as const,
     }));
     const result = flexLayout(
       { width: 100000, height: 100000 },
