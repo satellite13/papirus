@@ -409,7 +409,15 @@ export class CText implements CComponent {
         break;
     }
 
-    const fontStr = `${this._fontStyle} ${this._fontWeight} ${this._fontSize}px ${this._fontFamily}`;
+    const fontAttrs = [
+      `font-family="${this._fontFamily}"`,
+      `font-size="${this._fontSize}"`,
+      this._fontWeight !== 'normal' ? `font-weight="${this._fontWeight}"` : '',
+      this._fontStyle !== 'normal' ? `font-style="${this._fontStyle}"` : '',
+    ]
+      .filter(Boolean)
+      .join(' ');
+
     const transform =
       this._rotation !== 0
         ? ` transform="rotate(${this._rotation}, ${bounds.x + bounds.width / 2}, ${bounds.y + bounds.height / 2})"`
@@ -422,7 +430,7 @@ export class CText implements CComponent {
       )
       .join('');
 
-    return `<text x="${xBase}" y="${yStart}" font="${fontStr}" fill="${this._color}" text-anchor="${anchor}"${transform}>${tspans}</text>`;
+    return `<text x="${xBase}" y="${yStart}" ${fontAttrs} fill="${this._color}" text-anchor="${anchor}"${transform}>${tspans}</text>`;
   }
 }
 

@@ -67,7 +67,7 @@ function createBpmnTask(x, y) {
           children: [
             icon({
               id: 'type-icon',
-              source: `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%23e6a817" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/></svg>')}`,
+              source: `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#e6a817" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/></svg>')}`,
               width: 18,
               height: 18,
               onClick: () => console.log('BPMN icon clicked'),
@@ -89,7 +89,7 @@ function createBpmnTask(x, y) {
           gap: 6,
           children: [
             icon({
-              source: `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" stroke="%23999" stroke-width="1.5"><path d="M8 2v12M5 11l3 3 3-3M5 5l3-3 3 3"/></svg>')}`,
+              source: `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" stroke="#999" stroke-width="1.5"><path d="M8 2v12M5 11l3 3 3-3M5 5l3-3 3 3"/></svg>')}`,
               width: 14,
               height: 14,
             }),
@@ -117,7 +117,7 @@ function createArchiElement(x, y) {
           children: [
             icon({
               id: 'type-icon',
-              source: `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="%233498db" stroke-width="1.5"><circle cx="10" cy="10" r="7"/><path d="M10 6v4l3 2"/></svg>')}`,
+              source: `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="#3498db" stroke-width="1.5"><circle cx="10" cy="10" r="7"/><path d="M10 6v4l3 2"/></svg>')}`,
               width: 16,
               height: 16,
             }),
@@ -315,8 +315,10 @@ document.getElementById('fitView')?.addEventListener('click', () => {
   interactionManager.navigation.fitToView();
 });
 
+let gridVisible = false;
 document.getElementById('toggleGrid')?.addEventListener('click', () => {
-  gridOverlay.visible = !gridOverlay.visible;
+  gridVisible = !gridVisible;
+  gridOverlay.setEnabled(gridVisible);
   renderer.markDirty();
 });
 

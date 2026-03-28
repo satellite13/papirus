@@ -36,8 +36,9 @@ export class CContainer implements CComponent {
   private _children: CComponent[];
   private _onChange?: () => void;
 
-  // Cached layout results (invalidated on change)
+  // Cached layout results from last render (used by hitTest and toSVG)
   private _cachedBounds: Bounds[] | null = null;
+  private _cachedContainerBounds: Bounds | null = null;
 
   constructor(options: CContainerOptions = {}) {
     this.id = options.id;
@@ -169,6 +170,7 @@ export class CContainer implements CComponent {
     );
 
     this._cachedBounds = result.childBounds;
+    this._cachedContainerBounds = bounds;
 
     const opacity = this.style.opacity ?? 1;
     if (opacity < 1) {
@@ -267,34 +269,32 @@ export class CContainer implements CComponent {
   toSVG(bounds: Bounds): string {
     if (this.style.visible === false) return '';
 
-    const flexChildren: FlexChild[] = this._children.map((child) => {
-      const s = child.style;
-      // For SVG export, we need a measurement context — use a fallback size
-      return {
-        measure: { width: 50, height: 20 }, // approximate; real measurement needs ctx
-        minSize: { width: 0, height: 0 },
-        flexGrow: s.flexGrow ?? 0,
-        flexShrink: s.flexShrink ?? 1,
-        flexBasis: s.flexBasis ?? 'auto',
-        alignSelf: s.alignSelf ?? 'auto',
-        margin: normalizeSides(s.margin),
-      };
-    });
-
-    const result = flexLayout(
-      { width: bounds.width, height: bounds.height },
-      this.getFlexConfig(),
-      flexChildren
-    );
+    // Use cached bounds from last render() for accurate layout
+    const cachedBounds = this._cachedBounds;
+    const cachedContainer = this._cachedContainerBounds;
 
     const childSvg = this._children
       .map((child, i) => {
-        const cb = result.childBounds[i]!;
+        if (child.style.visible === false) return '';
+        if (cachedBounds && cachedContainer) {
+          // Use cached layout — translate from cached container origin to export bounds
+          const cb = cachedBounds[i]!;
+          const dx = bounds.x - cachedContainer.x;
+          const dy = bounds.y - cachedContainer.y;
+          return child.toSVG({
+            x: cachedContainer.x + cb.x + dx,
+            y: cachedContainer.y + cb.y + dy,
+            width: cb.width,
+            height: cb.height,
+          });
+        }
+        // Fallback: distribute evenly (no ctx available for proper layout)
+        const h = bounds.height / Math.max(1, this._children.length);
         return child.toSVG({
-          x: bounds.x + cb.x,
-          y: bounds.y + cb.y,
-          width: cb.width,
-          height: cb.height,
+          x: bounds.x,
+          y: bounds.y + i * h,
+          width: bounds.width,
+          height: h,
         });
       })
       .join('');
