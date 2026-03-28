@@ -47,6 +47,7 @@ export class CText implements CComponent {
   private _role?: string;
   private _rotation: number;
   private _onChange?: () => void;
+  private _cachedLines: string[] | null = null;
 
   constructor(options: CTextOptions) {
     this.id = options.id;
@@ -73,6 +74,7 @@ export class CText implements CComponent {
   set text(value: string) {
     if (this._text !== value) {
       this._text = value;
+      this._cachedLines = null;
       this._onChange?.();
     }
   }
@@ -271,6 +273,7 @@ export class CText implements CComponent {
       : bounds;
 
     const lines = this.wrapText(ctx, textBounds.width);
+    this._cachedLines = lines;
     const lineHeightPx = this.getLineHeightPx();
     const totalTextHeight = lines.length * lineHeightPx;
 
@@ -372,10 +375,8 @@ export class CText implements CComponent {
     if (this.style.visible === false) return '';
 
     const lineHeightPx = this.getLineHeightPx();
-    // For SVG we can't easily word-wrap without measuring, so use the raw text lines
-    const lines = this._text.split('\n');
-    const displayLines =
-      this._maxLines !== undefined ? lines.slice(0, this._maxLines) : lines;
+    // Use cached wrapped lines from last render() if available, otherwise fall back to raw lines
+    const displayLines = this._cachedLines ?? this._text.split('\n');
     const totalTextHeight = displayLines.length * lineHeightPx;
 
     let anchor: string;
