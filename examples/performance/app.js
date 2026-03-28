@@ -5,6 +5,11 @@ import {
   DiamondNode,
   Edge,
   Group,
+  CompositeNode,
+  container,
+  text,
+  divider,
+  shape,
 } from '../../dist/papirus.js';
 
 const NODE_COUNT = 1000;
@@ -49,9 +54,6 @@ function generateNodes(count) {
     const x = col * SPACING_X + 50;
     const y = row * SPACING_Y + 50;
 
-    const nodeTypes = [RectangleNode, CircleNode, DiamondNode];
-    const NodeClass = nodeTypes[i % 3];
-
     const colors = [
       { fill: '#3b82f6', stroke: '#1d4ed8' },
       { fill: '#10b981', stroke: '#047857' },
@@ -61,19 +63,75 @@ function generateNodes(count) {
     ];
     const color = colors[i % colors.length];
 
-    const node = new NodeClass({
-      id: `node-${i}`,
-      x,
-      y,
-      width: 80 + (i % 3) * 20,
-      height: 50 + (i % 2) * 10,
-      style: {
-        fillColor: color.fill,
-        strokeColor: color.stroke,
-        strokeWidth: 2,
-      },
-      label: `Node ${i + 1}`,
-    });
+    let node;
+    const variant = i % 5;
+
+    if (variant < 3) {
+      // Classic node types (60%)
+      const nodeTypes = [RectangleNode, CircleNode, DiamondNode];
+      const NodeClass = nodeTypes[variant];
+      node = new NodeClass({
+        id: `node-${i}`,
+        x,
+        y,
+        width: 80 + (i % 3) * 20,
+        height: 50 + (i % 2) * 10,
+        style: {
+          fillColor: color.fill,
+          strokeColor: color.stroke,
+          strokeWidth: 2,
+        },
+        label: `Node ${i + 1}`,
+      });
+    } else {
+      // CompositeNode types (40%)
+      const isC4 = variant === 4;
+      node = new CompositeNode({
+        id: `node-${i}`,
+        x,
+        y,
+        width: isC4 ? 140 : 120,
+        height: isC4 ? 70 : 55,
+        shapeType: 'rectangle',
+        cornerRadius: isC4 ? 6 : 0,
+        autoSize: false,
+        style: {
+          fillColor: color.fill,
+          strokeColor: color.stroke,
+          strokeWidth: 1.5,
+        },
+        content: isC4
+          ? container({
+              direction: 'column',
+              padding: 6,
+              gap: 2,
+              alignItems: 'center',
+              children: [
+                text({ text: `Svc ${i + 1}`, fontSize: 11, fontWeight: 'bold', color: '#fff' }),
+                text({ text: '[Container]', fontSize: 9, fontStyle: 'italic', color: '#ddd' }),
+              ],
+            })
+          : container({
+              direction: 'column',
+              padding: 4,
+              children: [
+                shape({
+                  backgroundColor: color.fill + '40',
+                  padding: 4,
+                  content: container({
+                    direction: 'column',
+                    alignItems: 'center',
+                    children: [
+                      text({ text: `Class ${i + 1}`, fontSize: 10, fontWeight: 'bold', color: '#fff' }),
+                    ],
+                  }),
+                }),
+                divider({ color: color.stroke }),
+                text({ text: '+ method()', fontSize: 9, color: '#eee', align: 'left' }),
+              ],
+            }),
+      });
+    }
 
     nodes.push(node);
   }

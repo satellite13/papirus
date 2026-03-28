@@ -1,5 +1,6 @@
 import type { Bounds } from '@/types';
 import { LRUCache } from '@/utils/LRUCache';
+import { tintSvg, isSvgMarkup, svgToDataUrl } from '@/utils/svgTint';
 
 export type NodeImageCornerPlacement = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
 export type NodeImageEdgePlacement = 'top' | 'bottom' | 'left' | 'right';
@@ -47,69 +48,6 @@ export interface NodeImageOptions {
 
 // LRU cache for fetched SVG content (limit 100 entries to prevent memory growth)
 const svgTextCache = new LRUCache<string, Promise<string>>(100);
-
-function styleSetColor(style: string, key: 'stroke' | 'fill', color: string): string {
-  const hasKey = new RegExp(`${key}\\s*:`).test(style);
-  if (hasKey) {
-    return style.replace(new RegExp(`${key}\\s*:[^;]+`), `${key}:${color}`);
-  }
-  const suffix = style.trim().endsWith(';') || style.trim() === '' ? '' : ';';
-  return `${style}${suffix}${key}:${color};`;
-}
-
-function tintSvg(svgText: string, strokeColor?: string, fillColor?: string): string {
-  if (!strokeColor && !fillColor) return svgText;
-
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(svgText, 'image/svg+xml');
-  const root = doc.documentElement;
-  if (!root || root.nodeName.toLowerCase() === 'parsererror') {
-    return svgText;
-  }
-
-  const all = [root, ...Array.from(root.querySelectorAll('*'))] as Element[];
-  for (const el of all) {
-    const stroke = el.getAttribute('stroke');
-    const fill = el.getAttribute('fill');
-    // Apply strokeColor when element has stroke or has no stroke (SVG default can draw with stroke)
-    if (strokeColor && (stroke === null || stroke.toLowerCase() !== 'none')) {
-      el.setAttribute('stroke', strokeColor);
-    }
-    // Apply fillColor when element has fill or has no fill (SVG default is black for path/shape)
-    if (fillColor && (fill === null || fill.toLowerCase() !== 'none')) {
-      el.setAttribute('fill', fillColor);
-    }
-    const style = el.getAttribute('style');
-    if (style) {
-      let next = style;
-      if (strokeColor && /stroke\s*:\s*(?!none)/.test(style)) {
-        next = styleSetColor(next, 'stroke', strokeColor);
-      }
-      if (fillColor && /fill\s*:\s*(?!none)/.test(style)) {
-        next = styleSetColor(next, 'fill', fillColor);
-      }
-      if (next !== style) {
-        el.setAttribute('style', next);
-      }
-    }
-  }
-
-  return new XMLSerializer().serializeToString(root);
-}
-
-function isSvgMarkup(value: string): boolean {
-  const trimmed = value.trim().toLowerCase();
-  return trimmed.startsWith('<svg') || trimmed.includes('<svg');
-}
-
-function svgToDataUrl(svg: string): string {
-  const encoded = encodeURIComponent(svg)
-    .replace(/%0A/g, '')
-    .replace(/%0D/g, '')
-    .replace(/%09/g, ' ')
-    .replace(/%20/g, ' ');
-  return `data:image/svg+xml;utf8,${encoded}`;
-}
 
 /**
  * Image helper for node rendering (supports images and inline SVG).

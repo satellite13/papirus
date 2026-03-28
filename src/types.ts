@@ -387,6 +387,26 @@ export interface SerializedStyleClass {
 }
 
 /**
+ * Serialized composite node data.
+ * Extends SerializedNode with component tree content.
+ */
+export interface SerializedCompositeNode extends SerializedNode {
+  type: 'composite';
+  /** Root component tree (CContainer) */
+  content: import('./elements/composite/CComponent').SerializedCComponent;
+  /** Shape type for the outer form */
+  shapeType?: 'rectangle' | 'circle' | 'diamond' | 'custom';
+  /** Corner radius for rectangle shape */
+  cornerRadius?: number;
+  /** Auto-size mode (default true) */
+  autoSize?: boolean;
+  /** Minimum width when auto-sizing */
+  minWidth?: number;
+  /** Minimum height when auto-sizing */
+  minHeight?: number;
+}
+
+/**
  * Command for history/undo system
  */
 export interface Command {

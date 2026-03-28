@@ -177,6 +177,42 @@ export class SvgExporter {
         }
         break;
       }
+      case 'composite': {
+        const cn = node as import('@/elements/composite/CompositeNode').CompositeNode;
+        switch (cn.shapeType) {
+          case 'circle': {
+            const center = node.getCenter();
+            shape = `<ellipse cx="${center.x}" cy="${center.y}" rx="${bounds.width / 2}" ry="${bounds.height / 2}"`;
+            break;
+          }
+          case 'diamond': {
+            const center = node.getCenter();
+            const hw = bounds.width / 2;
+            const hh = bounds.height / 2;
+            const points = [
+              `${center.x},${center.y - hh}`,
+              `${center.x + hw},${center.y}`,
+              `${center.x},${center.y + hh}`,
+              `${center.x - hw},${center.y}`,
+            ].join(' ');
+            shape = `<polygon points="${points}"`;
+            break;
+          }
+          default: {
+            const radius = cn.cornerRadius;
+            shape = `<rect x="${bounds.x}" y="${bounds.y}" width="${bounds.width}" height="${bounds.height}" rx="${radius}" ry="${radius}"`;
+            break;
+          }
+        }
+
+        // Render component tree instead of label/icon
+        const contentBounds = cn.getLabelContainerBounds(bounds);
+        const contentSvg = cn.content.toSVG(contentBounds);
+        return [
+          `${shape} fill="${fill}" fill-opacity="${fillOpacity}" stroke="${stroke}" stroke-width="${strokeWidth}" stroke-opacity="${strokeOpacity}"${dash}${dashOffset}/>`,
+          contentSvg,
+        ].join('');
+      }
       default: {
         shape = `<rect x="${bounds.x}" y="${bounds.y}" width="${bounds.width}" height="${bounds.height}"`;
       }
