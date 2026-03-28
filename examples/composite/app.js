@@ -246,6 +246,16 @@ const bpmn2 = createBpmnTask(280, 40);
 renderer.addNode(bpmn1);
 renderer.addNode(bpmn2);
 
+// Debug: trace measure chain
+requestAnimationFrame(() => {
+  const ctx = renderer.getCanvas().getContext('2d');
+  if (ctx) {
+    console.log('=== BPMN1 measure trace ===');
+    const size = bpmn1.content.debugMeasure(ctx);
+    console.log('Final contentSize:', size);
+  }
+});
+
 renderer.addEdge(new Edge({
   from: { nodeId: bpmn1.id }, to: { nodeId: bpmn2.id },
   type: 'polyline',
