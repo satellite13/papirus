@@ -35,7 +35,7 @@ export class CompositeNode extends Node {
     this._shapeType = options.shapeType ?? 'rectangle';
     this._cornerRadius = options.cornerRadius ?? 0;
     this._pathFactory = options.pathFactory;
-    this._autoSize = options.autoSize ?? true;
+    this._autoSize = options.autoSize ?? false;
     this._minWidth = options.minWidth ?? 0;
     this._minHeight = options.minHeight ?? 0;
 
@@ -261,18 +261,6 @@ export class CompositeNode extends Node {
     }
   }
 
-  /** Debug: get measured content size (call with canvas context). */
-  debugMeasure(ctx: CanvasRenderingContext2D): {
-    contentSize: { width: number; height: number };
-    nodeSize: { width: number; height: number };
-    inset: { top: number; right: number; bottom: number; left: number };
-  } {
-    return {
-      contentSize: this._content.measure(ctx),
-      nodeSize: { width: this._width, height: this._height },
-      inset: this.contentInset,
-    };
-  }
 
   // --- Outline methods for connections (delegate based on shapeType) ---
 

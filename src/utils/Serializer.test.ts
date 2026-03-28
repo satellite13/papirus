@@ -236,7 +236,7 @@ describe('Serializer', () => {
       expect(sn.type).toBe('composite');
       expect(sn.shapeType).toBe('rectangle');
       expect(sn.cornerRadius).toBe(8);
-      expect(sn.autoSize).toBe(true);
+      expect(sn.autoSize).toBe(false);
       expect(sn.content).toBeDefined();
       expect(sn.content.type).toBe('container');
       expect(sn.content.children).toHaveLength(3);

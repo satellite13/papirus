@@ -44,7 +44,7 @@ describe('CompositeNode', () => {
       expect(node.typeName).toBe('composite');
       expect(node.shapeType).toBe('rectangle');
       expect(node.cornerRadius).toBe(0);
-      expect(node.autoSize).toBe(true);
+      expect(node.autoSize).toBe(false);
       expect(node.content).toBeInstanceOf(CContainer);
     });
 
