@@ -116,6 +116,8 @@ export interface SerializedCComponent {
   height?: number;
   backgroundColor?: string;
   fillColor?: string;
+  /** Binds this icon to notation-level icon source in host app integrations */
+  bindsNotationIcon?: boolean;
 
   // CShape fields
   borderColor?: string;

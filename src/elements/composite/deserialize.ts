@@ -36,6 +36,7 @@ export function deserializeCComponent(data: SerializedCComponent): CComponent {
         height: data.height,
         backgroundColor: data.backgroundColor,
         fillColor: data.fillColor,
+        bindsNotationIcon: data.bindsNotationIcon === true,
         style: data.style,
       });
 

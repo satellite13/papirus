@@ -10,6 +10,7 @@ export interface CIconOptions {
   height?: number;
   backgroundColor?: string;
   fillColor?: string;
+  bindsNotationIcon?: boolean;
   visible?: boolean;
   onClick?: (component: CIcon) => void;
   style?: CComponentStyle;
@@ -34,6 +35,7 @@ export class CIcon implements CComponent {
   private _height: number;
   private _backgroundColor?: string;
   private _fillColor?: string;
+  private _bindsNotationIcon: boolean;
   private _image: HTMLImageElement;
   private _loaded = false;
   private _onChange?: () => void;
@@ -45,6 +47,7 @@ export class CIcon implements CComponent {
     this._height = options.height ?? DEFAULT_ICON_SIZE;
     this._backgroundColor = options.backgroundColor;
     this._fillColor = options.fillColor;
+    this._bindsNotationIcon = options.bindsNotationIcon ?? false;
     this.onClick = options.onClick;
     this.style = options.style ?? {};
     if (options.visible === false) {
@@ -118,6 +121,16 @@ export class CIcon implements CComponent {
 
   get loaded(): boolean {
     return this._loaded;
+  }
+
+  get bindsNotationIcon(): boolean {
+    return this._bindsNotationIcon;
+  }
+  set bindsNotationIcon(value: boolean) {
+    if (this._bindsNotationIcon !== value) {
+      this._bindsNotationIcon = value;
+      this._onChange?.();
+    }
   }
 
   setOnChange(cb: (() => void) | undefined): void {
@@ -208,6 +221,7 @@ export class CIcon implements CComponent {
     if (this.style && Object.keys(this.style).length > 0) data.style = this.style;
     if (this._backgroundColor) data.backgroundColor = this._backgroundColor;
     if (this._fillColor) data.fillColor = this._fillColor;
+    if (this._bindsNotationIcon) data.bindsNotationIcon = true;
     return data;
   }
 

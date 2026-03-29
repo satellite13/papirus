@@ -25,6 +25,7 @@ describe('CIcon', () => {
       expect(icon.height).toBe(24);
       expect(icon.backgroundColor).toBeUndefined();
       expect(icon.fillColor).toBeUndefined();
+      expect(icon.bindsNotationIcon).toBe(false);
       expect(icon.id).toBeUndefined();
     });
 
@@ -36,6 +37,7 @@ describe('CIcon', () => {
         height: 16,
         backgroundColor: '#eee',
         fillColor: '#f00',
+        bindsNotationIcon: true,
         style: { flexGrow: 1 },
       });
       expect(icon.id).toBe('my-icon');
@@ -43,6 +45,7 @@ describe('CIcon', () => {
       expect(icon.height).toBe(16);
       expect(icon.backgroundColor).toBe('#eee');
       expect(icon.fillColor).toBe('#f00');
+      expect(icon.bindsNotationIcon).toBe(true);
       expect(icon.style.flexGrow).toBe(1);
     });
 
@@ -130,6 +133,7 @@ describe('CIcon', () => {
       expect(data.height).toBe(16);
       expect(data.backgroundColor).toBeUndefined();
       expect(data.fillColor).toBeUndefined();
+      expect(data.bindsNotationIcon).toBeUndefined();
     });
 
     it('serializes all properties', () => {
@@ -140,12 +144,14 @@ describe('CIcon', () => {
         height: 20,
         backgroundColor: '#eee',
         fillColor: '#f00',
+        bindsNotationIcon: true,
         style: { opacity: 0.8 },
       });
       const data = icon.serialize();
       expect(data.id).toBe('ic');
       expect(data.backgroundColor).toBe('#eee');
       expect(data.fillColor).toBe('#f00');
+      expect(data.bindsNotationIcon).toBe(true);
       expect(data.style?.opacity).toBe(0.8);
     });
   });

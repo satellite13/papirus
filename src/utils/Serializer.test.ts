@@ -6,7 +6,7 @@ import { StyleManager } from '../styles/StyleManager';
 import { Serializer, SerializerValidationError } from './Serializer';
 import { stubAnimationFrame, stubCanvasContext } from '../test/testUtils';
 import { CompositeNode } from '../elements/composite/CompositeNode';
-import { container, text, divider, shape } from '../elements/composite';
+import { container, text, icon, divider, shape } from '../elements/composite';
 import { deserializeCComponent } from '../elements/composite/deserialize';
 import type { SerializedCompositeNode } from '../types';
 
@@ -255,6 +255,7 @@ describe('Serializer', () => {
         gap: 4,
         children: [
           text({ id: 'name', text: 'Title', fontWeight: 'bold', role: 'name' }),
+          icon({ id: 'mainIcon', source: '/icons/component.svg', bindsNotationIcon: true }),
           shape({
             backgroundColor: '#eee',
             padding: 4,
@@ -272,6 +273,8 @@ describe('Serializer', () => {
       expect(restored.type).toBe('container');
       const restoredSerialized = restored.serialize();
       expect(restoredSerialized).toEqual(serialized);
+      expect(restoredSerialized.children?.[1]?.type).toBe('icon');
+      expect(restoredSerialized.children?.[1]?.bindsNotationIcon).toBe(true);
     });
   });
 
