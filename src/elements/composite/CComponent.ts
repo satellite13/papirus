@@ -96,6 +96,9 @@ export interface SerializedCComponent {
   id?: string;
   /** Human-readable label for editor display (not used by rendering) */
   label?: string;
+  /** Bind this text element's content to a property value at render time.
+   *  '__name__' = node display name, other string = custom property name. */
+  bindToProperty?: string;
   style?: CComponentStyle;
 
   // CText fields
