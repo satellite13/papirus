@@ -94,6 +94,8 @@ export interface CComponent {
 export interface SerializedCComponent {
   type: CComponentType;
   id?: string;
+  /** Human-readable label for editor display (not used by rendering) */
+  label?: string;
   style?: CComponentStyle;
 
   // CText fields
