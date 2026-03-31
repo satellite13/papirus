@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-03-31
+
+### Changed
+- Composite `CText`: binding to the display name uses `bindToProperty: '__name__'` instead of legacy `role: 'name'`; deserialization, interaction handling, examples, and tests updated accordingly.
+
+### Documentation
+- README, API/elements docs, and examples expanded for `CompositeNode`, edge label options (`labelPosition`, `labelFollowPath`, `labelLineGap`), and related UI in the basic and composite demos.
+
 ## [0.6.0] - 2026-03-31
 
 ### Added
@@ -299,8 +307,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Edge animations (flow effect)
 - Context menu and search/filter
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.0...HEAD
-[0.6.0]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.6.0
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.1...HEAD
+[0.6.1]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.6.1
+[0.6.0]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.0...v0.6.1
 [0.5.9]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.9
 [0.5.8]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.8
 [0.5.7]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.7

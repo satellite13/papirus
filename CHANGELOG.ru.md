@@ -9,6 +9,14 @@
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-03-31
+
+### Изменено
+- В composite-`CText` привязка к отображаемому имени использует `bindToProperty: '__name__'` вместо устаревшего `role: 'name'`; обновлены десериализация, обработка взаимодействий, примеры и тесты.
+
+### Документация
+- Расширены README, API/elements и примеры по `CompositeNode`, опциям меток ребра (`labelPosition`, `labelFollowPath`, `labelLineGap`) и связанным элементам UI в демо basic и composite.
+
 ## [0.6.0] - 2026-03-31
 
 ### Добавлено
@@ -306,8 +314,9 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.0...HEAD
-[0.6.0]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.6.0
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.1...HEAD
+[0.6.1]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.6.1
+[0.6.0]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.0...v0.6.1
 [0.5.9]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.9
 [0.5.8]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.8
 [0.5.7]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.7
