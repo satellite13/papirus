@@ -87,6 +87,41 @@ export { DiamondNode } from './elements/nodes/DiamondNode';
 export { CustomShapeNode, ShapeFactories } from './elements/nodes/CustomShapeNode';
 export type { CustomShapeNodeOptions } from './elements/nodes/CustomShapeNode';
 
+// Composite
+export {
+  CompositeNode,
+  CText,
+  CIcon,
+  CDivider,
+  CContainer,
+  CShape,
+  container,
+  text,
+  icon,
+  divider,
+  shape,
+  flexLayout,
+  normalizeSides,
+  deserializeCComponent,
+} from './elements/composite';
+export type {
+  CompositeNodeOptions,
+  CompositeShapeType,
+  CTextOptions,
+  CIconOptions,
+  CDividerOptions,
+  CContainerOptions,
+  CShapeOptions,
+  CComponent,
+  CComponentType,
+  CComponentStyle,
+  SerializedCComponent,
+  SidesConfig,
+  FlexConfig,
+  FlexChild,
+  LayoutResult,
+} from './elements/composite';
+
 // Events
 export { EventEmitter } from './events/EventEmitter';
 export { InputHandler } from './events/InputHandler';
@@ -166,4 +201,5 @@ export type {
   SerializedEdge,
   SerializedGroup,
   Command,
+  SerializedCompositeNode,
 } from './types';

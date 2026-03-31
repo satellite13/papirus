@@ -715,6 +715,28 @@ export class InteractionManager {
     }
 
     this.selectionManager.handleClick(event);
+
+    // Emit componentClick for CompositeNode components
+    this.emitComponentClick(event);
+  }
+
+  private emitComponentClick(event: InputEvent): void {
+    const point = { x: event.worldX, y: event.worldY };
+    const hitElement = this.renderer.getInteractableElementAtPoint(point, event.screenX, event.screenY);
+    if (!hitElement || !('typeName' in hitElement)) return;
+    const node = hitElement;
+    if (node.typeName !== 'composite') return;
+    const compositeNode = node as import('@/elements/composite/CompositeNode').CompositeNode;
+    const component = compositeNode.getComponentAtPoint(point);
+    if (!component) return;
+    if (component.id !== undefined) {
+      this.renderer.emit('componentClick', node.id, component, point);
+    }
+    // Invoke onClick callback if component has one
+    const asAny = component as unknown as Record<string, unknown>;
+    if (typeof asAny['onClick'] === 'function') {
+      (asAny['onClick'] as (c: unknown) => void)(component);
+    }
   }
 
   private handleDoubleClick(event: InputEvent): void {
@@ -753,6 +775,11 @@ export class InteractionManager {
     }
 
     if ('typeName' in hitElement) {
+      // CompositeNode: edit CText with role 'name'
+      if (hitElement.typeName === 'composite') {
+        this.startCompositeNameEdit(hitElement as import('@/elements/composite/CompositeNode').CompositeNode);
+        return;
+      }
       const editText = hitElement.label?.editableText ?? hitElement.label?.text ?? '';
       this.startLabelEdit('node', hitElement.id, editText, hitElement.getLabelPosition());
       return;
@@ -902,6 +929,66 @@ export class InteractionManager {
       (x, y) => this.renderer.worldToScreen(x, y),
       (k, i, value) => this.handleLabelCommit(k, i, value)
     );
+  }
+
+  private startCompositeNameEdit(
+    node: import('@/elements/composite/CompositeNode').CompositeNode
+  ): void {
+    // Find CText with role 'name' in the content tree
+    const nameText = this.findNameComponent(node.content);
+    if (!nameText) return;
+
+    const currentText = nameText.text;
+    const worldPos = node.getLabelPosition();
+
+    this.labelEditor.start(
+      'node',
+      node.id,
+      currentText,
+      worldPos,
+      (x, y) => this.renderer.worldToScreen(x, y),
+      (_kind, _id, value) => {
+        const trimmed = value.trim();
+        if (trimmed.length > 0 && trimmed !== currentText) {
+          const before = currentText;
+          nameText.text = trimmed;
+          // Record in history for undo
+          this.historyManager.execute({
+            execute: (): void => {
+              nameText.text = trimmed;
+            },
+            undo: (): void => {
+              nameText.text = before;
+            },
+          });
+        }
+      }
+    );
+  }
+
+  private findNameComponent(
+    container: import('@/elements/composite/CContainer').CContainer
+  ): import('@/elements/composite/CText').CText | null {
+    for (const child of container.children) {
+      if (child.type === 'text') {
+        const ctext = child as import('@/elements/composite/CText').CText;
+        if (ctext.role === 'name') return ctext;
+      }
+      if (child.type === 'container') {
+        const found = this.findNameComponent(
+          child as import('@/elements/composite/CContainer').CContainer
+        );
+        if (found) return found;
+      }
+      if (child.type === 'shape') {
+        const content = (child as import('@/elements/composite/CShape').CShape).content;
+        if (content) {
+          const found = this.findNameComponent(content);
+          if (found) return found;
+        }
+      }
+    }
+    return null;
   }
 
   private handleLabelCommit(kind: 'node' | 'edge', id: string, nextValue: string): void {

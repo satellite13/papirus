@@ -15,6 +15,53 @@
 - `CircleNode`
 - `DiamondNode`
 - `CustomShapeNode` (произвольный `Path2D`)
+- `CompositeNode` (дерево компонентов с flex-компоновкой)
+
+### CompositeNode
+
+`CompositeNode` рендерит иерархию lightweight-компонентов внутри узла:
+
+- `container` — flex-контейнер (`direction`, `justifyContent`, `alignItems`, `gap`, `padding`)
+- `text` — текстовый компонент (`align`, `verticalAlign`, `maxLines`, `rotation`, `role`)
+- `icon` — иконка/изображение (`source`, `width/height`, `fillColor`, `bindsNotationIcon`)
+- `shape` — фон/рамка с вложенным `content`
+- `divider` — разделитель между секциями
+
+Базовая идея: вы описываете структуру нотационного элемента как дерево компонентов, а `CompositeNode` рассчитывает layout и отрисовывает результат в canvas/SVG.
+
+```ts
+import { CompositeNode, container, text, icon, divider } from '@ngroznykh/papirus';
+
+const composite = new CompositeNode({
+  x: 120,
+  y: 80,
+  width: 220,
+  height: 120,
+  shapeType: 'rectangle',
+  autoSize: true,
+  content: container({
+    direction: 'column',
+    padding: 10,
+    gap: 6,
+    children: [
+      text({ id: 'name', text: 'Service API', role: 'name' }),
+      divider({}),
+      container({
+        direction: 'row',
+        justifyContent: 'space-between',
+        children: [
+          text({ text: 'v2.1.0', color: '#64748b' }),
+          icon({ source: '/icons/cloud.svg', width: 16, height: 16, bindsNotationIcon: true }),
+        ],
+      }),
+    ],
+  }),
+});
+```
+
+Сериализация `CompositeNode`:
+- `SerializedCompositeNode.content` хранит корневой `SerializedCComponent`;
+- у `SerializedCComponent` доступны поля `label`, `bindToProperty`, `bindsNotationIcon` для редакторских/интеграционных сценариев.
 
 ### CustomShapeNode
 
@@ -107,6 +154,7 @@ const node = new RectangleNode({
 - тип пути (`type`: `straight | polyline | bezier | editable-polyline`)
 - стрелки (`arrowType`, `startMarker`, `endMarker`)
 - подпись (`label`), смещение подписи от центра пути (`labelOffset`) и фон подписи (`labelBackground`)
+- позиция подписи вдоль пути (`labelPosition`: `0..1`) и поворот подписи по касательной (`labelFollowPath`)
 - **разрыв линии под меткой** (`labelLineGap`): если `true` и задана метка, линия ребра не рисуется на участке, пересекающем прямоугольник метки — рисуются два отрезка (до метки и после), так что линия визуально «обрывается» под подписью
 - кастомные контрольные точки (`controlPoints`) для кривых
 - анимированный поток через `style.flowSpeed`
@@ -119,7 +167,9 @@ const edge = new Edge({
   to: { nodeId: nodeB.id },
   type: 'bezier',
   label: 'Flow',
-  labelOffset: 0,
+  labelOffset: 0,      // перпендикулярный сдвиг подписи
+  labelPosition: 0.65, // 0..1 вдоль пути
+  labelFollowPath: true,
   labelLineGap: true,  // линия не идёт под меткой
   labelBackground: { color: '#fff', padding: 6, borderRadius: 6 },
   controlPoints: [

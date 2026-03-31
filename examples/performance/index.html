@@ -10,21 +10,31 @@
         margin: 0;
         padding: 0;
         overflow: hidden;
-        font-family:
-          system-ui,
-          -apple-system,
-          sans-serif;
+      }
+
+      .performance-page {
+        max-width: none;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        height: 100vh;
+      }
+
+      .performance-card {
+        flex: 1;
+        min-height: 0;
       }
 
       #canvas {
         display: block;
-        width: 100vw;
-        height: 100vh;
+        width: 100%;
+        height: 100%;
       }
 
       #stats {
         position: fixed;
-        top: 16px;
+        top: 92px;
         left: 16px;
         background: rgba(0, 0, 0, 0.85);
         color: white;
@@ -71,7 +81,7 @@
 
       #controls {
         position: fixed;
-        top: 16px;
+        top: 92px;
         right: 16px;
         background: rgba(0, 0, 0, 0.85);
         color: white;
@@ -114,8 +124,6 @@
         text-transform: uppercase;
         letter-spacing: 0.5px;
       }
-      }
-
       #controls button:hover {
         background: #2563eb;
       }
@@ -126,6 +134,33 @@
     </style>
   </head>
   <body>
+    <div class="page performance-page">
+      <header class="header">
+        <a href="../index.html" class="logo">
+          <div class="logo-icon">P</div>
+          <div class="title-group">
+            <div class="title">Papirus</div>
+            <div class="subtitle">Performance Test</div>
+          </div>
+        </a>
+        <div class="header-actions">
+          <nav class="nav">
+            <a href="../basic/index.html" class="nav-item">Basic</a>
+            <a href="../ports/index.html" class="nav-item">Ports</a>
+            <a href="../custom-shapes/index.html" class="nav-item">Shapes</a>
+            <a href="../composite/index.html" class="nav-item">Composite</a>
+            <a href="index.html" class="nav-item active">Performance</a>
+          </nav>
+        </div>
+      </header>
+
+      <div class="card performance-card">
+        <div class="canvas-wrapper">
+          <canvas id="canvas"></canvas>
+        </div>
+      </div>
+    </div>
+
     <div id="stats">
       <div class="stat-row">
         <span class="stat-label">FPS</span>
@@ -165,8 +200,6 @@
         <button id="btn-zoom-reset" class="secondary">Reset</button>
       </div>
     </div>
-
-    <canvas id="canvas"></canvas>
 
     <script type="module" src="app.js"></script>
   </body>

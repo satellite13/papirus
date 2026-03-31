@@ -5,6 +5,10 @@ import { Edge } from '../elements/Edge';
 import { StyleManager } from '../styles/StyleManager';
 import { Serializer, SerializerValidationError } from './Serializer';
 import { stubAnimationFrame, stubCanvasContext } from '../test/testUtils';
+import { CompositeNode } from '../elements/composite/CompositeNode';
+import { container, text, icon, divider, shape } from '../elements/composite';
+import { deserializeCComponent } from '../elements/composite/deserialize';
+import type { SerializedCompositeNode } from '../types';
 
 describe('Serializer', () => {
   beforeEach(() => {
@@ -197,6 +201,80 @@ describe('Serializer', () => {
       expect(serializedEdge.labelBackground).toEqual({ color: '#f0f0f0', borderRadius: 4 });
 
       renderer.destroy();
+    });
+  });
+
+  describe('CompositeNode serialization', () => {
+    it('serializes CompositeNode with content tree', () => {
+      const canvas = document.createElement('canvas');
+      const renderer = new DiagramRenderer(canvas, { width: 300, height: 200 });
+
+      const node = new CompositeNode({
+        x: 10, y: 20, width: 200, height: 100,
+        shapeType: 'rectangle',
+        cornerRadius: 8,
+        content: container({
+          direction: 'column',
+          padding: 8,
+          children: [
+            text({ id: 'title', text: 'Hello', fontWeight: 'bold', role: 'name' }),
+            divider({ color: '#333' }),
+            text({ id: 'desc', text: 'Description' }),
+          ],
+        }),
+      });
+      renderer.addNode(node);
+
+      const serializer = new Serializer(renderer, {
+        nodeFactory: (data) => new RectangleNode(data),
+        edgeFactory: (data) => new Edge(data),
+      });
+
+      const data = serializer.serialize();
+      const sn = data.nodes[0] as SerializedCompositeNode;
+
+      expect(sn.type).toBe('composite');
+      expect(sn.shapeType).toBe('rectangle');
+      expect(sn.cornerRadius).toBe(8);
+      expect(sn.autoSize).toBe(false);
+      expect(sn.content).toBeDefined();
+      expect(sn.content.type).toBe('container');
+      expect(sn.content.children).toHaveLength(3);
+      expect(sn.content.children![0]!.type).toBe('text');
+      expect(sn.content.children![0]!.text).toBe('Hello');
+      expect(sn.content.children![0]!.role).toBe('name');
+      expect(sn.content.children![1]!.type).toBe('divider');
+
+      renderer.destroy();
+    });
+
+    it('deserializeCComponent round-trips a component tree', () => {
+      const original = container({
+        direction: 'column',
+        padding: 8,
+        gap: 4,
+        children: [
+          text({ id: 'name', text: 'Title', fontWeight: 'bold', role: 'name' }),
+          icon({ id: 'mainIcon', source: '/icons/component.svg', bindsNotationIcon: true }),
+          shape({
+            backgroundColor: '#eee',
+            padding: 4,
+            content: container({
+              children: [text({ text: 'Nested' })],
+            }),
+          }),
+          divider({ color: '#333', thickness: 2 }),
+        ],
+      });
+
+      const serialized = original.serialize();
+      const restored = deserializeCComponent(serialized);
+
+      expect(restored.type).toBe('container');
+      const restoredSerialized = restored.serialize();
+      expect(restoredSerialized).toEqual(serialized);
+      expect(restoredSerialized.children?.[1]?.type).toBe('icon');
+      expect(restoredSerialized.children?.[1]?.bindsNotationIcon).toBe(true);
     });
   });
 

@@ -324,8 +324,10 @@ export interface SerializedEdge {
   label?: string;
   labelStyleClass?: string;
   labelOffset?: number;
+  labelPosition?: number;
+  labelFollowPath?: boolean;
   labelBackground?: EdgeLabelBackground;
-   labelLineGap?: boolean;
+  labelLineGap?: boolean;
   data?: Record<string, unknown>;
 }
 
@@ -384,6 +386,26 @@ export interface SerializedStyleClass {
   text?: Partial<TextStyle>;
   port?: Partial<{ color: string; radius: number }>;
   group?: Partial<ElementStyle>;
+}
+
+/**
+ * Serialized composite node data.
+ * Extends SerializedNode with component tree content.
+ */
+export interface SerializedCompositeNode extends SerializedNode {
+  type: 'composite';
+  /** Root component tree (CContainer) */
+  content: import('./elements/composite/CComponent').SerializedCComponent;
+  /** Shape type for the outer form */
+  shapeType?: 'rectangle' | 'circle' | 'diamond' | 'custom';
+  /** Corner radius for rectangle shape */
+  cornerRadius?: number;
+  /** Auto-size mode (default true) */
+  autoSize?: boolean;
+  /** Minimum width when auto-sizing */
+  minWidth?: number;
+  /** Minimum height when auto-sizing */
+  minHeight?: number;
 }
 
 /**

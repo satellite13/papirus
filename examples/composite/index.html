@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Composite Nodes - Papirus Examples</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0,0">
+  <link rel="stylesheet" href="../shared/styles.css">
+</head>
+<body>
+  <div class="page">
+    <!-- Header -->
+    <header class="header">
+      <a href="../index.html" class="logo">
+        <div class="logo-icon">P</div>
+        <div class="title-group">
+          <div class="title">Papirus</div>
+          <div class="subtitle">Composite Nodes Example</div>
+        </div>
+      </a>
+      <div class="header-actions">
+        <nav class="nav">
+          <a href="../basic/index.html" class="nav-item">Basic</a>
+          <a href="../ports/index.html" class="nav-item">Ports</a>
+          <a href="../custom-shapes/index.html" class="nav-item">Shapes</a>
+          <a href="index.html" class="nav-item active">Composite</a>
+          <a href="../performance/index.html" class="nav-item">Performance</a>
+        </nav>
+      </div>
+    </header>
+
+    <!-- Toolbar -->
+    <div class="card">
+      <div class="toolbar">
+        <div class="toolbar-group">
+          <button class="btn btn-primary" id="addBpmn"><span class="material-symbols-outlined">task</span>BPMN Task</button>
+          <button class="btn btn-primary" id="addArchi"><span class="material-symbols-outlined">layers</span>ArchiMate</button>
+          <button class="btn btn-primary" id="addC4"><span class="material-symbols-outlined">dns</span>C4 Container</button>
+          <button class="btn btn-primary" id="addUml"><span class="material-symbols-outlined">class</span>UML Class</button>
+          <button class="btn btn-primary" id="addSwimlane"><span class="material-symbols-outlined">view_column</span>Swimlane</button>
+          <button class="btn btn-primary" id="addStatus"><span class="material-symbols-outlined">stacked_bar_chart</span>Status Card</button>
+        </div>
+        <div class="toolbar-group">
+          <button class="btn" id="fitView"><span class="material-symbols-outlined">fit_screen</span>Fit</button>
+          <button class="btn" id="toggleGrid"><span class="material-symbols-outlined">grid_view</span>Grid</button>
+        </div>
+        <div class="toolbar-group">
+          <button class="btn" id="exportSvg"><span class="material-symbols-outlined">description</span>SVG</button>
+          <button class="btn" id="exportJson"><span class="material-symbols-outlined">data_object</span>JSON</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Content -->
+    <div class="content">
+      <div class="canvas-wrapper">
+        <canvas id="canvas"></canvas>
+      </div>
+
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <div class="card">
+          <div class="card-header">
+            <h3>Composite Nodes</h3>
+          </div>
+          <div class="card-body">
+            <div class="info-panel">
+              <p>Composite nodes contain a tree of child components laid out with a flexbox-like engine.</p>
+              <ul>
+                <li><strong>BPMN Task</strong> — icon + name + markers</li>
+                <li><strong>ArchiMate</strong> — icon in corner + centered name</li>
+                <li><strong>C4 Container</strong> — multi-line styled text</li>
+                <li><strong>UML Class</strong> — sections with dividers</li>
+                <li><strong>Swimlane</strong> — vertical rotated text</li>
+                <li><strong>Status Card</strong> — colored indicator bars</li>
+              </ul>
+              <p style="margin-top: 12px; color: var(--muted);">
+                Edge labels demo `labelPosition` + `labelFollowPath` + `labelLineGap`.
+              </p>
+              <p style="margin-top: 8px; color: var(--muted);">
+                Component schema supports editor fields like `label`, `bindToProperty`, `bindsNotationIcon`.
+              </p>
+              <p style="margin-top: 12px; color: var(--muted);">Double-click a node to edit its name. Click icons to trigger callbacks.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>Keyboard Shortcuts</h3>
+          </div>
+          <div class="card-body">
+            <div class="info-panel">
+              <ul>
+                <li><kbd>Double-click</kbd> Edit node name</li>
+                <li><kbd>Delete</kbd> Remove selected</li>
+                <li><kbd>Ctrl+Z</kbd> Undo</li>
+                <li><kbd>Ctrl+Shift+Z</kbd> Redo</li>
+                <li><kbd>Scroll</kbd> Zoom</li>
+                <li><kbd>Space+Drag</kbd> Pan</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-03-31
+
+### Added
+- New `CompositeNode` with flex layout for complex notation elements (BPMN, ArchiMate, C4, UML), including examples such as swimlane and status card compositions.
+- New edge label options: `labelPosition` and `labelFollowPath` for finer label placement behavior.
+- Composite serialization now includes `label`, `bindToProperty`, and `bindsNotationIcon` fields in `SerializedCComponent`.
+
+### Fixed
+- Edge rendering with label offset/line gap now correctly respects label rotation.
+- Composite text SVG export now follows wrapped lines consistently; auto-size measurement behavior was stabilized to avoid inflated bounds in examples.
+
 ## [0.5.9] - 2026-03-25
 
 ### Fixed
@@ -288,7 +299,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Edge animations (flow effect)
 - Context menu and search/filter
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.5.9...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.0...HEAD
+[0.6.0]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.6.0
 [0.5.9]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.9
 [0.5.8]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.8
 [0.5.7]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.7

@@ -145,6 +145,9 @@ const edge = new Edge({
   to: { nodeId: nodeB.id },
   label: 'API call',
   labelOffset: 12,
+  labelPosition: 0.65, // 0..1 along edge path (0 = start, 1 = end)
+  labelFollowPath: true, // rotate label with local edge direction
+  labelLineGap: true, // line is cut under label bounds
   labelBackground: {
     color: '#ffffff',
     opacity: 0.9,
@@ -152,6 +155,45 @@ const edge = new Edge({
   },
 });
 ```
+
+### CompositeNode (Flex Components)
+
+`CompositeNode` lets you build notation-specific visual structures as a component tree (`container`, `text`, `icon`, `shape`, `divider`) with a flexbox-like layout engine:
+
+```ts
+import { CompositeNode, container, text, icon, divider } from '@ngroznykh/papirus';
+
+const composite = new CompositeNode({
+  x: 120,
+  y: 80,
+  width: 220,
+  height: 120,
+  shapeType: 'rectangle',
+  autoSize: true,
+  content: container({
+    direction: 'column',
+    padding: 10,
+    gap: 6,
+    children: [
+      text({ id: 'name', text: 'Service API', role: 'name', style: { alignSelf: 'center' } }),
+      divider({}),
+      container({
+        direction: 'row',
+        justifyContent: 'space-between',
+        children: [
+          text({ text: 'v2.1.0', color: '#64748b' }),
+          icon({ source: '/icons/cloud.svg', width: 16, height: 16, bindsNotationIcon: true }),
+        ],
+      }),
+    ],
+  }),
+});
+```
+
+Serialized composite components (`SerializedCComponent`) include editor/integration fields:
+- `label` — human-readable component caption for host editors.
+- `bindToProperty` — bind `text` value to a property name (`'__name__'` for node display name).
+- `bindsNotationIcon` — mark `icon` source as notation-level icon binding.
 
 ### Styling
 

@@ -1,9 +1,17 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DiagramRenderer } from '@/core/DiagramRenderer';
 import { Edge } from '@/elements/Edge';
 import { RectangleNode } from '@/elements/nodes/RectangleNode';
+import { CompositeNode } from '@/elements/composite/CompositeNode';
+import { container, text, divider } from '@/elements/composite';
 import { stubAnimationFrame, stubCanvasContext } from '@/test/testUtils';
 import { SvgExporter } from './SvgExporter';
+
+class FakeImage {
+  src = '';
+  onload: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+}
 
 describe('SvgExporter', () => {
   beforeEach(() => {
@@ -52,6 +60,63 @@ describe('SvgExporter', () => {
 
     const svg = new SvgExporter(renderer).exportSVG({ includeBackground: false });
     expect(filledMarkerPathCount(svg)).toBe(0);
+
+    renderer.destroy();
+  });
+
+  it('exports CompositeNode with content tree', () => {
+    vi.stubGlobal('Image', FakeImage);
+    const canvas = document.createElement('canvas');
+    const renderer = new DiagramRenderer(canvas, { width: 400, height: 300, retina: false });
+
+    const node = new CompositeNode({
+      x: 10, y: 10, width: 200, height: 100,
+      shapeType: 'rectangle',
+      cornerRadius: 4,
+      content: container({
+        direction: 'column',
+        padding: 8,
+        children: [
+          text({ text: 'Title', fontWeight: 'bold' }),
+          divider({ color: '#333' }),
+          text({ text: 'Description' }),
+        ],
+      }),
+    });
+    renderer.addNode(node);
+
+    const svg = new SvgExporter(renderer).exportSVG({ includeBackground: false });
+
+    // Should contain the outer rect shape
+    expect(svg).toContain('<rect');
+    expect(svg).toContain('rx="4"');
+    // Should contain text elements from content tree
+    expect(svg).toContain('Title');
+    expect(svg).toContain('Description');
+    // Should contain divider line
+    expect(svg).toContain('<line');
+
+    renderer.destroy();
+  });
+
+  it('exports CompositeNode with circle shape', () => {
+    vi.stubGlobal('Image', FakeImage);
+    const canvas = document.createElement('canvas');
+    const renderer = new DiagramRenderer(canvas, { width: 400, height: 300, retina: false });
+
+    const node = new CompositeNode({
+      x: 10, y: 10, width: 100, height: 100,
+      shapeType: 'circle',
+      content: container({
+        children: [text({ text: 'Center' })],
+      }),
+    });
+    renderer.addNode(node);
+
+    const svg = new SvgExporter(renderer).exportSVG({ includeBackground: false });
+
+    expect(svg).toContain('<ellipse');
+    expect(svg).toContain('Center');
 
     renderer.destroy();
   });

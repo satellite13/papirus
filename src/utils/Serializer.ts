@@ -294,7 +294,7 @@ export class Serializer {
       contentInset.bottom !== 0 ||
       contentInset.left !== 0;
 
-    return omitEmptyValues({
+    const base = omitEmptyValues({
       id: node.id,
       type: node.typeName,
       x: node.x,
@@ -311,6 +311,20 @@ export class Serializer {
       ports: ports.length > 0 ? ports : undefined,
       data: Object.keys(node.data).length > 0 ? node.data : undefined,
     }) as SerializedNode;
+
+    // Extend with CompositeNode-specific fields
+    if (node.typeName === 'composite') {
+      const cn = node as import('@/elements/composite/CompositeNode').CompositeNode;
+      const ext = base as import('@/types').SerializedCompositeNode;
+      ext.content = cn.content.serialize();
+      ext.shapeType = cn.shapeType;
+      if (cn.cornerRadius !== 0) ext.cornerRadius = cn.cornerRadius;
+      ext.autoSize = cn.autoSize;
+      if (cn.minWidth !== 0) ext.minWidth = cn.minWidth;
+      if (cn.minHeight !== 0) ext.minHeight = cn.minHeight;
+    }
+
+    return base;
   }
 
   private serializeEdge(edge: Edge): SerializedEdge {
@@ -328,6 +342,8 @@ export class Serializer {
       label: edge.label?.text,
       labelStyleClass: edge.label?.styleClass,
       labelOffset: edge.labelOffset !== 0 ? edge.labelOffset : undefined,
+      labelPosition: edge.labelPosition !== 0.5 ? edge.labelPosition : undefined,
+      labelFollowPath: edge.labelFollowPath ? true : undefined,
       labelBackground: edge.labelBackground,
       labelLineGap: edge.labelLineGap ? true : undefined,
       data: Object.keys(edge.data).length > 0 ? edge.data : undefined,

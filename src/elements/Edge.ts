@@ -48,6 +48,10 @@ export interface EdgeOptions {
   styleClass?: string;
   label?: string | TextLabelOptions;
   labelOffset?: number;
+  /** Position along the path (0 = source, 0.5 = midpoint, 1 = target). Default 0.5 */
+  labelPosition?: number;
+  /** Rotate label text to follow the path tangent */
+  labelFollowPath?: boolean;
   labelBackground?: EdgeLabelBackground;
   lockAnchors?: boolean;
   labelLineGap?: boolean;
@@ -74,6 +78,8 @@ export class Edge extends Element {
   private _edgeStyle: EdgeStyle;
   private _label?: TextLabel;
   private _labelOffset: number;
+  private _labelPosition: number;
+  private _labelFollowPath: boolean;
   private _labelBackground?: EdgeLabelBackground;
   private _labelLineGap: boolean;
   private _path: Point[] = [];
@@ -111,6 +117,8 @@ export class Edge extends Element {
     this._pathStrategy = this.getPathStrategy(this._type);
     this._lockAnchors = options.lockAnchors ?? true;
     this._labelOffset = options.labelOffset ?? 0;
+    this._labelPosition = options.labelPosition ?? 0.5;
+    this._labelFollowPath = options.labelFollowPath ?? false;
     this._labelBackground = options.labelBackground;
     this._labelLineGap = options.labelLineGap ?? false;
 
@@ -216,6 +224,35 @@ export class Edge extends Element {
   set labelOffset(value: number) {
     if (this._labelOffset !== value) {
       this._labelOffset = value;
+      this.markDirty();
+    }
+  }
+
+  /**
+   * Position along path (0 = source, 0.5 = midpoint, 1 = target)
+   */
+  get labelPosition(): number {
+    return this._labelPosition;
+  }
+
+  set labelPosition(value: number) {
+    const clamped = Math.max(0, Math.min(1, value));
+    if (this._labelPosition !== clamped) {
+      this._labelPosition = clamped;
+      this.markDirty();
+    }
+  }
+
+  /**
+   * Whether label text rotates to follow the path tangent
+   */
+  get labelFollowPath(): boolean {
+    return this._labelFollowPath;
+  }
+
+  set labelFollowPath(value: boolean) {
+    if (this._labelFollowPath !== value) {
+      this._labelFollowPath = value;
       this.markDirty();
     }
   }
@@ -750,11 +787,22 @@ export class Edge extends Element {
     const labelWidth = this._label!.measuredWidth;
     const labelHeight = this._label!.measuredHeight;
 
+    // When label is rotated, compute axis-aligned bounding box of the rotated rect
+    const rot = this.getLabelRotation();
+    let effectiveWidth = labelWidth;
+    let effectiveHeight = labelHeight;
+    if (rot !== 0) {
+      const cosR = Math.abs(Math.cos(rot));
+      const sinR = Math.abs(Math.sin(rot));
+      effectiveWidth = labelWidth * cosR + labelHeight * sinR;
+      effectiveHeight = labelWidth * sinR + labelHeight * cosR;
+    }
+
     const labelRect: Bounds = {
-      x: labelCenter.x - labelWidth / 2,
-      y: labelCenter.y - labelHeight / 2,
-      width: labelWidth,
-      height: labelHeight,
+      x: labelCenter.x - effectiveWidth / 2,
+      y: labelCenter.y - effectiveHeight / 2,
+      width: effectiveWidth,
+      height: effectiveHeight,
     };
 
     type SegmentIntersection = { segIndex: number; t: number; point: Point };
@@ -1119,16 +1167,17 @@ export class Edge extends Element {
       return;
     }
 
-    // Calculate midpoint of path with offset
-    const midpoint = this.getPathMidpoint();
-    const labelPosition = {
-      x: midpoint.x,
-      y: midpoint.y + this._labelOffset,
+    const { point, angle: pathAngle } = this.getPathPointAt(this._labelPosition);
+    const rotation = this.getLabelRotation();
+    // Apply offset perpendicular to path direction
+    const perpAngle = this._labelFollowPath ? pathAngle + Math.PI / 2 : Math.PI / 2;
+    const labelCenter = {
+      x: point.x + this._labelOffset * Math.cos(perpAngle),
+      y: point.y + this._labelOffset * Math.sin(perpAngle),
     };
 
     const labelOpacity = this._label.style.opacity ?? 1;
 
-    // Draw background for label
     this._label.measure(ctx);
     const labelWidth = this._label.measuredWidth;
     const labelHeight = this._label.measuredHeight;
@@ -1137,24 +1186,30 @@ export class Edge extends Element {
     const bgOpacity = this._labelBackground?.opacity ?? 1;
     const bgRadius = this._labelBackground?.borderRadius ?? EDGE_LABEL_BACKGROUND_RADIUS;
 
-    const bgX = labelPosition.x - labelWidth / 2;
-    const bgY = labelPosition.y - labelHeight / 2;
-    const bgWidth = labelWidth;
-    const bgHeight = labelHeight;
+    ctx.save();
+    if (rotation !== 0) {
+      ctx.translate(labelCenter.x, labelCenter.y);
+      ctx.rotate(rotation);
+      ctx.translate(-labelCenter.x, -labelCenter.y);
+    }
+
+    const bgX = labelCenter.x - labelWidth / 2;
+    const bgY = labelCenter.y - labelHeight / 2;
 
     ctx.fillStyle = bgColor;
     ctx.globalAlpha = bgOpacity;
 
     if (bgRadius > 0) {
-      this.drawRoundedRect(ctx, bgX, bgY, bgWidth, bgHeight, bgRadius);
+      this.drawRoundedRect(ctx, bgX, bgY, labelWidth, labelHeight, bgRadius);
       ctx.fill();
     } else {
-      ctx.fillRect(bgX, bgY, bgWidth, bgHeight);
+      ctx.fillRect(bgX, bgY, labelWidth, labelHeight);
     }
 
     ctx.globalAlpha = labelOpacity;
-    this._label.renderAt(ctx, labelPosition);
+    this._label.renderAt(ctx, labelCenter);
     ctx.globalAlpha = 1;
+    ctx.restore();
   }
 
   private drawRoundedRect(
@@ -1168,11 +1223,16 @@ export class Edge extends Element {
     drawRoundedRectPath(ctx, x, y, width, height, radius);
   }
 
-  private getPathMidpoint(): Point {
+  /**
+   * Get a point along the sampled path at parameter t (0..1).
+   * Also returns the tangent angle in radians at that point.
+   */
+  private getPathPointAt(t: number): { point: Point; angle: number } {
     const path = this._path;
+    let samples: Point[];
 
     if (this._type === 'bezier' && path.length >= 4) {
-      const samples: Point[] = [];
+      samples = [];
       const steps = 20;
       for (let i = 1; i + 2 < path.length; i += 3) {
         const p0 = path[i - 1]!;
@@ -1180,19 +1240,16 @@ export class Edge extends Element {
         const p2 = path[i + 1]!;
         const p3 = path[i + 2]!;
         for (let s = 0; s <= steps; s++) {
-          const t = s / steps;
-          if (samples.length > 0 && t === 0) {
-            continue;
-          }
-          samples.push(bezierPoint(p0, p1, p2, p3, t));
+          const st = s / steps;
+          if (samples.length > 0 && st === 0) continue;
+          samples.push(bezierPoint(p0, p1, p2, p3, st));
         }
       }
-
-      return this.getPolylineMidpoint(samples);
+    } else {
+      samples = path;
     }
 
-    // For straight/polyline, find midpoint of total length
-    return this.getPolylineMidpoint(path);
+    return this.getPointAlongPolyline(samples, t);
   }
 
   /**
@@ -1203,19 +1260,39 @@ export class Edge extends Element {
       return null;
     }
 
-    const midpoint = this.getPathMidpoint();
+    const { point, angle: pathAngle } = this.getPathPointAt(this._labelPosition);
+    const perpAngle = this._labelFollowPath ? pathAngle + Math.PI / 2 : Math.PI / 2;
     return {
-      x: midpoint.x,
-      y: midpoint.y + this._labelOffset,
+      x: point.x + this._labelOffset * Math.cos(perpAngle),
+      y: point.y + this._labelOffset * Math.sin(perpAngle),
     };
   }
 
-  private getPolylineMidpoint(path: Point[]): Point {
+  /**
+   * Get label rotation angle in radians (if labelFollowPath is true).
+   */
+  getLabelRotation(): number {
+    if (!this._labelFollowPath || this._path.length < 2) return 0;
+    const { angle } = this.getPathPointAt(this._labelPosition);
+    // Normalize: keep text readable (flip if pointing left)
+    let a = angle;
+    if (a > Math.PI / 2) a -= Math.PI;
+    if (a < -Math.PI / 2) a += Math.PI;
+    return a;
+  }
+
+  /**
+   * Get point and tangent angle at parameter t along a polyline.
+   */
+  private getPointAlongPolyline(
+    path: Point[],
+    t: number,
+  ): { point: Point; angle: number } {
     if (path.length === 0) {
-      return { x: 0, y: 0 };
+      return { point: { x: 0, y: 0 }, angle: 0 };
     }
     if (path.length === 1) {
-      return path[0]!;
+      return { point: path[0]!, angle: 0 };
     }
 
     let totalLength = 0;
@@ -1229,21 +1306,30 @@ export class Edge extends Element {
       totalLength += length;
     }
 
-    const halfLength = totalLength / 2;
+    const targetLength = totalLength * Math.max(0, Math.min(1, t));
     let accumulated = 0;
 
     for (const seg of segments) {
-      if (accumulated + seg.length >= halfLength) {
-        const t = (halfLength - accumulated) / seg.length;
-        return {
-          x: seg.start.x + t * (seg.end.x - seg.start.x),
-          y: seg.start.y + t * (seg.end.y - seg.start.y),
+      if (accumulated + seg.length >= targetLength) {
+        const segT = seg.length > 0 ? (targetLength - accumulated) / seg.length : 0;
+        const point = {
+          x: seg.start.x + segT * (seg.end.x - seg.start.x),
+          y: seg.start.y + segT * (seg.end.y - seg.start.y),
         };
+        const angle = Math.atan2(seg.end.y - seg.start.y, seg.end.x - seg.start.x);
+        return { point, angle };
       }
       accumulated += seg.length;
     }
 
-    return path[0]!;
+    const lastSeg = segments[segments.length - 1]!;
+    return {
+      point: lastSeg.end,
+      angle: Math.atan2(
+        lastSeg.end.y - lastSeg.start.y,
+        lastSeg.end.x - lastSeg.start.x,
+      ),
+    };
   }
 
   private getPathStrategy(type: EdgePathType): PathStrategy {

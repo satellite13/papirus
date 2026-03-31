@@ -27,6 +27,7 @@ export interface DiagramEvents {
   edgeAdd: [edge: Edge];
   edgeRemove: [edge: Edge];
   nodeBadgeClick: [nodeId: string, badgeId: string];
+  componentClick: [nodeId: string, component: import('@/elements/composite/CComponent').CComponent, point: Point];
 }
 
 export interface DiagramPlugin {

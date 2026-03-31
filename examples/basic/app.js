@@ -110,6 +110,9 @@ const edgeFactory = (data) =>
         : data.label
       : undefined,
     labelOffset: data.labelOffset,
+    labelPosition: data.labelPosition,
+    labelFollowPath: data.labelFollowPath,
+    labelLineGap: data.labelLineGap,
     labelBackground: data.labelBackground,
   });
 
@@ -595,6 +598,9 @@ function updateEdgePanel(edge) {
   document.getElementById('edgeStrokeColorText').value = style.strokeColor || '#666666';
   document.getElementById('edgeStrokeWidth').value = style.strokeWidth || 2;
   document.getElementById('edgeLabelOffset').value = edge.labelOffset ?? 0;
+  document.getElementById('edgeLabelPosition').value = edge.labelPosition ?? 0.5;
+  document.getElementById('edgeLabelFollowPath').checked = edge.labelFollowPath === true;
+  document.getElementById('edgeLabelLineGap').checked = edge.labelLineGap === true;
   const labelInset = edge.label?.inset;
   let liT = 8, liR = 8, liB = 8, liL = 8;
   if (typeof labelInset === 'number' && Number.isFinite(labelInset)) {
@@ -872,6 +878,30 @@ document.getElementById('edgeLabelOffset').addEventListener('input', (e) => {
       edge.labelOffset = parseFloat(e.target.value) || 0;
     });
   }
+});
+
+document.getElementById('edgeLabelPosition').addEventListener('input', (e) => {
+  if (!selectedEdge) return;
+  const raw = parseFloat(e.target.value);
+  const clamped = Number.isFinite(raw) ? Math.min(1, Math.max(0, raw)) : 0.5;
+  e.target.value = clamped.toString();
+  changeEdge(selectedEdge.id, (edge) => {
+    edge.labelPosition = clamped;
+  });
+});
+
+document.getElementById('edgeLabelFollowPath').addEventListener('change', (e) => {
+  if (!selectedEdge) return;
+  changeEdge(selectedEdge.id, (edge) => {
+    edge.labelFollowPath = e.target.checked;
+  });
+});
+
+document.getElementById('edgeLabelLineGap').addEventListener('change', (e) => {
+  if (!selectedEdge) return;
+  changeEdge(selectedEdge.id, (edge) => {
+    edge.labelLineGap = e.target.checked;
+  });
 });
 
 function getEdgeLabelInsetFromPanel() {
