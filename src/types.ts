@@ -324,8 +324,10 @@ export interface SerializedEdge {
   label?: string;
   labelStyleClass?: string;
   labelOffset?: number;
+  labelPosition?: number;
+  labelFollowPath?: boolean;
   labelBackground?: EdgeLabelBackground;
-   labelLineGap?: boolean;
+  labelLineGap?: boolean;
   data?: Record<string, unknown>;
 }
 

@@ -342,6 +342,8 @@ export class Serializer {
       label: edge.label?.text,
       labelStyleClass: edge.label?.styleClass,
       labelOffset: edge.labelOffset !== 0 ? edge.labelOffset : undefined,
+      labelPosition: edge.labelPosition !== 0.5 ? edge.labelPosition : undefined,
+      labelFollowPath: edge.labelFollowPath ? true : undefined,
       labelBackground: edge.labelBackground,
       labelLineGap: edge.labelLineGap ? true : undefined,
       data: Object.keys(edge.data).length > 0 ? edge.data : undefined,
