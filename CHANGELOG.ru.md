@@ -9,6 +9,17 @@
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-03-31
+
+### Добавлено
+- Новый `CompositeNode` с flex-layout для сложных элементов нотации (BPMN, ArchiMate, C4, UML), включая примеры композиций в стиле swimlane и status card.
+- Новые опции меток ребра: `labelPosition` и `labelFollowPath` для более точного управления размещением подписи.
+- В сериализацию composite-компонентов добавлены поля `label`, `bindToProperty` и `bindsNotationIcon` в `SerializedCComponent`.
+
+### Исправлено
+- Отрисовка ребра с `labelOffset`/`labelLineGap` теперь корректно учитывает поворот метки.
+- SVG-экспорт текста в composite-узлах теперь стабильно использует перенос строк; поведение auto-size при измерении исправлено, чтобы не раздувать размеры в примерах.
+
 ## [0.5.9] - 2026-03-25
 
 ### Исправлено
@@ -295,7 +306,8 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.5.9...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.0...HEAD
+[0.6.0]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.6.0
 [0.5.9]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.9
 [0.5.8]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.8
 [0.5.7]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.7
