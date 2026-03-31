@@ -146,6 +146,9 @@ const edge = new Edge({
   to: { nodeId: nodeB.id },
   label: 'API call',
   labelOffset: 12,
+  labelPosition: 0.65, // 0..1 вдоль пути ребра (0 = начало, 1 = конец)
+  labelFollowPath: true, // поворачивать подпись по направлению ребра
+  labelLineGap: true, // линия разрывается под подписью
   labelBackground: {
     color: '#ffffff',
     opacity: 0.9,
@@ -153,6 +156,45 @@ const edge = new Edge({
   },
 });
 ```
+
+### CompositeNode (компонентная flex-компоновка)
+
+`CompositeNode` позволяет собирать нотационные элементы как дерево компонентов (`container`, `text`, `icon`, `shape`, `divider`) с flexbox-подобной раскладкой:
+
+```ts
+import { CompositeNode, container, text, icon, divider } from '@ngroznykh/papirus';
+
+const composite = new CompositeNode({
+  x: 120,
+  y: 80,
+  width: 220,
+  height: 120,
+  shapeType: 'rectangle',
+  autoSize: true,
+  content: container({
+    direction: 'column',
+    padding: 10,
+    gap: 6,
+    children: [
+      text({ id: 'name', text: 'Service API', role: 'name', style: { alignSelf: 'center' } }),
+      divider({}),
+      container({
+        direction: 'row',
+        justifyContent: 'space-between',
+        children: [
+          text({ text: 'v2.1.0', color: '#64748b' }),
+          icon({ source: '/icons/cloud.svg', width: 16, height: 16, bindsNotationIcon: true }),
+        ],
+      }),
+    ],
+  }),
+});
+```
+
+Сериализация компонентов (`SerializedCComponent`) включает поля для редакторов и интеграций:
+- `label` — человекочитаемая подпись компонента для host-редактора.
+- `bindToProperty` — привязка значения `text` к имени свойства (`'__name__'` для отображаемого имени узла).
+- `bindsNotationIcon` — признак того, что `icon` привязан к иконке на уровне нотации.
 
 ### Стили
 

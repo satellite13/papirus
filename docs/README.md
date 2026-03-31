@@ -27,6 +27,8 @@
 - Группы (`Group`) и иерархия элементов.
 - Иконки в узлах (`NodeImage` через `icon`).
 - Фон подписи ребра (`labelBackground`) и разрыв линии под меткой (`labelLineGap`).
+- Продвинутая подпись ребра: позиция вдоль пути (`labelPosition`) и поворот по касательной (`labelFollowPath`).
+- Composite-пример с `CompositeNode` (BPMN/ArchiMate/C4/UML + swimlane/status-card) и сериализацией компонентного дерева.
 - `zoomToSelection()` и управление снаппингом через `drag.setSnapToGrid()`.
 - Линейки в `ports`-примере — это встроенный оверлей `RulersOverlay`, подключаемый через `renderer.use(...)`.
 

@@ -28,6 +28,7 @@
 
 - `RectangleNode`, `CircleNode`, `DiamondNode` — встроенные формы.
 - `CustomShapeNode` — пользовательские формы (`Path2D`). Опция `svgPath` для SVG-экспорта.
+- `CompositeNode` — узел с компонентным деревом и flex-layout (`container`/`text`/`icon`/`shape`/`divider`).
 - `ShapeFactories` — фабрики Path2D (`hexagon`, `parallelogram`, `cylinder`, `document`) и `ShapeFactories.svg` — SVG path для экспорта.
 
 ## События и ввод
@@ -58,4 +59,13 @@
 
 ## Типы
 
-Экспортируются основные типы: `Point`, `Size`, `Bounds`, `ContentInsetSides` (отступы по сторонам: используется в `contentInset` узла и в `label.inset`), `ElementStyle`, `NodeStyle`, `EdgeStyle`, `TextStyle` (в т.ч. `align`, `verticalAlign`), `DiagramOptions`, `DiagramData`, а также сериализованные формы (`SerializedNode`, `SerializedEdge`, `SerializedGroup`, `SerializedPort`) и др.
+Экспортируются основные типы: `Point`, `Size`, `Bounds`, `ContentInsetSides` (отступы по сторонам: используется в `contentInset` узла и в `label.inset`), `ElementStyle`, `NodeStyle`, `EdgeStyle`, `TextStyle` (в т.ч. `align`, `verticalAlign`), `DiagramOptions`, `DiagramData`, а также сериализованные формы (`SerializedNode`, `SerializedEdge`, `SerializedGroup`, `SerializedPort`, `SerializedCompositeNode`) и др.
+
+В `SerializedEdge` поддерживаются поля позиционирования метки:
+- `labelPosition` — относительная позиция метки вдоль пути (`0..1`),
+- `labelFollowPath` — поворот метки по направлению линии.
+
+Для `SerializedCComponent` (контент `CompositeNode`) доступны поля интеграции:
+- `label` — подпись компонента для редактора,
+- `bindToProperty` — привязка текста к свойству,
+- `bindsNotationIcon` — привязка иконки к нотации.

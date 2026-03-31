@@ -24,6 +24,7 @@
           <a href="../ports/index.html" class="nav-item">Ports</a>
           <a href="../custom-shapes/index.html" class="nav-item">Shapes</a>
           <a href="../composite/index.html" class="nav-item">Composite</a>
+          <a href="../performance/index.html" class="nav-item">Performance</a>
         </nav>
       </div>
     </header>
@@ -195,6 +196,18 @@
             <div class="form-row">
               <label class="form-label">Label Offset</label>
               <input type="number" class="form-input" id="edgeLabelOffset" min="-80" max="80" step="1" value="0">
+            </div>
+            <div class="form-row">
+              <label class="form-label">Label Position</label>
+              <input type="number" class="form-input" id="edgeLabelPosition" min="0" max="1" step="0.05" value="0.5">
+            </div>
+            <div class="form-row">
+              <label class="form-label">Follow Path</label>
+              <input type="checkbox" id="edgeLabelFollowPath">
+            </div>
+            <div class="form-row">
+              <label class="form-label">Label Line Gap</label>
+              <input type="checkbox" id="edgeLabelLineGap">
             </div>
             <div class="form-row form-row--sides">
               <label class="form-label">Label Inset</label>

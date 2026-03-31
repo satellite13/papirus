@@ -122,6 +122,7 @@ function createArchiElement(x, y) {
               source: `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="#3498db" stroke-width="1.5"><circle cx="10" cy="10" r="7"/><path d="M10 6v4l3 2"/></svg>')}`,
               width: 16,
               height: 16,
+              bindsNotationIcon: true,
             }),
           ],
         }),
@@ -354,12 +355,34 @@ renderer.addNode(c4);
 
 const uml = createUmlClass(520, 200);
 renderer.addNode(uml);
+renderer.addEdge(new Edge({
+  from: { nodeId: c4.id }, to: { nodeId: uml.id },
+  type: 'bezier',
+  style: { strokeColor: '#3b82f6', strokeWidth: 2 },
+  label: 'implements',
+  labelPosition: 0.35,
+  labelOffset: -10,
+  labelFollowPath: true,
+  labelLineGap: true,
+  labelBackground: { color: '#ffffff', opacity: 0.95, borderRadius: 4 },
+}));
 
 const swimlane = createSwimlane(780, 40);
 renderer.addNode(swimlane);
 
 const statusCard = createStatusCard(520, 400);
 renderer.addNode(statusCard);
+renderer.addEdge(new Edge({
+  from: { nodeId: uml.id }, to: { nodeId: statusCard.id },
+  type: 'polyline',
+  style: { strokeColor: '#4b5563', strokeWidth: 1.5 },
+  label: 'status',
+  labelPosition: 0.75,
+  labelOffset: 8,
+  labelFollowPath: false,
+  labelLineGap: true,
+  labelBackground: { color: '#f8fafc', opacity: 0.95, borderRadius: 4 },
+}));
 
 // --- componentClick event ---
 
