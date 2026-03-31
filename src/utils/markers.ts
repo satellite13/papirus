@@ -130,6 +130,8 @@ export function getMarkerLength(config: ArrowMarkerConfig): number {
       return size;
     case 'circle':
       return size * 2;
+    case 'square':
+      return size * 2;
     default:
       return 0;
   }
@@ -194,6 +196,30 @@ export function generateSvgCircleMarker(
 }
 
 /**
+ * Square marker: front edge centered at `to`, depth 2×size along the edge toward `from`.
+ */
+export function generateSvgSquareMarker(
+  to: Point,
+  angle: number,
+  size: number,
+  fill: string,
+  fillOpacity: number,
+  stroke: string
+): string {
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  const px = -sin;
+  const py = cos;
+  const p1 = { x: to.x + size * px, y: to.y + size * py };
+  const p2 = { x: to.x - size * px, y: to.y - size * py };
+  const bx = 2 * size * cos;
+  const by = 2 * size * sin;
+  const p3 = { x: p2.x - bx, y: p2.y - by };
+  const p4 = { x: p1.x - bx, y: p1.y - by };
+  return `<path d="M ${p1.x} ${p1.y} L ${p2.x} ${p2.y} L ${p3.x} ${p3.y} L ${p4.x} ${p4.y} Z" fill="${fill}" fill-opacity="${fillOpacity}" stroke="${stroke}" stroke-width="1"/>`;
+}
+
+/**
  * Generate SVG path for any marker type
  */
 export function generateSvgMarker(
@@ -215,6 +241,8 @@ export function generateSvgMarker(
       return generateSvgDiamondMarker(to, angle, size, fill, fillOpacity, stroke);
     case 'circle':
       return generateSvgCircleMarker(to, angle, size, fill, fillOpacity, stroke);
+    case 'square':
+      return generateSvgSquareMarker(to, angle, size, fill, fillOpacity, stroke);
     case 'arrow':
     default:
       return generateSvgArrowMarker(to, angle, size, fill, fillOpacity, stroke);

@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-03-31
+
+### Added
+- Edge marker type `square` for `startMarker` / `endMarker`: canvas rendering, SVG export, and default size in `MARKER_SIZES`.
+
 ## [0.6.1] - 2026-03-31
 
 ### Changed
@@ -307,7 +312,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Edge animations (flow effect)
 - Context menu and search/filter
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.1...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.2...HEAD
+[0.6.2]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.6.2
 [0.6.1]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.6.1
 [0.6.0]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.0...v0.6.1
 [0.5.9]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.9

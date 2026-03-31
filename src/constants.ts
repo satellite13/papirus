@@ -15,6 +15,7 @@ export const MARKER_SIZES: Record<string, number> = {
   open: 12,
   diamond: 14,
   circle: 6,
+  square: 6,
 };
 
 // Edge label

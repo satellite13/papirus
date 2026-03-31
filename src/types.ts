@@ -64,7 +64,7 @@ export type ArrowType = 'none' | 'single' | 'double';
 /**
  * Arrow marker type
  */
-export type ArrowMarkerType = 'none' | 'arrow' | 'open' | 'diamond' | 'circle';
+export type ArrowMarkerType = 'none' | 'arrow' | 'open' | 'diamond' | 'circle' | 'square';
 
 /**
  * Arrow marker configuration

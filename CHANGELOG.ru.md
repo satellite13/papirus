@@ -9,6 +9,11 @@
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-03-31
+
+### Добавлено
+- Тип маркера ребра `square` для `startMarker` / `endMarker`: отрисовка на canvas, экспорт в SVG, значение по умолчанию в `MARKER_SIZES`.
+
 ## [0.6.1] - 2026-03-31
 
 ### Изменено
@@ -314,7 +319,8 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.1...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.2...HEAD
+[0.6.2]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.6.2
 [0.6.1]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.6.1
 [0.6.0]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.0...v0.6.1
 [0.5.9]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.5.9

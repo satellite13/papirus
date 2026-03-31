@@ -994,6 +994,8 @@ export class Edge extends Element {
         return size; // Diamond length is full size
       case 'circle':
         return size * 2; // Circle diameter
+      case 'square':
+        return size * 2; // Square depth along edge (matches circle footprint)
       default:
         return 0;
     }
@@ -1028,6 +1030,9 @@ export class Edge extends Element {
         break;
       case 'circle':
         this.drawCircleMarker(ctx, to, angle, size, fillColor, fillOpacity);
+        break;
+      case 'square':
+        this.drawSquareMarker(ctx, to, angle, size, fillColor, fillOpacity);
         break;
     }
 
@@ -1133,6 +1138,39 @@ export class Edge extends Element {
 
     ctx.beginPath();
     ctx.arc(cx, cy, size, 0, Math.PI * 2);
+
+    ctx.globalAlpha = fillOpacity;
+    ctx.fillStyle = fillColor;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.stroke();
+  }
+
+  private drawSquareMarker(
+    ctx: CanvasRenderingContext2D,
+    to: Point,
+    angle: number,
+    size: number,
+    fillColor: string,
+    fillOpacity: number
+  ): void {
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    const px = -sin;
+    const py = cos;
+    const p1 = { x: to.x + size * px, y: to.y + size * py };
+    const p2 = { x: to.x - size * px, y: to.y - size * py };
+    const bx = 2 * size * cos;
+    const by = 2 * size * sin;
+    const p3 = { x: p2.x - bx, y: p2.y - by };
+    const p4 = { x: p1.x - bx, y: p1.y - by };
+
+    ctx.beginPath();
+    ctx.moveTo(p1.x, p1.y);
+    ctx.lineTo(p2.x, p2.y);
+    ctx.lineTo(p3.x, p3.y);
+    ctx.lineTo(p4.x, p4.y);
+    ctx.closePath();
 
     ctx.globalAlpha = fillOpacity;
     ctx.fillStyle = fillColor;
