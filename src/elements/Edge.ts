@@ -787,11 +787,22 @@ export class Edge extends Element {
     const labelWidth = this._label!.measuredWidth;
     const labelHeight = this._label!.measuredHeight;
 
+    // When label is rotated, compute axis-aligned bounding box of the rotated rect
+    const rot = this.getLabelRotation();
+    let effectiveWidth = labelWidth;
+    let effectiveHeight = labelHeight;
+    if (rot !== 0) {
+      const cosR = Math.abs(Math.cos(rot));
+      const sinR = Math.abs(Math.sin(rot));
+      effectiveWidth = labelWidth * cosR + labelHeight * sinR;
+      effectiveHeight = labelWidth * sinR + labelHeight * cosR;
+    }
+
     const labelRect: Bounds = {
-      x: labelCenter.x - labelWidth / 2,
-      y: labelCenter.y - labelHeight / 2,
-      width: labelWidth,
-      height: labelHeight,
+      x: labelCenter.x - effectiveWidth / 2,
+      y: labelCenter.y - effectiveHeight / 2,
+      width: effectiveWidth,
+      height: effectiveHeight,
     };
 
     type SegmentIntersection = { segIndex: number; t: number; point: Point };
@@ -1156,12 +1167,14 @@ export class Edge extends Element {
       return;
     }
 
-    const { point } = this.getPathPointAt(this._labelPosition);
-    const labelCenter = {
-      x: point.x,
-      y: point.y + this._labelOffset,
-    };
+    const { point, angle: pathAngle } = this.getPathPointAt(this._labelPosition);
     const rotation = this.getLabelRotation();
+    // Apply offset perpendicular to path direction
+    const perpAngle = this._labelFollowPath ? pathAngle + Math.PI / 2 : Math.PI / 2;
+    const labelCenter = {
+      x: point.x + this._labelOffset * Math.cos(perpAngle),
+      y: point.y + this._labelOffset * Math.sin(perpAngle),
+    };
 
     const labelOpacity = this._label.style.opacity ?? 1;
 
@@ -1247,10 +1260,11 @@ export class Edge extends Element {
       return null;
     }
 
-    const { point } = this.getPathPointAt(this._labelPosition);
+    const { point, angle: pathAngle } = this.getPathPointAt(this._labelPosition);
+    const perpAngle = this._labelFollowPath ? pathAngle + Math.PI / 2 : Math.PI / 2;
     return {
-      x: point.x,
-      y: point.y + this._labelOffset,
+      x: point.x + this._labelOffset * Math.cos(perpAngle),
+      y: point.y + this._labelOffset * Math.sin(perpAngle),
     };
   }
 
