@@ -24,6 +24,7 @@ export function deserializeCComponent(data: SerializedCComponent): CComponent {
         maxLines: data.maxLines,
         lineHeight: data.lineHeight,
         role: data.role,
+        bindToProperty: data.bindToProperty,
         rotation: data.rotation,
         style: data.style,
       });

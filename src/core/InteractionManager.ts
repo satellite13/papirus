@@ -775,7 +775,7 @@ export class InteractionManager {
     }
 
     if ('typeName' in hitElement) {
-      // CompositeNode: edit CText with role 'name'
+      // CompositeNode: edit CText bound to display name (`bindToProperty === '__name__'`)
       if (hitElement.typeName === 'composite') {
         this.startCompositeNameEdit(hitElement as import('@/elements/composite/CompositeNode').CompositeNode);
         return;
@@ -934,7 +934,6 @@ export class InteractionManager {
   private startCompositeNameEdit(
     node: import('@/elements/composite/CompositeNode').CompositeNode
   ): void {
-    // Find CText with role 'name' in the content tree
     const nameText = this.findNameComponent(node.content);
     if (!nameText) return;
 
@@ -969,10 +968,11 @@ export class InteractionManager {
   private findNameComponent(
     container: import('@/elements/composite/CContainer').CContainer
   ): import('@/elements/composite/CText').CText | null {
+    const bindToDisplayName = '__name__';
     for (const child of container.children) {
       if (child.type === 'text') {
         const ctext = child as import('@/elements/composite/CText').CText;
-        if (ctext.role === 'name') return ctext;
+        if (ctext.bindToProperty === bindToDisplayName) return ctext;
       }
       if (child.type === 'container') {
         const found = this.findNameComponent(

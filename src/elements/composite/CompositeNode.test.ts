@@ -31,7 +31,7 @@ describe('CompositeNode', () => {
       content: container({
         direction: 'column',
         children: [
-          text({ id: 'title', text: 'Hello', role: 'name' }),
+          text({ id: 'title', text: 'Hello', bindToProperty: '__name__' }),
           text({ id: 'desc', text: 'Description' }),
         ],
       }),
@@ -289,7 +289,7 @@ describe('CompositeNode', () => {
                 alignItems: 'center',
                 children: [
                   text({ text: '<<interface>>', fontSize: 10, fontStyle: 'italic' }),
-                  text({ id: 'name', text: 'Serializable', fontWeight: 'bold', role: 'name' }),
+                  text({ id: 'name', text: 'Serializable', fontWeight: 'bold', bindToProperty: '__name__' }),
                 ],
               }),
             }),

@@ -13,8 +13,10 @@ export interface CTextOptions {
   verticalAlign?: 'top' | 'middle' | 'bottom';
   maxLines?: number;
   lineHeight?: number;
-  /** Mark as the primary text for inline editing (double-click) */
+  /** Optional marker for host apps (not used for composite name edit; use `bindToProperty: '__name__'`). */
   role?: string;
+  /** Bind displayed text to a property (`__name__` = node display name; enables double-click name edit on composite). */
+  bindToProperty?: string;
   /** Rotation in degrees (e.g. -90 for vertical swimlane text) */
   rotation?: number;
   style?: CComponentStyle;
@@ -45,6 +47,7 @@ export class CText implements CComponent {
   private _maxLines?: number;
   private _lineHeight: number;
   private _role?: string;
+  private _bindToProperty?: string;
   private _rotation: number;
   private _onChange?: () => void;
   private _cachedLines: string[] | null = null;
@@ -62,6 +65,7 @@ export class CText implements CComponent {
     this._maxLines = options.maxLines;
     this._lineHeight = options.lineHeight ?? DEFAULT_LINE_HEIGHT;
     this._role = options.role;
+    this._bindToProperty = options.bindToProperty;
     this._rotation = options.rotation ?? 0;
     this.style = options.style ?? {};
   }
@@ -165,6 +169,10 @@ export class CText implements CComponent {
 
   get role(): string | undefined {
     return this._role;
+  }
+
+  get bindToProperty(): string | undefined {
+    return this._bindToProperty;
   }
 
   get rotation(): number {
@@ -366,6 +374,7 @@ export class CText implements CComponent {
     if (this._verticalAlign !== 'middle') data.verticalAlign = this._verticalAlign;
     if (this._maxLines !== undefined) data.maxLines = this._maxLines;
     if (this._lineHeight !== DEFAULT_LINE_HEIGHT) data.lineHeight = this._lineHeight;
+    if (this._bindToProperty !== undefined) data.bindToProperty = this._bindToProperty;
     if (this._role !== undefined) data.role = this._role;
     if (this._rotation !== 0) data.rotation = this._rotation;
     return data;

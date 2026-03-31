@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { CText } from './CText';
+import { deserializeCComponent } from './deserialize';
 import { mockCanvasContext } from '@/test/testUtils';
 
 describe('CText', () => {
@@ -38,7 +39,7 @@ describe('CText', () => {
         verticalAlign: 'top',
         maxLines: 2,
         lineHeight: 1.5,
-        role: 'name',
+        role: 'caption',
         rotation: -90,
         style: { flexGrow: 1 },
       });
@@ -52,7 +53,7 @@ describe('CText', () => {
       expect(t.verticalAlign).toBe('top');
       expect(t.maxLines).toBe(2);
       expect(t.lineHeight).toBe(1.5);
-      expect(t.role).toBe('name');
+      expect(t.role).toBe('caption');
       expect(t.rotation).toBe(-90);
       expect(t.style.flexGrow).toBe(1);
     });
@@ -216,7 +217,7 @@ describe('CText', () => {
         verticalAlign: 'top',
         maxLines: 3,
         lineHeight: 1.5,
-        role: 'name',
+        bindToProperty: '__name__',
         rotation: -90,
         style: { flexGrow: 1 },
       });
@@ -231,10 +232,29 @@ describe('CText', () => {
       expect(data.verticalAlign).toBe('top');
       expect(data.maxLines).toBe(3);
       expect(data.lineHeight).toBe(1.5);
-      expect(data.role).toBe('name');
+      expect(data.bindToProperty).toBe('__name__');
       expect(data.rotation).toBe(-90);
       expect(data.style?.flexGrow).toBe(1);
     });
+
+    it('serializes bindToProperty for name binding without role', () => {
+      const t = new CText({ text: 'Node', bindToProperty: '__name__' });
+      const data = t.serialize();
+      expect(data.bindToProperty).toBe('__name__');
+      expect(t.bindToProperty).toBe('__name__');
+    });
+
+    it('deserializes bindToProperty', () => {
+      const c = deserializeCComponent({
+        type: 'text',
+        text: 'X',
+        bindToProperty: '__name__',
+      });
+      expect(c.type).toBe('text');
+      expect(c).toBeInstanceOf(CText);
+      expect((c as CText).bindToProperty).toBe('__name__');
+    });
+
   });
 
   describe('toSVG', () => {

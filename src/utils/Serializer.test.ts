@@ -217,7 +217,7 @@ describe('Serializer', () => {
           direction: 'column',
           padding: 8,
           children: [
-            text({ id: 'title', text: 'Hello', fontWeight: 'bold', role: 'name' }),
+            text({ id: 'title', text: 'Hello', fontWeight: 'bold', bindToProperty: '__name__' }),
             divider({ color: '#333' }),
             text({ id: 'desc', text: 'Description' }),
           ],
@@ -242,7 +242,7 @@ describe('Serializer', () => {
       expect(sn.content.children).toHaveLength(3);
       expect(sn.content.children![0]!.type).toBe('text');
       expect(sn.content.children![0]!.text).toBe('Hello');
-      expect(sn.content.children![0]!.role).toBe('name');
+      expect(sn.content.children![0]!.bindToProperty).toBe('__name__');
       expect(sn.content.children![1]!.type).toBe('divider');
 
       renderer.destroy();
@@ -254,7 +254,7 @@ describe('Serializer', () => {
         padding: 8,
         gap: 4,
         children: [
-          text({ id: 'name', text: 'Title', fontWeight: 'bold', role: 'name' }),
+          text({ id: 'name', text: 'Title', fontWeight: 'bold', bindToProperty: '__name__' }),
           icon({ id: 'mainIcon', source: '/icons/component.svg', bindsNotationIcon: true }),
           shape({
             backgroundColor: '#eee',
