@@ -141,11 +141,8 @@ export class NodeImage {
     drawWidth = Math.min(drawWidth, maxWidth);
     drawHeight = Math.min(drawHeight, maxHeight);
 
-    let x = innerBounds.x;
-    let y = innerBounds.y;
-
-    x = innerBounds.x + (innerBounds.width - drawWidth) / 2;
-    y = innerBounds.y + (innerBounds.height - drawHeight) / 2;
+    const x = innerBounds.x + (innerBounds.width - drawWidth) / 2;
+    const y = innerBounds.y + (innerBounds.height - drawHeight) / 2;
 
     ctx.save();
     ctx.globalAlpha = opacity;

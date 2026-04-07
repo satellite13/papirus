@@ -9,6 +9,11 @@
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-04-07
+
+### Исправлено
+- Экспорт SVG для подписей связей теперь соответствует canvas-отрисовке: учитывается поворот по `labelFollowPath`, а при `labelLineGap` в экспортируемом пути связи создаётся разрыв под меткой.
+
 ## [0.6.2] - 2026-03-31
 
 ### Добавлено
@@ -319,7 +324,8 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.2...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.3...HEAD
+[0.6.3]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.6.3
 [0.6.2]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.6.2
 [0.6.1]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.6.1
 [0.6.0]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.0...v0.6.1

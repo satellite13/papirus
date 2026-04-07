@@ -1,5 +1,5 @@
 import type { DiagramRenderer } from '@/core/DiagramRenderer';
-import type { ContentInsetSides, Point } from '@/types';
+import type { Bounds, ContentInsetSides, Point } from '@/types';
 import type { Edge } from '@/elements/Edge';
 import type { Node } from '@/elements/Node';
 import type { Group } from '@/elements/Group';
@@ -10,6 +10,7 @@ import { applyStyleManagerToElements } from './style';
 import { getContentBounds } from './contentBounds';
 import { downloadBlob } from './download';
 import { generateSvgMarker, calculateMarkerPoints } from './markers';
+import { bezierPoint, segmentRectIntersections } from './geometry';
 
 export interface SvgExportOptions {
   padding?: number;
@@ -245,7 +246,7 @@ export class SvgExporter {
     const dashOffset =
       style.lineDashOffset !== undefined ? ` stroke-dashoffset="${style.lineDashOffset}"` : '';
 
-    const d = this.buildPath(edge);
+    const d = this.buildEdgePath(edge, edgeLabelOffset);
     const markerShapes = this.renderEdgeMarkers(edge, stroke);
     const label = this.renderEdgeLabel(edge, edgeLabelOffset);
 
@@ -257,13 +258,16 @@ export class SvgExporter {
       return '';
     }
 
-    const labelPoint = this.getEdgeLabelPoint(edge, edgeLabelOffset);
-    const text = this.renderTextLabel(edge.label.text, labelPoint, edge.label.style);
-    const bg = this.renderEdgeLabelBackground(edge, labelPoint);
+    const labelState = this.getEdgeLabelState(edge, edgeLabelOffset);
+    if (!labelState) {
+      return '';
+    }
+    const text = this.renderTextLabel(edge.label.text, labelState.point, edge.label.style, labelState.rotation);
+    const bg = this.renderEdgeLabelBackground(edge, labelState.point, labelState.rotation);
     return `${bg}${text}`;
   }
 
-  private renderEdgeLabelBackground(edge: Edge, point: Point): string {
+  private renderEdgeLabelBackground(edge: Edge, point: Point, rotation = 0): string {
     if (!edge.label) {
       return '';
     }
@@ -279,11 +283,13 @@ export class SvgExporter {
     const height = metrics.height;
     const radius = Math.max(0, Math.min(bgRadius, width / 2, height / 2));
 
+    const transform = rotation !== 0 ? ` transform="rotate(${(rotation * 180) / Math.PI} ${point.x} ${point.y})"` : '';
+
     if (radius <= 0) {
-      return `<rect x="${x}" y="${y}" width="${width}" height="${height}" fill="${bgColor}" fill-opacity="${bgOpacity}"/>`;
+      return `<rect x="${x}" y="${y}" width="${width}" height="${height}" fill="${bgColor}" fill-opacity="${bgOpacity}"${transform}/>`;
     }
 
-    return `<rect x="${x}" y="${y}" width="${width}" height="${height}" rx="${radius}" ry="${radius}" fill="${bgColor}" fill-opacity="${bgOpacity}"/>`;
+    return `<rect x="${x}" y="${y}" width="${width}" height="${height}" rx="${radius}" ry="${radius}" fill="${bgColor}" fill-opacity="${bgOpacity}"${transform}/>`;
   }
 
   private normalizeLabelInset(
@@ -456,15 +462,34 @@ export class SvgExporter {
   }
 
   private getEdgeLabelPoint(edge: Edge, edgeLabelOffset?: number): Point {
+    if (edgeLabelOffset === undefined) {
+      const runtimePoint = edge.getLabelPosition();
+      if (runtimePoint) {
+        return runtimePoint;
+      }
+    }
+
     const midpoint = this.getPathMidpoint(edge);
-    const effectiveOffset = edgeLabelOffset ?? edge.labelOffset ?? 0;
+    const effectiveOffset = edgeLabelOffset ?? edge.labelOffset;
     return {
       x: midpoint.x,
       y: midpoint.y + effectiveOffset,
     };
   }
 
-  private renderTextLabel(text: string, point: Point, style: TextStyle = {}): string {
+  private getEdgeLabelState(
+    edge: Edge,
+    edgeLabelOffset?: number
+  ): { point: Point; rotation: number } | null {
+    if (!edge.label) {
+      return null;
+    }
+    const point = this.getEdgeLabelPoint(edge, edgeLabelOffset);
+    const rotation = edgeLabelOffset === undefined ? edge.getLabelRotation() : 0;
+    return { point, rotation };
+  }
+
+  private renderTextLabel(text: string, point: Point, style: TextStyle = {}, rotation = 0): string {
     const fill = style.color ?? '#000000';
     const fontSize = style.fontSize ?? 14;
     const fontFamily = style.fontFamily ?? 'sans-serif';
@@ -478,9 +503,11 @@ export class SvgExporter {
         ? 'text-after-edge'
         : 'middle';
 
+    const transform = rotation !== 0 ? ` transform="rotate(${(rotation * 180) / Math.PI} ${point.x} ${point.y})"` : '';
+
     const lines = text.split('\n');
     if (lines.length <= 1) {
-      return `<text x="${point.x}" y="${point.y}" fill="${fill}" fill-opacity="${opacity}" font-size="${fontSize}" font-family="${fontFamily}" font-weight="${fontWeight}" text-anchor="${anchor}" dominant-baseline="${baseline}">${this.escapeText(
+      return `<text x="${point.x}" y="${point.y}" fill="${fill}" fill-opacity="${opacity}" font-size="${fontSize}" font-family="${fontFamily}" font-weight="${fontWeight}" text-anchor="${anchor}" dominant-baseline="${baseline}"${transform}>${this.escapeText(
         text
       )}</text>`;
     }
@@ -490,7 +517,162 @@ export class SvgExporter {
     const tspans = lines
       .map((line, index) => `<tspan x="${point.x}" y="${startY + index * lineHeight}">${this.escapeText(line)}</tspan>`)
       .join('');
-    return `<text x="${point.x}" y="${point.y}" fill="${fill}" fill-opacity="${opacity}" font-size="${fontSize}" font-family="${fontFamily}" font-weight="${fontWeight}" text-anchor="${anchor}" dominant-baseline="${baseline}">${tspans}</text>`;
+    return `<text x="${point.x}" y="${point.y}" fill="${fill}" fill-opacity="${opacity}" font-size="${fontSize}" font-family="${fontFamily}" font-weight="${fontWeight}" text-anchor="${anchor}" dominant-baseline="${baseline}"${transform}>${tspans}</text>`;
+  }
+
+  private buildEdgePath(edge: Edge, edgeLabelOffset?: number): string {
+    if (!edge.label || !edge.labelLineGap) {
+      return this.buildPath(edge);
+    }
+
+    const labelState = this.getEdgeLabelState(edge, edgeLabelOffset);
+    if (!labelState) {
+      return this.buildPath(edge);
+    }
+
+    const polyline = this.buildEdgePolyline(edge);
+    if (polyline.length < 2) {
+      return this.buildPath(edge);
+    }
+
+    const metrics = this.measureTextLabel(edge.label.text, edge.label.style, edge.label.inset);
+    const labelRect = this.getLabelGapRect(labelState.point, metrics, labelState.rotation);
+    const withGap = this.cutPolylineByRect(polyline, labelRect);
+    return this.buildPolylinePath(withGap);
+  }
+
+  private buildEdgePolyline(edge: Edge): Point[] {
+    const path = edge.path;
+    if (edge.type !== 'bezier' || path.length < 4) {
+      return path.map((point) => ({ x: point.x, y: point.y }));
+    }
+
+    const samples: Point[] = [];
+    const steps = 20;
+    for (let i = 1; i + 2 < path.length; i += 3) {
+      const p0 = path[i - 1]!;
+      const p1 = path[i]!;
+      const p2 = path[i + 1]!;
+      const p3 = path[i + 2]!;
+      for (let s = 0; s <= steps; s++) {
+        const t = s / steps;
+        if (samples.length > 0 && t === 0) {
+          continue;
+        }
+        samples.push(bezierPoint(p0, p1, p2, p3, t));
+      }
+    }
+    return samples;
+  }
+
+  private getLabelGapRect(
+    point: Point,
+    metrics: { width: number; height: number },
+    rotation: number
+  ): Bounds {
+    let width = metrics.width;
+    let height = metrics.height;
+
+    if (rotation !== 0) {
+      const cos = Math.abs(Math.cos(rotation));
+      const sin = Math.abs(Math.sin(rotation));
+      width = metrics.width * cos + metrics.height * sin;
+      height = metrics.width * sin + metrics.height * cos;
+    }
+
+    return {
+      x: point.x - width / 2,
+      y: point.y - height / 2,
+      width,
+      height,
+    };
+  }
+
+  private cutPolylineByRect(polyline: Point[], rect: Bounds): Point[][] {
+    type SegmentIntersection = { segIndex: number; t: number; point: Point };
+    const intersections: SegmentIntersection[] = [];
+
+    for (let i = 0; i < polyline.length - 1; i++) {
+      const p0 = polyline[i]!;
+      const p1 = polyline[i + 1]!;
+      const segmentHits = segmentRectIntersections(p0, p1, rect);
+      for (const hit of segmentHits) {
+        intersections.push({ segIndex: i, t: hit.t, point: hit.point });
+      }
+    }
+
+    if (intersections.length < 2) {
+      return [polyline];
+    }
+
+    intersections.sort((a, b) => {
+      if (a.segIndex === b.segIndex) {
+        return a.t - b.t;
+      }
+      return a.segIndex - b.segIndex;
+    });
+
+    const segments: Point[][] = [];
+    let current: Point[] = [{ ...polyline[0]! }];
+    let entered = false;
+    let exited = false;
+
+    for (let i = 0; i < polyline.length - 1; i++) {
+      const p1 = polyline[i + 1]!;
+      const currentIntersections = intersections
+        .filter((intersection) => intersection.segIndex === i)
+        .sort((a, b) => a.t - b.t);
+
+      if (!entered && currentIntersections.length > 0) {
+        current.push({ ...currentIntersections[0]!.point });
+        if (current.length > 1) {
+          segments.push(current);
+        }
+        current = [];
+        entered = true;
+
+        const exitOnSameSegment =
+          currentIntersections.length > 1 ? currentIntersections[currentIntersections.length - 1]! : undefined;
+        if (exitOnSameSegment) {
+          current = [{ ...exitOnSameSegment.point }, { ...p1 }];
+          exited = true;
+        }
+        continue;
+      }
+
+      if (entered && !exited && currentIntersections.length > 0) {
+        const exitPoint = currentIntersections[currentIntersections.length - 1]!.point;
+        current = [{ ...exitPoint }, { ...p1 }];
+        exited = true;
+        continue;
+      }
+
+      if (!entered || exited) {
+        if (current.length === 0) {
+          current.push({ ...polyline[i]! });
+        }
+        current.push({ ...p1 });
+      }
+    }
+
+    if (current.length > 1) {
+      segments.push(current);
+    }
+
+    return segments.length > 0 ? segments : [polyline];
+  }
+
+  private buildPolylinePath(segments: Point[][]): string {
+    return segments
+      .filter((segment) => segment.length > 1)
+      .map((segment) => {
+        let d = `M ${segment[0]!.x} ${segment[0]!.y}`;
+        for (let i = 1; i < segment.length; i++) {
+          d += ` L ${segment[i]!.x} ${segment[i]!.y}`;
+        }
+        return d;
+      })
+      .join(' ');
   }
 
   private getMeasurementContext(): CanvasRenderingContext2D | null {
@@ -708,11 +890,8 @@ export class SvgExporter {
     drawWidth = Math.min(Math.max(0, drawWidth), Math.max(0, availableWidth));
     drawHeight = Math.min(Math.max(0, drawHeight), Math.max(0, availableHeight));
 
-    let x = innerBounds.x;
-    let y = innerBounds.y;
-
-    x = innerBounds.x + (innerBounds.width - drawWidth) / 2;
-    y = innerBounds.y + (innerBounds.height - drawHeight) / 2;
+    const x = innerBounds.x + (innerBounds.width - drawWidth) / 2;
+    const y = innerBounds.y + (innerBounds.height - drawHeight) / 2;
 
     return {
       x,

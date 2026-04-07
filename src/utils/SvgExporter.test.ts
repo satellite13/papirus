@@ -120,4 +120,95 @@ describe('SvgExporter', () => {
 
     renderer.destroy();
   });
+
+  it('rotates edge label in SVG when labelFollowPath is enabled', () => {
+    const canvas = document.createElement('canvas');
+    const renderer = new DiagramRenderer(canvas, { width: 400, height: 300, retina: false });
+    const a = new RectangleNode({ x: 20, y: 20, width: 40, height: 40 });
+    const b = new RectangleNode({ x: 220, y: 160, width: 40, height: 40 });
+    renderer.addNode(a);
+    renderer.addNode(b);
+
+    const edge = new Edge({
+      from: { nodeId: a.id },
+      to: { nodeId: b.id },
+      type: 'straight',
+      label: 'Flow',
+      labelFollowPath: true,
+      labelBackground: { color: '#fff', opacity: 1, borderRadius: 0 },
+    });
+    edge.updateEndpoints(
+      { x: a.x + a.width, y: a.y + a.height / 2 },
+      { x: b.x, y: b.y + b.height / 2 }
+    );
+    renderer.addEdge(edge);
+
+    const svg = new SvgExporter(renderer).exportSVG({ includeBackground: false });
+    expect(svg).toMatch(/<text[^>]*transform="rotate\([^)]+\s[\d.]+\s[\d.]+\)"/);
+    expect(svg).toMatch(/<rect[^>]*transform="rotate\([^)]+\s[\d.]+\s[\d.]+\)"/);
+
+    renderer.destroy();
+  });
+
+  it('cuts SVG edge path under label when labelLineGap is enabled', () => {
+    const canvas = document.createElement('canvas');
+    const renderer = new DiagramRenderer(canvas, { width: 400, height: 300, retina: false });
+    const a = new RectangleNode({ x: 20, y: 20, width: 40, height: 40 });
+    const b = new RectangleNode({ x: 280, y: 20, width: 40, height: 40 });
+    renderer.addNode(a);
+    renderer.addNode(b);
+
+    const edge = new Edge({
+      from: { nodeId: a.id },
+      to: { nodeId: b.id },
+      type: 'straight',
+      label: 'Very long label for visible gap',
+      labelLineGap: true,
+    });
+    edge.updateEndpoints(
+      { x: a.x + a.width, y: a.y + a.height / 2 },
+      { x: b.x, y: b.y + b.height / 2 }
+    );
+    renderer.addEdge(edge);
+
+    const svg = new SvgExporter(renderer).exportSVG({ includeBackground: false });
+    const pathMatch = svg.match(/<path d="([^"]+)" fill="none"/);
+    expect(pathMatch).not.toBeNull();
+    expect(pathMatch?.[1]).toContain(' M ');
+
+    renderer.destroy();
+  });
+
+  it('exports bezier edge with rotated label and line gap together', () => {
+    const canvas = document.createElement('canvas');
+    const renderer = new DiagramRenderer(canvas, { width: 500, height: 350, retina: false });
+    const a = new RectangleNode({ x: 40, y: 180, width: 40, height: 40 });
+    const b = new RectangleNode({ x: 360, y: 80, width: 40, height: 40 });
+    renderer.addNode(a);
+    renderer.addNode(b);
+
+    const edge = new Edge({
+      from: { nodeId: a.id },
+      to: { nodeId: b.id },
+      type: 'bezier',
+      label: 'Bezier label',
+      labelFollowPath: true,
+      labelLineGap: true,
+      labelBackground: { color: '#fff', opacity: 1, borderRadius: 4 },
+    });
+    edge.updateEndpoints(
+      { x: a.x + a.width, y: a.y + a.height / 2 },
+      { x: b.x, y: b.y + b.height / 2 }
+    );
+    renderer.addEdge(edge);
+
+    const svg = new SvgExporter(renderer).exportSVG({ includeBackground: false });
+    const pathMatch = svg.match(/<path d="([^"]+)" fill="none"/);
+    expect(pathMatch).not.toBeNull();
+    expect(pathMatch?.[1]).toContain(' M ');
+    expect(svg).toMatch(/<text[^>]*transform="rotate\([^)]+\s[\d.]+\s[\d.]+\)"/);
+    expect(svg).toMatch(/<rect[^>]*transform="rotate\([^)]+\s[\d.]+\s[\d.]+\)"/);
+
+    renderer.destroy();
+  });
 });

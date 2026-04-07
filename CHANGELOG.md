@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-04-07
+
+### Fixed
+- SVG export for edge labels now matches canvas behavior: `labelFollowPath` rotation is applied, and `labelLineGap` creates a gap in the exported edge path under the label.
+
 ## [0.6.2] - 2026-03-31
 
 ### Added
@@ -312,7 +317,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Edge animations (flow effect)
 - Context menu and search/filter
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.2...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.3...HEAD
+[0.6.3]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.6.3
 [0.6.2]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.6.2
 [0.6.1]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.6.1
 [0.6.0]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.0...v0.6.1
