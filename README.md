@@ -59,6 +59,7 @@ renderer.enableInteractions();
 
 - [Docs Index](./docs/README.md)
 - [API Overview](./docs/api.md)
+- [CompositeNode](./docs/composite.md)
 - [Elements](./docs/elements.md)
 - [Interactions](./docs/interactions.md)
 - [Overlays](./docs/overlays.md)
@@ -175,7 +176,7 @@ const composite = new CompositeNode({
     padding: 10,
     gap: 6,
     children: [
-      text({ id: 'name', text: 'Service API', role: 'name', style: { alignSelf: 'center' } }),
+      text({ id: 'name', text: 'Service API', bindToProperty: '__name__', style: { alignSelf: 'center' } }),
       divider({}),
       container({
         direction: 'row',
@@ -217,13 +218,20 @@ Built-in themes: `DEFAULT_THEME`, `DARK_THEME`.
 import { Serializer } from '@ngroznykh/papirus';
 
 const serializer = new Serializer(renderer, {
-  nodeFactory: (data) => new RectangleNode(data),
+  nodeFactory: (data) => {
+    if (data.type === 'composite') {
+      /* see docs/utils.md — deserializeCComponent + CompositeNode */
+    }
+    return new RectangleNode(data);
+  },
   edgeFactory: (data) => new Edge(data),
 });
 
 const json = serializer.toJSON(true);
 serializer.fromJSON(json);
 ```
+
+See [Utils](./docs/utils.md) for multi-type and composite `nodeFactory` examples.
 
 ### Export
 

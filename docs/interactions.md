@@ -139,6 +139,26 @@ interactions.connection.setAttachToOutline(true);  // привязка стре�
 - при drag точки работают осевые магниты (к вертикали/горизонтали соседних сегментов);
 - при drag узла ближайшая ортогональная точка перелома может сопровождать движение для сохранения геометрии.
 
+Undo/redo для правок контрольных точек выполняется через `ChangeEditablePolylineControlPointsCommand` (добавляется в `history` автоматически при интерактивном drag; можно использовать вручную при программных изменениях).
+
+### События `ConnectionManager`
+
+При перетаскивании контрольных точек polyline/bezier (в т.ч. `editable-polyline`):
+
+- `controlPointDragStart` — начало drag точки;
+- `controlPointDragEnd` — завершение (отпускание или отмена).
+
+Удобно для live sync и совместного редактирования в host-приложении:
+
+```ts
+interactions.connection.on('controlPointDragStart', () => {
+  // pause remote updates
+});
+interactions.connection.on('controlPointDragEnd', () => {
+  // commit + resume sync
+});
+```
+
 ## События менеджеров
 
 Менеджеры реализованы через `EventEmitter` и поддерживают подписки:

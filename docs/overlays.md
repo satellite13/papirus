@@ -1,6 +1,51 @@
 # Оверлеи
 
-Оверлеи подключаются через `renderer.use(...)` и рисуются поверх/под диаграммой. Все оверлеи поддерживают опцию `enabled` (по умолчанию `true`).
+Оверлеи подключаются через `renderer.use(...)` и рисуются поверх/под диаграммой. Все оверлеи реализуют `DiagramPlugin` (`install` / `destroy`) и поддерживают опцию `enabled` (по умолчанию `true`).
+
+## Контракт `DiagramPlugin` для указателя
+
+Оверлеи, которые перехватывают мышь (например `MiniMap`), могут реализовать опциональные методы:
+
+| Метод | Назначение |
+|-------|------------|
+| `blocksDiagramPointerAtScreen(renderer, screenX, screenY)` | `true` — клики/drag по диаграмме в этой точке экрана игнорируются (выделение, связи, resize). |
+| `beginOverlayDrag(renderer, screenX, screenY)` | Начало drag-сессии оверлея; возвращает opaque `payload`. |
+| `updateOverlayDrag(renderer, screenX, screenY, payload)` | Обновление drag; `false` — сессия завершена. |
+| `endOverlayDrag(renderer, payload)` | Завершение drag. |
+
+`DiagramRenderer` маршрутизирует эти вызовы через `beginOverlayDrag()`, `blocksDiagramPointerAtScreen()`. `InteractionManager`, `ConnectionManager`, `ResizeManager` и `ContextMenuManager` учитывают блокировку указателя.
+
+Пример кастомного оверлея с drag-рамкой (упрощённо):
+
+```ts
+class MyOverlay implements DiagramPlugin {
+  name = 'my-overlay';
+
+  install(renderer: DiagramRenderer): void {
+    renderer.addOverlayRenderer((ctx) => { /* draw */ });
+  }
+
+  blocksDiagramPointerAtScreen(renderer, screenX, screenY): boolean {
+    return this.hitTest(screenX, screenY);
+  }
+
+  beginOverlayDrag(renderer, screenX, screenY): unknown {
+    if (!this.hitTest(screenX, screenY)) return undefined;
+    return { startX: screenX, startY: screenY };
+  }
+
+  updateOverlayDrag(renderer, screenX, screenY, payload): boolean {
+    // move viewport / selection rect
+    return true;
+  }
+
+  endOverlayDrag(renderer, payload): void {
+    // cleanup
+  }
+}
+```
+
+См. реализацию: `src/core/overlays/MiniMap.ts`.
 
 ## GridOverlay
 

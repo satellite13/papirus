@@ -9,6 +9,9 @@
 
 ## [Unreleased]
 
+### Documentation
+- Расширена `docs/`: новый `composite.md`, обновлены разделы API/elements/interactions/overlays/renderer/utils и индекс; исправлены примеры на `bindToProperty: '__name__'`; описаны бейджи, типы маркеров, хуки `DiagramPlugin` для указателя, события контрольных точек `ConnectionManager` и сериализация composite.
+
 ## [0.6.4] - 2026-06-02
 
 ### Исправлено

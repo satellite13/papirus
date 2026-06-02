@@ -292,10 +292,16 @@ Papirus is framework-agnostic and can be integrated into Vue/React/Svelte/vanill
 
 ## Documentation
 
-- API docs: `docs/api.md`
+- Docs index: `docs/README.md`
+- API overview: `docs/api.md`
+- Composite nodes: `docs/composite.md`
 - Elements: `docs/elements.md`
+- Renderer: `docs/renderer.md`
 - Interactions: `docs/interactions.md`
+- Input: `docs/input.md`
+- Search: `docs/search.md`
 - Overlays: `docs/overlays.md`
+- Utils: `docs/utils.md`
 - Examples: `examples/index.html`
 
 ## Security Considerations

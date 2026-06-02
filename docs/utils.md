@@ -15,6 +15,77 @@ const json = serializer.toJSON(true);
 serializer.fromJSON(json);
 ```
 
+### Узлы разных типов и `CompositeNode`
+
+`nodeFactory` получает `SerializedNode` с полем `type` (`'rectangle' | 'circle' | 'diamond' | 'composite' | ...`). Для composite в данных есть `content` (дерево `SerializedCComponent`).
+
+```ts
+import {
+  Serializer,
+  RectangleNode,
+  CircleNode,
+  DiamondNode,
+  Edge,
+  Group,
+  CompositeNode,
+  CContainer,
+  deserializeCComponent,
+} from '@ngroznykh/papirus';
+import type { SerializedNode, SerializedCompositeNode } from '@ngroznykh/papirus';
+
+function nodeFactory(data: SerializedNode) {
+  const base = {
+    id: data.id,
+    x: data.x,
+    y: data.y,
+    width: data.width,
+    height: data.height,
+    style: data.style,
+    styleClass: data.styleClass,
+    label: data.label,
+    icon: data.icon,
+    contentInset: data.contentInset,
+    ports: data.ports,
+    anchorPoints: data.anchorPoints,
+  };
+
+  if (data.type === 'composite') {
+    const c = data as SerializedCompositeNode;
+    const root = deserializeCComponent(c.content);
+    if (!(root instanceof CContainer)) {
+      throw new Error('Composite root must be a container');
+    }
+    return new CompositeNode({
+      ...base,
+      content: root,
+      shapeType: c.shapeType,
+      cornerRadius: c.cornerRadius,
+      autoSize: c.autoSize ?? true,
+      minWidth: c.minWidth,
+      minHeight: c.minHeight,
+    });
+  }
+
+  switch (data.type) {
+    case 'circle':
+      return new CircleNode(base);
+    case 'diamond':
+      return new DiamondNode(base);
+    case 'rectangle':
+    default:
+      return new RectangleNode(base);
+  }
+}
+
+const serializer = new Serializer(renderer, {
+  nodeFactory,
+  edgeFactory: (data) => new Edge(data),
+  groupFactory: (data) => new Group(data),
+});
+```
+
+Подробнее о composite: `docs/composite.md`.
+
 ## Экспорт
 
 ```ts

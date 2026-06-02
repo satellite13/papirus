@@ -125,9 +125,25 @@ const removeUnderlay = renderer.addUnderlayRenderer((ctx) => {
 - `nodeAdd`, `nodeRemove`
 - `edgeAdd`, `edgeRemove`
 - `nodeBadgeClick` — клик по бейджу узла (`nodeId`, `badgeId`)
+- `componentClick` — клик по компоненту внутри `CompositeNode` (`nodeId`, `CComponent`, `point`)
 
 ```ts
 renderer.on('zoom', (value) => {
   console.log('zoom', value);
 });
+
+renderer.on('nodeBadgeClick', (nodeId, badgeId) => {
+  console.log('badge', nodeId, badgeId);
+});
+
+renderer.on('componentClick', (nodeId, component, point) => {
+  console.log('component', nodeId, component.type, point);
+});
 ```
+
+## Бейджи и hover
+
+- `updateBadgeHover(worldPoint)` — подсветка бейджа и `cursor: pointer` при наведении (вызывайте из `mousemove`).
+- `getInteractableElementAtPoint(world, screenX, screenY)` — hit-test с учётом `blocksDiagramPointerAtScreen` (миникарта и др. не «пробивают» выделение).
+
+Подробнее о бейджах: `docs/elements.md`.

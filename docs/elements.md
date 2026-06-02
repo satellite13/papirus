@@ -44,7 +44,7 @@ const composite = new CompositeNode({
     padding: 10,
     gap: 6,
     children: [
-      text({ id: 'name', text: 'Service API', role: 'name' }),
+      text({ id: 'name', text: 'Service API', bindToProperty: '__name__' }),
       divider({}),
       container({
         direction: 'row',
@@ -62,6 +62,8 @@ const composite = new CompositeNode({
 Сериализация `CompositeNode`:
 - `SerializedCompositeNode.content` хранит корневой `SerializedCComponent`;
 - у `SerializedCComponent` доступны поля `label`, `bindToProperty`, `bindsNotationIcon` для редакторских/интеграционных сценариев.
+
+Подробнее: [CompositeNode](./composite.md) (`autoSize`, `flexLayout`, `deserializeCComponent`, `shapeType: 'custom'` + `svgPath`).
 
 ### CustomShapeNode
 
@@ -103,6 +105,26 @@ const node = new CustomShapeNode({
 - `contentInset` — отступы контентной области от краёв фигуры (см. выше).
 - `ports` — список портов (`PortOptions`).
 - `anchorPoints` — количество anchor-точек по сторонам.
+- `badges` — иконки-бейджи в левом верхнем углу контентной области (`{ id, iconUrl }[]`).
+
+### Бейджи узла (`badges`)
+
+Бейджи рисуются в левом верхнем углу контентной области (над меткой/иконкой). Используются host-приложениями для индикаторов (например, несохранённые свойства).
+
+```ts
+const node = new RectangleNode({
+  x: 40,
+  y: 40,
+  width: 140,
+  height: 72,
+  label: 'Order',
+  badges: [{ id: 'dirty', iconUrl: '/icons/warning.svg' }],
+});
+```
+
+- Клик по бейджу: событие `nodeBadgeClick` на `DiagramRenderer` (`nodeId`, `badgeId`).
+- Hover: вызывайте `renderer.updateBadgeHover(worldPoint)` из `mousemove`, чтобы подсветить бейдж и выставить `cursor: pointer`.
+- Hit-test: `node.getBadgeAtPoint(point)` → `{ id, index } | null`.
 
 Поведение меток узла при длинном тексте:
 
@@ -152,7 +174,8 @@ const node = new RectangleNode({
 `Edge` соединяет узлы и поддерживает:
 
 - тип пути (`type`: `straight | polyline | bezier | editable-polyline`)
-- стрелки (`arrowType`, `startMarker`, `endMarker`)
+- стрелки: устаревшее `arrowType` или явные `startMarker` / `endMarker` (`ArrowMarkerConfig`: `type`, `size`)
+- типы маркеров (`ArrowMarkerType`): `none`, `arrow`, `open`, `diamond`, `circle`, `square` (canvas и SVG-экспорт)
 - подпись (`label`), смещение подписи от центра пути (`labelOffset`) и фон подписи (`labelBackground`)
 - позиция подписи вдоль пути (`labelPosition`: `0..1`) и поворот подписи по касательной (`labelFollowPath`)
 - **разрыв линии под меткой** (`labelLineGap`): если `true` и задана метка, линия ребра не рисуется на участке, пересекающем прямоугольник метки — рисуются два отрезка (до метки и после), так что линия визуально «обрывается» под подписью
@@ -178,6 +201,8 @@ const edge = new Edge({
     { x: 320, y: 160 },
   ],
   style: { flowSpeed: 30, flowDash: [6, 6] },
+  startMarker: { type: 'square', size: 8 },
+  endMarker: { type: 'arrow', size: 10 },
 });
 ```
 

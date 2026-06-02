@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+- Expanded `docs/`: new `composite.md`, updated API/elements/interactions/overlays/renderer/utils indexes; fixed `bindToProperty: '__name__'` examples; documented badges, marker types, `DiagramPlugin` pointer hooks, `ConnectionManager` control-point events, and composite serialization.
+
 ## [0.6.4] - 2026-06-02
 
 ### Fixed

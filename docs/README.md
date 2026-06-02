@@ -3,6 +3,7 @@
 Здесь собрана расширенная документация по API и возможностям библиотеки.
 
 - [Обзор API](./api.md)
+- [CompositeNode](./composite.md)
 - [DiagramRenderer](./renderer.md)
 - [Элементы диаграммы](./elements.md)
 - [Интерактивность и менеджеры](./interactions.md)
@@ -32,6 +33,11 @@
 - `zoomToSelection()` и управление снаппингом через `drag.setSnapToGrid()`.
 - Линейки в `ports`-примере — это встроенный оверлей `RulersOverlay`, подключаемый через `renderer.use(...)`.
 
+## История изменений
+
+- [CHANGELOG (English)](../CHANGELOG.md)
+- [CHANGELOG (Русский)](../CHANGELOG.ru.md)
+
 ## Что дальше
 
-Начните с `api.md`, затем переходите к разделам по элементам, интерактивности и утилитам.
+Начните с `api.md`, затем переходите к разделам по элементам, composite, интерактивности и утилитам.

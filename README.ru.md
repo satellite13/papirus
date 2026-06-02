@@ -59,6 +59,7 @@ renderer.enableInteractions();
 
 - [Индекс документации](./docs/README.md)
 - [Обзор API](./docs/api.md)
+- [CompositeNode](./docs/composite.md)
 - [Элементы](./docs/elements.md)
 - [Интерактивность](./docs/interactions.md)
 - [Оверлеи](./docs/overlays.md)
@@ -176,7 +177,7 @@ const composite = new CompositeNode({
     padding: 10,
     gap: 6,
     children: [
-      text({ id: 'name', text: 'Service API', role: 'name', style: { alignSelf: 'center' } }),
+      text({ id: 'name', text: 'Service API', bindToProperty: '__name__', style: { alignSelf: 'center' } }),
       divider({}),
       container({
         direction: 'row',
@@ -218,13 +219,20 @@ renderer.setStyleManager(styles);
 import { Serializer } from '@ngroznykh/papirus';
 
 const serializer = new Serializer(renderer, {
-  nodeFactory: (data) => new RectangleNode(data),
+  nodeFactory: (data) => {
+    if (data.type === 'composite') {
+      /* см. docs/utils.md — deserializeCComponent + CompositeNode */
+    }
+    return new RectangleNode(data);
+  },
   edgeFactory: (data) => new Edge(data),
 });
 
 const json = serializer.toJSON(true);
 serializer.fromJSON(json);
 ```
+
+Примеры для нескольких типов узлов и composite: [Утилиты](./docs/utils.md).
 
 ### Экспорт
 
