@@ -121,6 +121,50 @@ describe('SvgExporter', () => {
     renderer.destroy();
   });
 
+  it('exports CompositeNode with custom shape via svgPath', () => {
+    vi.stubGlobal('Image', FakeImage);
+    const canvas = document.createElement('canvas');
+    const renderer = new DiagramRenderer(canvas, { width: 400, height: 300, retina: false });
+
+    const node = new CompositeNode({
+      x: 10,
+      y: 10,
+      width: 200,
+      height: 100,
+      shapeType: 'custom',
+      pathFactory: (w, h) => {
+        const path = new Path2D();
+        const cut = Math.min(w, h) * 0.16;
+        path.moveTo(cut, 0);
+        path.lineTo(w - cut, 0);
+        path.lineTo(w, cut);
+        path.lineTo(w, h - cut);
+        path.lineTo(w - cut, h);
+        path.lineTo(cut, h);
+        path.lineTo(0, h - cut);
+        path.lineTo(0, cut);
+        path.closePath();
+        return path;
+      },
+      svgPath: (w, h) => {
+        const cut = Math.min(w, h) * 0.16;
+        return `M ${cut} 0 L ${w - cut} 0 L ${w} ${cut} L ${w} ${h - cut} L ${w - cut} ${h} L ${cut} ${h} L 0 ${h - cut} L 0 ${cut} Z`;
+      },
+      content: container({
+        children: [text({ text: 'Custom frame' })],
+      }),
+    });
+    renderer.addNode(node);
+
+    const svg = new SvgExporter(renderer).exportSVG({ includeBackground: false });
+
+    expect(svg).toContain('<path d="M');
+    expect(svg).not.toMatch(/<rect x="10" y="10" width="200" height="100"/);
+    expect(svg).toContain('Custom frame');
+
+    renderer.destroy();
+  });
+
   it('rotates edge label in SVG when labelFollowPath is enabled', () => {
     const canvas = document.createElement('canvas');
     const renderer = new DiagramRenderer(canvas, { width: 400, height: 300, retina: false });

@@ -11,6 +11,12 @@ export interface CompositeNodeOptions extends NodeOptions {
   shapeType?: CompositeShapeType;
   cornerRadius?: number;
   pathFactory?: (width: number, height: number) => Path2D;
+  /**
+   * SVG path string for export. Required for correct SVG export of custom shapes.
+   * Path coordinates are in local space (0,0 = top-left, width×height = node bounds).
+   * If omitted, SVG export falls back to a rectangle.
+   */
+  svgPath?: string | ((width: number, height: number) => string);
   autoSize?: boolean;
   minWidth?: number;
   minHeight?: number;
@@ -25,6 +31,7 @@ export class CompositeNode extends Node {
   private _shapeType: CompositeShapeType;
   private _cornerRadius: number;
   private _pathFactory?: (width: number, height: number) => Path2D;
+  private _svgPathFactory: ((width: number, height: number) => string) | null = null;
   private _autoSize: boolean;
   private _minWidth: number;
   private _minHeight: number;
@@ -35,6 +42,14 @@ export class CompositeNode extends Node {
     this._shapeType = options.shapeType ?? 'rectangle';
     this._cornerRadius = options.cornerRadius ?? 0;
     this._pathFactory = options.pathFactory;
+    if (options.svgPath !== undefined) {
+      if (typeof options.svgPath === 'string') {
+        const staticSvg = options.svgPath;
+        this._svgPathFactory = (): string => staticSvg;
+      } else {
+        this._svgPathFactory = options.svgPath;
+      }
+    }
     this._autoSize = options.autoSize ?? false;
     this._minWidth = options.minWidth ?? 0;
     this._minHeight = options.minHeight ?? 0;
@@ -57,6 +72,16 @@ export class CompositeNode extends Node {
 
   get cornerRadius(): number {
     return this._cornerRadius;
+  }
+
+  /**
+   * Get SVG path string for export. Returns null if svgPath was not provided.
+   */
+  getSvgPath(): string | null {
+    if (this._svgPathFactory === null) {
+      return null;
+    }
+    return this._svgPathFactory(this._width, this._height);
   }
 
   get autoSize(): boolean {

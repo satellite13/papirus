@@ -199,6 +199,16 @@ export class SvgExporter {
             shape = `<polygon points="${points}"`;
             break;
           }
+          case 'custom': {
+            const svgPath = cn.getSvgPath();
+            if (svgPath) {
+              shape = `<path d="${this.escapeAttribute(svgPath)}" transform="translate(${bounds.x}, ${bounds.y})"`;
+            } else {
+              const radius = cn.cornerRadius;
+              shape = `<rect x="${bounds.x}" y="${bounds.y}" width="${bounds.width}" height="${bounds.height}" rx="${radius}" ry="${radius}"`;
+            }
+            break;
+          }
           default: {
             const radius = cn.cornerRadius;
             shape = `<rect x="${bounds.x}" y="${bounds.y}" width="${bounds.width}" height="${bounds.height}" rx="${radius}" ry="${radius}"`;

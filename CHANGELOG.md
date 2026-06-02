@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.4] - 2026-06-02
+
+### Fixed
+- SVG export for `CompositeNode` with `shapeType: 'custom'` now renders the custom outline via `svgPath` instead of falling back to a rectangle.
+
 ## [0.6.3] - 2026-04-07
 
 ### Fixed
@@ -317,7 +322,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Edge animations (flow effect)
 - Context menu and search/filter
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.3...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.4...HEAD
+[0.6.4]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.3...v0.6.4
 [0.6.3]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.6.3
 [0.6.2]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.6.2
 [0.6.1]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.6.1

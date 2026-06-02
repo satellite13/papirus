@@ -9,6 +9,11 @@
 
 ## [Unreleased]
 
+## [0.6.4] - 2026-06-02
+
+### Исправлено
+- Экспорт SVG для `CompositeNode` с `shapeType: 'custom'` теперь рисует кастомный контур через `svgPath`, а не подставляет прямоугольник.
+
 ## [0.6.3] - 2026-04-07
 
 ### Исправлено
@@ -324,7 +329,8 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.3...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.4...HEAD
+[0.6.4]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.3...v0.6.4
 [0.6.3]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.6.3
 [0.6.2]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.6.2
 [0.6.1]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.6.1
