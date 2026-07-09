@@ -13,10 +13,10 @@ This file provides essential information for AI coding agents working with the P
 
 ## Technology Stack
 
-- **Language**: TypeScript 5.9+ with strict mode enabled
-- **Build Tool**: Vite 7.3+ with ES modules output
-- **Testing**: Vitest 4.0+ with jsdom environment, coverage via v8
-- **Linting**: ESLint 9.x with typescript-eslint
+- **Language**: TypeScript 6.x with strict mode enabled
+- **Build Tool**: Vite 8.x with ES modules output
+- **Testing**: Vitest 4.x with jsdom environment, coverage via v8
+- **Linting**: ESLint 10.x with typescript-eslint
 - **Formatting**: Prettier 3.8+
 - **Target**: ES2020, DOM APIs
 
@@ -60,6 +60,11 @@ src/
 │   │   ├── CircleNode.ts
 │   │   ├── DiamondNode.ts
 │   │   └── CustomShapeNode.ts
+│   ├── composite/        # Composite nodes (0.6.x)
+│   │   ├── CompositeNode.ts
+│   │   ├── CComponent.ts / CContainer.ts / CText.ts / CIcon.ts / …
+│   │   ├── FlexLayout.ts
+│   │   └── deserialize.ts
 │   └── paths/            # Edge path strategies
 │       ├── PathStrategy.ts
 │       ├── StraightPathStrategy.ts
@@ -78,9 +83,8 @@ src/
     ├── AutoRouting.ts    # Edge routing
     ├── AlignDistribute.ts# Alignment/distribution
     ├── geometry.ts       # Geometric calculations
-    ├── style.ts          # Style utilities
+    ├── style.ts          # Style utilities (incl. applyStyleManagerToElements)
     ├── contentBounds.ts  # Content boundary calculation
-    ├── applyStyleManager.ts
     └── download.ts
 ```
 
