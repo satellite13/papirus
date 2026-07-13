@@ -1,5 +1,16 @@
 export type Direction = 'top' | 'right' | 'bottom' | 'left' | undefined;
 
+/**
+ * Map outline param [0,1) to cardinal direction (top → right → bottom → left).
+ */
+export function getDirectionFromOutlineParam(param: number): Exclude<Direction, undefined> {
+  const p = ((param % 1) + 1) % 1;
+  if (p < 0.25) return 'top';
+  if (p < 0.5) return 'right';
+  if (p < 0.75) return 'bottom';
+  return 'left';
+}
+
 export function isHorizontal(dir?: string): boolean {
   return dir === 'left' || dir === 'right';
 }

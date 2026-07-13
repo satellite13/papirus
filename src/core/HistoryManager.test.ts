@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { HistoryManager } from './HistoryManager';
+import { getHistoryShortcut } from '../utils/keymap';
 
 describe('HistoryManager', () => {
   it('starts with empty undo/redo', () => {
@@ -81,5 +82,22 @@ describe('HistoryManager', () => {
     history.execute({ execute: vi.fn(), undo: vi.fn() });
 
     expect(onChange).toHaveBeenCalledWith(true, false);
+  });
+
+  it('uses the shared keymap helper for layout-independent history shortcuts', () => {
+    const undo = new KeyboardEvent('keydown', {
+      key: 'я',
+      code: 'KeyZ',
+      ctrlKey: true,
+    });
+    const redo = new KeyboardEvent('keydown', {
+      key: 'я',
+      code: 'KeyZ',
+      metaKey: true,
+      shiftKey: true,
+    });
+
+    expect(getHistoryShortcut(undo)).toBe('undo');
+    expect(getHistoryShortcut(redo)).toBe('redo');
   });
 });

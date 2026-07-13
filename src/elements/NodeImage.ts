@@ -1,6 +1,7 @@
 import type { Bounds } from '@/types';
-import { LRUCache } from '@/utils/LRUCache';
 import { tintSvg, isSvgMarkup, svgToDataUrl } from '@/utils/svgTint';
+import { fetchSvgText } from '@/utils/svgAssetLoader';
+import { computeIconDrawRect } from '@/utils/iconLayout';
 
 export type NodeImageCornerPlacement = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
 export type NodeImageEdgePlacement = 'top' | 'bottom' | 'left' | 'right';
@@ -45,9 +46,6 @@ export interface NodeImageOptions {
   strokeColor?: string;
   fillColor?: string;
 }
-
-// LRU cache for fetched SVG content (limit 100 entries to prevent memory growth)
-const svgTextCache = new LRUCache<string, Promise<string>>(100);
 
 /**
  * Image helper for node rendering (supports images and inline SVG).
@@ -107,46 +105,20 @@ export class NodeImage {
     }
 
     const ins = this.inset;
-    const fit = this._options.fit ?? 'none';
-    const scaleWithBounds = this._options.scaleWithBounds ?? false;
     const opacity = this._options.opacity ?? 1;
-
-    const innerBounds: Bounds = {
-      x: bounds.x + ins,
-      y: bounds.y + ins,
-      width: Math.max(0, bounds.width - ins * 2),
-      height: Math.max(0, bounds.height - ins * 2),
-    };
-    const availableWidth = Math.max(0, innerBounds.width);
-    const availableHeight = Math.max(0, innerBounds.height);
-
-    let drawWidth = this._options.width ?? this._naturalWidth;
-    let drawHeight = this._options.height ?? this._naturalHeight;
-
-    if (scaleWithBounds) {
-      if (fit === 'contain' || fit === 'cover') {
-        const scaleX = availableWidth / this._naturalWidth;
-        const scaleY = availableHeight / this._naturalHeight;
-        const scale = fit === 'contain' ? Math.min(scaleX, scaleY) : Math.max(scaleX, scaleY);
-        drawWidth = this._naturalWidth * scale;
-        drawHeight = this._naturalHeight * scale;
-      } else if (fit === 'stretch') {
-        drawWidth = availableWidth;
-        drawHeight = availableHeight;
-      }
+    const drawRect = computeIconDrawRect(
+      bounds,
+      this._options,
+      { width: this._naturalWidth, height: this._naturalHeight },
+      ins
+    );
+    if (drawRect.width <= 0 || drawRect.height <= 0) {
+      return;
     }
-
-    const maxWidth = Math.max(0, availableWidth);
-    const maxHeight = Math.max(0, availableHeight);
-    drawWidth = Math.min(drawWidth, maxWidth);
-    drawHeight = Math.min(drawHeight, maxHeight);
-
-    const x = innerBounds.x + (innerBounds.width - drawWidth) / 2;
-    const y = innerBounds.y + (innerBounds.height - drawHeight) / 2;
 
     ctx.save();
     ctx.globalAlpha = opacity;
-    ctx.drawImage(this._image, x, y, drawWidth, drawHeight);
+    ctx.drawImage(this._image, drawRect.x, drawRect.y, drawRect.width, drawRect.height);
     ctx.restore();
   }
 
@@ -183,12 +155,7 @@ export class NodeImage {
     // URL source with optional SVG tinting
     const shouldTint = !!this._options.strokeColor || !!this._options.fillColor;
     if (shouldTint && source.toLowerCase().endsWith('.svg')) {
-      let svgPromise = svgTextCache.get(source);
-      if (!svgPromise) {
-        svgPromise = fetch(source).then((r) => (r.ok ? r.text() : ''));
-        svgTextCache.set(source, svgPromise);
-      }
-      const svgText = await svgPromise;
+      const svgText = await fetchSvgText(source);
       if (version !== this._sourceVersion) return;
       if (svgText) {
         const tinted = tintSvg(svgText, this._options.strokeColor, this._options.fillColor);

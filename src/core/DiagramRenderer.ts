@@ -4,15 +4,17 @@ import type { Node } from '@/elements/Node';
 import type { Edge } from '@/elements/Edge';
 import type { Group } from '@/elements/Group';
 import type { PathObstacle } from '@/elements/paths';
-import type { Bounds, DiagramOptions, Point, ScrollbarOptions, ViewportState } from '@/types';
+import type { Bounds, DiagramOptions, Point, ViewportState } from '@/types';
 import { InteractionManager } from './InteractionManager';
 import type { InteractionManagerOptions } from './InteractionManager';
-import { ANCHOR_PORT_PREFIX } from '@/constants';
-import { drawRoundedRectPath } from '@/utils/geometry';
 import { applyStyleManagerToElements } from '@/utils/style';
 import { getContentBounds } from '@/utils/contentBounds';
 import { AnimationManager } from './AnimationManager';
 import { ContextMenuManager } from './ContextMenuManager';
+import { EdgeEndpointUpdater } from './EdgeEndpointUpdater';
+import { ScrollbarController } from './ScrollbarController';
+import type { ScrollbarAxis } from './ScrollbarController';
+import type { DiagramSurface, OverlayDragSession } from './DiagramSurface';
 
 /**
  * Events emitted by DiagramRenderer
@@ -27,7 +29,11 @@ export interface DiagramEvents {
   edgeAdd: [edge: Edge];
   edgeRemove: [edge: Edge];
   nodeBadgeClick: [nodeId: string, badgeId: string];
-  componentClick: [nodeId: string, component: import('@/elements/composite/CComponent').CComponent, point: Point];
+  componentClick: [
+    nodeId: string,
+    component: import('@/elements/composite/CComponent').CComponent,
+    point: Point,
+  ];
 }
 
 export interface DiagramPlugin {
@@ -35,22 +41,6 @@ export interface DiagramPlugin {
   install(renderer: DiagramRenderer): void;
   destroy?(renderer: DiagramRenderer): void;
 }
-
-const DEFAULT_SCROLLBAR_OPTIONS: ScrollbarOptions = {
-  enabled: true,
-  autoHide: false,
-  autoHideDelay: 1200,
-  fadeDuration: 220,
-  thickness: 6,
-  hoverThickness: 8,
-  minThumbLength: 24,
-  hitAreaPadding: 4,
-  pageScrollRatio: 0.8,
-  trackColor: '',
-  thumbColor: '',
-  thumbHoverColor: '',
-  thumbActiveColor: '',
-};
 
 const DEFAULT_OPTIONS: Required<Omit<DiagramOptions, 'scrollbar'>> = {
   width: 800,
@@ -80,43 +70,23 @@ interface OverlayDragPlugin extends DiagramPlugin {
 
 /** Оверлей, который перехватывает указатель в экранных координатах (миникарта и т.п.). */
 interface OverlayPointerBlocker extends DiagramPlugin {
-  blocksDiagramPointerAtScreen?(renderer: DiagramRenderer, screenX: number, screenY: number): boolean;
+  blocksDiagramPointerAtScreen?(
+    renderer: DiagramRenderer,
+    screenX: number,
+    screenY: number
+  ): boolean;
 }
 
-export interface OverlayDragSession {
-  plugin: OverlayDragPlugin;
-  payload: unknown;
-}
-
-type ScrollbarAxis = 'horizontal' | 'vertical';
-
-interface ScrollbarTrackMetrics {
-  trackX: number;
-  trackY: number;
-  trackLength: number;
-  thickness: number;
-  thumbLength: number;
-  thumbOffset: number;
-  maxScroll: number;
-}
-
-interface ScrollbarMetrics {
-  contentBounds: Bounds;
-  viewportBounds: Bounds;
-  thickness: number;
-  horizontal: ScrollbarTrackMetrics | null;
-  vertical: ScrollbarTrackMetrics | null;
-}
+export type { OverlayDragSession } from './DiagramSurface';
 
 /**
  * Main diagram renderer class
  * Manages canvas, coordinate system, and render loop
  */
-export class DiagramRenderer extends EventEmitter<DiagramEvents> {
+export class DiagramRenderer extends EventEmitter<DiagramEvents> implements DiagramSurface {
   private readonly canvas: HTMLCanvasElement;
   private readonly ctx: CanvasRenderingContext2D;
   private readonly options: Required<Omit<DiagramOptions, 'scrollbar'>>;
-  private readonly scrollbar: ScrollbarOptions;
   private plugins: DiagramPlugin[] = [];
   private styleManager?: StyleManager;
   private underlayRenderers = new Set<(ctx: CanvasRenderingContext2D) => void>();
@@ -126,11 +96,9 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
   private interactionManager: InteractionManager | null = null;
   private contextMenuManager: ContextMenuManager | null = null;
   private readonly animationManager: AnimationManager;
+  private readonly scrollbarController: ScrollbarController;
+  private readonly edgeEndpointUpdater: EdgeEndpointUpdater;
   private frameTime = 0;
-  private scrollbarHoveredAxis: ScrollbarAxis | null = null;
-  private scrollbarActiveAxis: ScrollbarAxis | null = null;
-  private scrollbarLastInteractionAt = 0;
-  private lastScrollbarAlpha = -1;
 
   private _zoom = 1;
   private _offsetX = 0;
@@ -167,7 +135,6 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
     super();
     this.canvas = this.resolveCanvas(canvas);
     this.options = { ...DEFAULT_OPTIONS, ...options };
-    this.scrollbar = this.resolveScrollbarOptions(options);
 
     const ctx = this.canvas.getContext('2d');
     if (ctx === null) {
@@ -178,7 +145,32 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
     this.devicePixelRatio = this.options.retina ? window.devicePixelRatio || 1 : 1;
     this._zoom = this.options.initialZoom;
     this.animationManager = new AnimationManager(this.options.animations);
-    this.scrollbarLastInteractionAt = performance.now();
+    this.scrollbarController = new ScrollbarController(
+      {
+        getWidth: (): number => this.width,
+        getHeight: (): number => this.height,
+        getZoom: (): number => this.zoom,
+        getOffsetX: (): number => this.offsetX,
+        setOffsetX: (value: number): void => {
+          this.offsetX = value;
+        },
+        getOffsetY: (): number => this.offsetY,
+        setOffsetY: (value: number): void => {
+          this.offsetY = value;
+        },
+        getPixelRatio: (): number => this.pixelRatio,
+        markDirty: (): void => this.markDirty(),
+        screenToCanvas: (x, y): Point | null => this.screenToCanvas(x, y),
+        getContentBounds: (): Bounds | null => this.getContentBounds(),
+        isDarkTheme: (): boolean => this.styleManager?.theme.name === 'dark',
+      },
+      options
+    );
+    this.edgeEndpointUpdater = new EdgeEndpointUpdater({
+      getNodes: (): ReadonlyMap<string, Node> => this.nodes,
+      getEdges: (): ReadonlyMap<string, Edge> => this.edges,
+      getNodeObstacles: (): PathObstacle[] => this.getNodeObstacles(),
+    });
 
     this.setupCanvas();
     this.startRenderLoop();
@@ -195,7 +187,7 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
     const clampedZoom = Math.max(this.options.minZoom, Math.min(this.options.maxZoom, value));
     if (this._zoom !== clampedZoom) {
       this._zoom = clampedZoom;
-      this.scrollbarLastInteractionAt = performance.now();
+      this.scrollbarController.notifyInteraction();
       this.markDirty();
       this.emit('zoom', clampedZoom);
     }
@@ -211,7 +203,7 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
   set offsetX(value: number) {
     if (this._offsetX !== value) {
       this._offsetX = value;
-      this.scrollbarLastInteractionAt = performance.now();
+      this.scrollbarController.notifyInteraction();
       this.markDirty();
       this.emit('pan', this._offsetX, this._offsetY);
     }
@@ -227,7 +219,7 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
   set offsetY(value: number) {
     if (this._offsetY !== value) {
       this._offsetY = value;
-      this.scrollbarLastInteractionAt = performance.now();
+      this.scrollbarController.notifyInteraction();
       this.markDirty();
       this.emit('pan', this._offsetX, this._offsetY);
     }
@@ -697,7 +689,11 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
    * Элемент в точке worldPoint, если курсор (screen) не над оверлеем вроде миникарты.
    * Иначе undefined — взаимодействие как с пустым местом (стрелка под миникартой не выделяется).
    */
-  getInteractableElementAtPoint(worldPoint: Point, screenX: number, screenY: number): Node | Edge | Group | undefined {
+  getInteractableElementAtPoint(
+    worldPoint: Point,
+    screenX: number,
+    screenY: number
+  ): Node | Edge | Group | undefined {
     if (this.blocksDiagramPointerAtScreen(screenX, screenY)) {
       return undefined;
     }
@@ -841,12 +837,8 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
       if (animationChanged || this.animationManager.hasActive()) {
         this._dirty = true;
       }
-      if (this.scrollbar.enabled && this.scrollbar.autoHide) {
-        const alpha = this.getScrollbarAlpha(now);
-        if (Math.abs(alpha - this.lastScrollbarAlpha) > 0.001) {
-          this._dirty = true;
-          this.lastScrollbarAlpha = alpha;
-        }
+      if (this.scrollbarController.updateAnimation(now)) {
+        this._dirty = true;
       }
 
       // Invalidate cached canvas rect every frame so that screenToWorld /
@@ -911,7 +903,7 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
     }
 
     // Sync edge endpoints with node positions
-    this.updateEdgeEndpoints();
+    this.edgeEndpointUpdater.updateAll();
 
     // Render nodes (middle layer)
     for (const node of this._nodes.values()) {
@@ -944,7 +936,7 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
       topOverlay(ctx);
     }
 
-    this.renderScrollbars(ctx);
+    this.scrollbarController.render(ctx, this.frameTime);
     this.emit('render');
   }
 
@@ -988,128 +980,7 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
    * Called during drag to keep control points in sync
    */
   updateEdgeEndpointsForDrag(): void {
-    for (const edge of this._edges.values()) {
-      if (!edge.autoUpdateEndpoints) {
-        continue;
-      }
-
-      const fromNode = this._nodes.get(edge.from.nodeId);
-      const toNode = this._nodes.get(edge.to.nodeId);
-      if (fromNode === undefined || toNode === undefined) {
-        continue;
-      }
-
-      let fromPoint: Point;
-      let toPoint: Point;
-      let fromDir: string | undefined;
-      let toDir: string | undefined;
-
-      if (edge.from.portId) {
-        const anchorId = edge.from.portId.slice(ANCHOR_PORT_PREFIX.length);
-        const anchorPoint = fromNode.getAnchorPointById(anchorId);
-        if (anchorPoint) {
-          fromPoint = anchorPoint;
-          fromDir = anchorId.split(':')[0];
-        } else {
-          fromPoint = fromNode.getCenter();
-        }
-      } else if (edge.from.outlineParam !== undefined) {
-        fromPoint = fromNode.getConnectionPointAtOutlineParam(edge.from.outlineParam);
-        fromDir = this.getDirectionFromOutlineParam(edge.from.outlineParam);
-      } else {
-        fromPoint = fromNode.getCenter();
-      }
-
-      if (edge.to.portId) {
-        const anchorId = edge.to.portId.slice(ANCHOR_PORT_PREFIX.length);
-        const anchorPoint = toNode.getAnchorPointById(anchorId);
-        if (anchorPoint) {
-          toPoint = anchorPoint;
-          toDir = anchorId.split(':')[0];
-        } else {
-          toPoint = toNode.getCenter();
-        }
-      } else if (edge.to.outlineParam !== undefined) {
-        toPoint = toNode.getConnectionPointAtOutlineParam(edge.to.outlineParam);
-        toDir = this.getDirectionFromOutlineParam(edge.to.outlineParam);
-      } else {
-        toPoint = toNode.getCenter();
-      }
-
-      edge.updateEndpoints(fromPoint, toPoint, fromDir, toDir);
-    }
-  }
-
-  private updateEdgeEndpoints(): void {
-    const obstacles = this.getNodeObstacles();
-
-    for (const edge of this._edges.values()) {
-      if (!edge.autoUpdateEndpoints) {
-        continue;
-      }
-
-      const fromNode = this._nodes.get(edge.from.nodeId);
-      const toNode = this._nodes.get(edge.to.nodeId);
-      if (fromNode === undefined || toNode === undefined) {
-        continue;
-      }
-
-      if (edge.lockAnchors && edge.from.outlineParam === undefined) {
-        if (!edge.from.portId) {
-          const anchor = fromNode.getNearestAnchor(toNode.getCenter());
-          if (anchor) {
-            edge.from = { ...edge.from, portId: `${ANCHOR_PORT_PREFIX}${anchor.id}` };
-          }
-        }
-      }
-      if (edge.lockAnchors && edge.to.outlineParam === undefined) {
-        if (!edge.to.portId) {
-          const anchor = toNode.getNearestAnchor(fromNode.getCenter());
-          if (anchor) {
-            edge.to = { ...edge.to, portId: `${ANCHOR_PORT_PREFIX}${anchor.id}` };
-          }
-        }
-      }
-
-      let fromPoint: Point;
-      let toPoint: Point;
-      let fromDir: string | undefined;
-      let toDir: string | undefined;
-
-      if (edge.from.portId) {
-        const anchorId = edge.from.portId.slice(ANCHOR_PORT_PREFIX.length);
-        const anchorPoint = fromNode.getAnchorPointById(anchorId);
-        if (anchorPoint) {
-          fromPoint = anchorPoint;
-          fromDir = anchorId.split(':')[0];
-        } else {
-          fromPoint = fromNode.getCenter();
-        }
-      } else if (edge.from.outlineParam !== undefined) {
-        fromPoint = fromNode.getConnectionPointAtOutlineParam(edge.from.outlineParam);
-        fromDir = this.getDirectionFromOutlineParam(edge.from.outlineParam);
-      } else {
-        fromPoint = fromNode.getCenter();
-      }
-
-      if (edge.to.portId) {
-        const anchorId = edge.to.portId.slice(ANCHOR_PORT_PREFIX.length);
-        const anchorPoint = toNode.getAnchorPointById(anchorId);
-        if (anchorPoint) {
-          toPoint = anchorPoint;
-          toDir = anchorId.split(':')[0];
-        } else {
-          toPoint = toNode.getCenter();
-        }
-      } else if (edge.to.outlineParam !== undefined) {
-        toPoint = toNode.getConnectionPointAtOutlineParam(edge.to.outlineParam);
-        toDir = this.getDirectionFromOutlineParam(edge.to.outlineParam);
-      } else {
-        toPoint = toNode.getCenter();
-      }
-
-      edge.updateEndpoints(fromPoint, toPoint, fromDir, toDir, { obstacles });
-    }
+    this.edgeEndpointUpdater.updateForDrag();
   }
 
   private getNodeObstacles(): PathObstacle[] {
@@ -1128,106 +999,6 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
     return this._nodeObstaclesCache;
   }
 
-  private getDirectionFromOutlineParam(param: number): string {
-    const p = ((param % 1) + 1) % 1;
-    if (p < 0.25) return 'top';
-    if (p < 0.5) return 'right';
-    if (p < 0.75) return 'bottom';
-    return 'left';
-  }
-
-  private renderScrollbars(ctx: CanvasRenderingContext2D): void {
-    const metrics = this.getScrollbarMetrics();
-    if (!metrics) {
-      return;
-    }
-
-    const alpha = this.getScrollbarAlpha(this.frameTime);
-    this.lastScrollbarAlpha = alpha;
-    if (alpha <= 0.001) {
-      return;
-    }
-
-    const colors = this.resolveScrollbarColors();
-    const drawRoundedRect = (x: number, y: number, w: number, h: number, r: number): void => {
-      drawRoundedRectPath(ctx, x, y, w, h, r);
-    };
-
-    ctx.save();
-    ctx.setTransform(this.devicePixelRatio, 0, 0, this.devicePixelRatio, 0, 0);
-    ctx.globalAlpha = alpha;
-
-    if (metrics.horizontal) {
-      const isHovered = this.scrollbarHoveredAxis === 'horizontal';
-      const isActive = this.scrollbarActiveAxis === 'horizontal';
-      const thickness =
-        isHovered || isActive ? this.scrollbar.hoverThickness : this.scrollbar.thickness;
-      const trackY = metrics.horizontal.trackY + (metrics.horizontal.thickness - thickness) / 2;
-      const radius = thickness / 2;
-      const thumbColor = isActive
-        ? colors.thumbActive
-        : isHovered
-          ? colors.thumbHover
-          : colors.thumb;
-
-      ctx.fillStyle = colors.track;
-      drawRoundedRect(
-        metrics.horizontal.trackX,
-        trackY,
-        metrics.horizontal.trackLength,
-        thickness,
-        radius
-      );
-      ctx.fill();
-
-      ctx.fillStyle = thumbColor;
-      drawRoundedRect(
-        metrics.horizontal.trackX + metrics.horizontal.thumbOffset,
-        trackY,
-        metrics.horizontal.thumbLength,
-        thickness,
-        radius
-      );
-      ctx.fill();
-    }
-
-    if (metrics.vertical) {
-      const isHovered = this.scrollbarHoveredAxis === 'vertical';
-      const isActive = this.scrollbarActiveAxis === 'vertical';
-      const thickness =
-        isHovered || isActive ? this.scrollbar.hoverThickness : this.scrollbar.thickness;
-      const trackX = metrics.vertical.trackX + (metrics.vertical.thickness - thickness) / 2;
-      const radius = thickness / 2;
-      const thumbColor = isActive
-        ? colors.thumbActive
-        : isHovered
-          ? colors.thumbHover
-          : colors.thumb;
-
-      ctx.fillStyle = colors.track;
-      drawRoundedRect(
-        trackX,
-        metrics.vertical.trackY,
-        thickness,
-        metrics.vertical.trackLength,
-        radius
-      );
-      ctx.fill();
-
-      ctx.fillStyle = thumbColor;
-      drawRoundedRect(
-        trackX,
-        metrics.vertical.trackY + metrics.vertical.thumbOffset,
-        thickness,
-        metrics.vertical.thumbLength,
-        radius
-      );
-      ctx.fill();
-    }
-
-    ctx.restore();
-  }
-
   private getContentBounds(): Bounds | null {
     return getContentBounds({
       nodes: this._nodes.values(),
@@ -1236,99 +1007,27 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
     });
   }
 
-  private getViewportBounds(): Bounds {
-    return {
-      x: -this._offsetX / this._zoom,
-      y: -this._offsetY / this._zoom,
-      width: this.options.width / this._zoom,
-      height: this.options.height / this._zoom,
-    };
-  }
-
   notifyScrollbarInteraction(): void {
-    this.scrollbarLastInteractionAt = performance.now();
-    this.markDirty();
+    this.scrollbarController.notifyInteraction();
   }
 
   setScrollbarActiveAxis(axis: ScrollbarAxis | null): void {
-    if (this.scrollbarActiveAxis === axis) {
-      return;
-    }
-    this.scrollbarActiveAxis = axis;
-    if (axis !== null) {
-      this.notifyScrollbarInteraction();
-    } else {
-      this.markDirty();
-    }
+    this.scrollbarController.setActiveAxis(axis);
   }
 
   updateScrollbarHover(screenX: number, screenY: number): boolean {
-    const axis = this.hitTestScrollbarArea(screenX, screenY);
-    if (this.scrollbarHoveredAxis !== axis) {
-      this.scrollbarHoveredAxis = axis;
-      this.markDirty();
-      if (axis !== null) {
-        this.notifyScrollbarInteraction();
-      }
-    }
-    return axis !== null;
+    return this.scrollbarController.updateHover(screenX, screenY);
   }
 
   clearScrollbarHover(): void {
-    if (this.scrollbarHoveredAxis !== null) {
-      this.scrollbarHoveredAxis = null;
-      this.markDirty();
-    }
+    this.scrollbarController.clearHover();
   }
 
   hitTestScrollbarThumb(
     screenX: number,
     screenY: number
   ): { axis: ScrollbarAxis; pointerOffset: number } | null {
-    const metrics = this.getScrollbarMetrics();
-    if (!metrics) {
-      return null;
-    }
-
-    const localPoint = this.screenToCanvas(screenX, screenY);
-    if (!localPoint) {
-      return null;
-    }
-
-    const { x, y } = localPoint;
-    const hitPadding = this.scrollbar.hitAreaPadding;
-
-    if (metrics.horizontal) {
-      const thumbStartX = metrics.horizontal.trackX + metrics.horizontal.thumbOffset;
-      if (
-        x >= thumbStartX - hitPadding &&
-        x <= thumbStartX + metrics.horizontal.thumbLength + hitPadding &&
-        y >= metrics.horizontal.trackY - hitPadding &&
-        y <= metrics.horizontal.trackY + metrics.horizontal.thickness + hitPadding
-      ) {
-        return {
-          axis: 'horizontal',
-          pointerOffset: x - thumbStartX,
-        };
-      }
-    }
-
-    if (metrics.vertical) {
-      const thumbStartY = metrics.vertical.trackY + metrics.vertical.thumbOffset;
-      if (
-        x >= metrics.vertical.trackX - hitPadding &&
-        x <= metrics.vertical.trackX + metrics.vertical.thickness + hitPadding &&
-        y >= thumbStartY - hitPadding &&
-        y <= thumbStartY + metrics.vertical.thumbLength + hitPadding
-      ) {
-        return {
-          axis: 'vertical',
-          pointerOffset: y - thumbStartY,
-        };
-      }
-    }
-
-    return null;
+    return this.scrollbarController.hitTestThumb(screenX, screenY);
   }
 
   dragScrollbarThumb(
@@ -1337,175 +1036,23 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
     screenY: number,
     pointerOffset: number
   ): boolean {
-    const metrics = this.getScrollbarMetrics();
-    if (!metrics) {
-      return false;
-    }
-
-    const localPoint = this.screenToCanvas(screenX, screenY);
-    if (!localPoint) {
-      return false;
-    }
-
-    if (axis === 'horizontal' && metrics.horizontal) {
-      const travel = Math.max(0, metrics.horizontal.trackLength - metrics.horizontal.thumbLength);
-      const desiredThumbOffset = localPoint.x - metrics.horizontal.trackX - pointerOffset;
-      const clampedThumbOffset = Math.min(Math.max(desiredThumbOffset, 0), travel);
-      const scrollX =
-        travel > 0 && metrics.horizontal.maxScroll > 0
-          ? (clampedThumbOffset / travel) * metrics.horizontal.maxScroll
-          : 0;
-      const viewportX = metrics.contentBounds.x + scrollX;
-      this.offsetX = -viewportX * this._zoom;
-      this.notifyScrollbarInteraction();
-      return true;
-    }
-
-    if (axis === 'vertical' && metrics.vertical) {
-      const travel = Math.max(0, metrics.vertical.trackLength - metrics.vertical.thumbLength);
-      const desiredThumbOffset = localPoint.y - metrics.vertical.trackY - pointerOffset;
-      const clampedThumbOffset = Math.min(Math.max(desiredThumbOffset, 0), travel);
-      const scrollY =
-        travel > 0 && metrics.vertical.maxScroll > 0
-          ? (clampedThumbOffset / travel) * metrics.vertical.maxScroll
-          : 0;
-      const viewportY = metrics.contentBounds.y + scrollY;
-      this.offsetY = -viewportY * this._zoom;
-      this.notifyScrollbarInteraction();
-      return true;
-    }
-
-    return false;
+    return this.scrollbarController.dragThumb(axis, screenX, screenY, pointerOffset);
   }
 
   clickScrollbarTrack(screenX: number, screenY: number): boolean {
-    const metrics = this.getScrollbarMetrics();
-    if (!metrics) {
-      return false;
-    }
-    const localPoint = this.screenToCanvas(screenX, screenY);
-    if (!localPoint) {
-      return false;
-    }
-
-    if (metrics.horizontal) {
-      const { trackX, trackY, trackLength, thumbOffset, thumbLength, maxScroll } =
-        metrics.horizontal;
-      const inTrack =
-        localPoint.x >= trackX &&
-        localPoint.x <= trackX + trackLength &&
-        localPoint.y >= trackY &&
-        localPoint.y <= trackY + metrics.horizontal.thickness;
-      if (inTrack) {
-        const thumbStart = trackX + thumbOffset;
-        const thumbEnd = thumbStart + thumbLength;
-        if (localPoint.x < thumbStart || localPoint.x > thumbEnd) {
-          const direction = localPoint.x < thumbStart ? -1 : 1;
-          const step = metrics.viewportBounds.width * this.scrollbar.pageScrollRatio * direction;
-          const currentScrollX = Math.min(
-            Math.max(metrics.viewportBounds.x - metrics.contentBounds.x, 0),
-            maxScroll
-          );
-          const nextScrollX = Math.min(Math.max(currentScrollX + step, 0), maxScroll);
-          const viewportX = metrics.contentBounds.x + nextScrollX;
-          this.offsetX = -viewportX * this.zoom;
-          this.notifyScrollbarInteraction();
-          return true;
-        }
-      }
-    }
-
-    if (metrics.vertical) {
-      const { trackX, trackY, trackLength, thumbOffset, thumbLength, maxScroll } = metrics.vertical;
-      const inTrack =
-        localPoint.x >= trackX &&
-        localPoint.x <= trackX + metrics.vertical.thickness &&
-        localPoint.y >= trackY &&
-        localPoint.y <= trackY + trackLength;
-      if (inTrack) {
-        const thumbStart = trackY + thumbOffset;
-        const thumbEnd = thumbStart + thumbLength;
-        if (localPoint.y < thumbStart || localPoint.y > thumbEnd) {
-          const direction = localPoint.y < thumbStart ? -1 : 1;
-          const step = metrics.viewportBounds.height * this.scrollbar.pageScrollRatio * direction;
-          const currentScrollY = Math.min(
-            Math.max(metrics.viewportBounds.y - metrics.contentBounds.y, 0),
-            maxScroll
-          );
-          const nextScrollY = Math.min(Math.max(currentScrollY + step, 0), maxScroll);
-          const viewportY = metrics.contentBounds.y + nextScrollY;
-          this.offsetY = -viewportY * this.zoom;
-          this.notifyScrollbarInteraction();
-          return true;
-        }
-      }
-    }
-
-    return false;
+    return this.scrollbarController.clickTrack(screenX, screenY);
   }
 
   scrollViewportBy(screenDx: number, screenDy: number): boolean {
-    const scrollState = this.getScrollState();
-    if (!scrollState) {
-      return false;
-    }
-    const worldDx = screenDx / this.zoom;
-    const worldDy = screenDy / this.zoom;
-    const currentViewportX = scrollState.viewportBounds.x;
-    const currentViewportY = scrollState.viewportBounds.y;
-    const maxScrollX = Math.max(
-      0,
-      scrollState.contentBounds.width - scrollState.viewportBounds.width
-    );
-    const maxScrollY = Math.max(
-      0,
-      scrollState.contentBounds.height - scrollState.viewportBounds.height
-    );
-    const nextViewportX = Math.min(
-      Math.max(currentViewportX + worldDx, scrollState.contentBounds.x),
-      scrollState.contentBounds.x + maxScrollX
-    );
-    const nextViewportY = Math.min(
-      Math.max(currentViewportY + worldDy, scrollState.contentBounds.y),
-      scrollState.contentBounds.y + maxScrollY
-    );
-
-    this.offsetX = -nextViewportX * this.zoom;
-    this.offsetY = -nextViewportY * this.zoom;
-    this.notifyScrollbarInteraction();
-    return true;
+    return this.scrollbarController.scrollBy(screenDx, screenDy);
   }
 
   scrollViewportToStart(): boolean {
-    const scrollState = this.getScrollState();
-    if (!scrollState) {
-      return false;
-    }
-    this.offsetX = -scrollState.contentBounds.x * this.zoom;
-    this.offsetY = -scrollState.contentBounds.y * this.zoom;
-    this.notifyScrollbarInteraction();
-    return true;
+    return this.scrollbarController.scrollToStart();
   }
 
   scrollViewportToEnd(): boolean {
-    const scrollState = this.getScrollState();
-    if (!scrollState) {
-      return false;
-    }
-    const maxScrollX = Math.max(
-      0,
-      scrollState.contentBounds.width - scrollState.viewportBounds.width
-    );
-    const maxScrollY = Math.max(
-      0,
-      scrollState.contentBounds.height - scrollState.viewportBounds.height
-    );
-    const targetViewportX = scrollState.contentBounds.x + maxScrollX;
-    const targetViewportY = scrollState.contentBounds.y + maxScrollY;
-    this.offsetX = -targetViewportX * this.zoom;
-    this.offsetY = -targetViewportY * this.zoom;
-    this.notifyScrollbarInteraction();
-    return true;
+    return this.scrollbarController.scrollToEnd();
   }
 
   beginOverlayDrag(screenX: number, screenY: number): OverlayDragSession | null {
@@ -1536,11 +1083,13 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
   }
 
   updateOverlayDrag(session: OverlayDragSession, screenX: number, screenY: number): boolean {
-    return session.plugin.updateOverlayDrag?.(this, screenX, screenY, session.payload) ?? false;
+    const plugin = session.plugin as OverlayDragPlugin;
+    return plugin.updateOverlayDrag?.(this, screenX, screenY, session.payload) ?? false;
   }
 
   endOverlayDrag(session: OverlayDragSession): void {
-    session.plugin.endOverlayDrag?.(this, session.payload);
+    const plugin = session.plugin as OverlayDragPlugin;
+    plugin.endOverlayDrag?.(this, session.payload);
   }
 
   screenToCanvas(screenX: number, screenY: number): Point | null {
@@ -1554,250 +1103,6 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> {
     return {
       x: (screenX - rect.left) / scaleX,
       y: (screenY - rect.top) / scaleY,
-    };
-  }
-
-  private getScrollbarMetrics(): ScrollbarMetrics | null {
-    if (!this.scrollbar.enabled) {
-      return null;
-    }
-
-    const rawContentBounds = this.getContentBounds();
-    if (!rawContentBounds) {
-      return null;
-    }
-
-    const viewportBounds = this.getViewportBounds();
-    const unionMinX = Math.min(rawContentBounds.x, viewportBounds.x);
-    const unionMinY = Math.min(rawContentBounds.y, viewportBounds.y);
-    const unionMaxX = Math.max(
-      rawContentBounds.x + rawContentBounds.width,
-      viewportBounds.x + viewportBounds.width
-    );
-    const unionMaxY = Math.max(
-      rawContentBounds.y + rawContentBounds.height,
-      viewportBounds.y + viewportBounds.height
-    );
-    const contentBounds = {
-      x: unionMinX,
-      y: unionMinY,
-      width: unionMaxX - unionMinX,
-      height: unionMaxY - unionMinY,
-    };
-
-    const contentWidth = Math.max(contentBounds.width, 1);
-    const contentHeight = Math.max(contentBounds.height, 1);
-    const showHorizontal = contentWidth > viewportBounds.width + 0.01;
-    const showVertical = contentHeight > viewportBounds.height + 0.01;
-    if (!showHorizontal && !showVertical) {
-      return null;
-    }
-
-    const { width, height } = this.options;
-    const padding = 6;
-    const thickness = this.scrollbar.thickness;
-    const spacing = 4;
-    const minThumbLength = this.scrollbar.minThumbLength;
-
-    const availableWidth = width - padding * 2;
-    const availableHeight = height - padding * 2;
-    if (availableWidth <= 0 || availableHeight <= 0) {
-      return null;
-    }
-
-    const horizontalTrackLength = Math.max(
-      0,
-      availableWidth - (showVertical ? thickness + spacing : 0)
-    );
-    const verticalTrackLength = Math.max(
-      0,
-      availableHeight - (showHorizontal ? thickness + spacing : 0)
-    );
-
-    const horizontalTrackX = padding;
-    const horizontalTrackY = height - padding - thickness;
-    const verticalTrackX = width - padding - thickness;
-    const verticalTrackY = padding;
-
-    let horizontal: ScrollbarTrackMetrics | null = null;
-    if (showHorizontal && horizontalTrackLength > 0) {
-      const maxScrollX = Math.max(0, contentWidth - viewportBounds.width);
-      const scrollX = Math.min(Math.max(viewportBounds.x - contentBounds.x, 0), maxScrollX);
-      const ratioX = viewportBounds.width / contentWidth;
-      const thumbLength = Math.min(
-        horizontalTrackLength,
-        Math.max(minThumbLength, horizontalTrackLength * ratioX)
-      );
-      const travel = Math.max(0, horizontalTrackLength - thumbLength);
-      const thumbOffset = maxScrollX > 0 ? (scrollX / maxScrollX) * travel : 0;
-      horizontal = {
-        trackX: horizontalTrackX,
-        trackY: horizontalTrackY,
-        trackLength: horizontalTrackLength,
-        thickness,
-        thumbLength,
-        thumbOffset,
-        maxScroll: maxScrollX,
-      };
-    }
-
-    let vertical: ScrollbarTrackMetrics | null = null;
-    if (showVertical && verticalTrackLength > 0) {
-      const maxScrollY = Math.max(0, contentHeight - viewportBounds.height);
-      const scrollY = Math.min(Math.max(viewportBounds.y - contentBounds.y, 0), maxScrollY);
-      const ratioY = viewportBounds.height / contentHeight;
-      const thumbLength = Math.min(
-        verticalTrackLength,
-        Math.max(minThumbLength, verticalTrackLength * ratioY)
-      );
-      const travel = Math.max(0, verticalTrackLength - thumbLength);
-      const thumbOffset = maxScrollY > 0 ? (scrollY / maxScrollY) * travel : 0;
-      vertical = {
-        trackX: verticalTrackX,
-        trackY: verticalTrackY,
-        trackLength: verticalTrackLength,
-        thickness,
-        thumbLength,
-        thumbOffset,
-        maxScroll: maxScrollY,
-      };
-    }
-
-    if (!horizontal && !vertical) {
-      return null;
-    }
-
-    return {
-      contentBounds,
-      viewportBounds,
-      thickness: this.scrollbar.thickness,
-      horizontal,
-      vertical,
-    };
-  }
-
-  private resolveScrollbarOptions(options: DiagramOptions): ScrollbarOptions {
-    const fallbackEnabled = options.scrollbarOverlay ?? DEFAULT_SCROLLBAR_OPTIONS.enabled;
-    const resolved: ScrollbarOptions = {
-      ...DEFAULT_SCROLLBAR_OPTIONS,
-      enabled: fallbackEnabled,
-    };
-    if (typeof options.scrollbar === 'boolean') {
-      resolved.enabled = options.scrollbar;
-      return resolved;
-    }
-    if (options.scrollbar) {
-      return { ...resolved, ...options.scrollbar };
-    }
-    return resolved;
-  }
-
-  private resolveScrollbarColors(): {
-    track: string;
-    thumb: string;
-    thumbHover: string;
-    thumbActive: string;
-  } {
-    const isDarkTheme = this.styleManager?.theme.name === 'dark';
-    const fallback = isDarkTheme
-      ? {
-          track: 'rgba(148, 163, 184, 0.22)',
-          thumb: 'rgba(226, 232, 240, 0.68)',
-          thumbHover: 'rgba(226, 232, 240, 0.86)',
-          thumbActive: 'rgba(248, 250, 252, 0.96)',
-        }
-      : {
-          track: 'rgba(15, 23, 42, 0.16)',
-          thumb: 'rgba(51, 65, 85, 0.7)',
-          thumbHover: 'rgba(30, 41, 59, 0.82)',
-          thumbActive: 'rgba(15, 23, 42, 0.9)',
-        };
-
-    return {
-      track: this.scrollbar.trackColor || fallback.track,
-      thumb: this.scrollbar.thumbColor || fallback.thumb,
-      thumbHover: this.scrollbar.thumbHoverColor || fallback.thumbHover,
-      thumbActive: this.scrollbar.thumbActiveColor || fallback.thumbActive,
-    };
-  }
-
-  private getScrollbarAlpha(now: number): number {
-    if (!this.scrollbar.autoHide) {
-      return 1;
-    }
-    if (this.scrollbarActiveAxis !== null || this.scrollbarHoveredAxis !== null) {
-      return 1;
-    }
-    const elapsed = now - this.scrollbarLastInteractionAt;
-    if (elapsed <= this.scrollbar.autoHideDelay) {
-      return 1;
-    }
-    if (this.scrollbar.fadeDuration <= 0) {
-      return 0;
-    }
-    const fadeProgress = (elapsed - this.scrollbar.autoHideDelay) / this.scrollbar.fadeDuration;
-    return Math.max(0, 1 - fadeProgress);
-  }
-
-  private hitTestScrollbarArea(screenX: number, screenY: number): ScrollbarAxis | null {
-    const metrics = this.getScrollbarMetrics();
-    if (!metrics) {
-      return null;
-    }
-    const localPoint = this.screenToCanvas(screenX, screenY);
-    if (!localPoint) {
-      return null;
-    }
-    const hitPadding = this.scrollbar.hitAreaPadding;
-
-    if (metrics.horizontal) {
-      const inHorizontalTrack =
-        localPoint.x >= metrics.horizontal.trackX - hitPadding &&
-        localPoint.x <= metrics.horizontal.trackX + metrics.horizontal.trackLength + hitPadding &&
-        localPoint.y >= metrics.horizontal.trackY - hitPadding &&
-        localPoint.y <= metrics.horizontal.trackY + metrics.horizontal.thickness + hitPadding;
-      if (inHorizontalTrack) {
-        return 'horizontal';
-      }
-    }
-
-    if (metrics.vertical) {
-      const inVerticalTrack =
-        localPoint.x >= metrics.vertical.trackX - hitPadding &&
-        localPoint.x <= metrics.vertical.trackX + metrics.vertical.thickness + hitPadding &&
-        localPoint.y >= metrics.vertical.trackY - hitPadding &&
-        localPoint.y <= metrics.vertical.trackY + metrics.vertical.trackLength + hitPadding;
-      if (inVerticalTrack) {
-        return 'vertical';
-      }
-    }
-    return null;
-  }
-
-  private getScrollState(): { contentBounds: Bounds; viewportBounds: Bounds } | null {
-    const rawContentBounds = this.getContentBounds();
-    if (!rawContentBounds) {
-      return null;
-    }
-    const viewportBounds = this.getViewportBounds();
-    const unionMinX = Math.min(rawContentBounds.x, viewportBounds.x);
-    const unionMinY = Math.min(rawContentBounds.y, viewportBounds.y);
-    const unionMaxX = Math.max(
-      rawContentBounds.x + rawContentBounds.width,
-      viewportBounds.x + viewportBounds.width
-    );
-    const unionMaxY = Math.max(
-      rawContentBounds.y + rawContentBounds.height,
-      viewportBounds.y + viewportBounds.height
-    );
-    return {
-      contentBounds: {
-        x: unionMinX,
-        y: unionMinY,
-        width: unionMaxX - unionMinX,
-        height: unionMaxY - unionMinY,
-      },
-      viewportBounds,
     };
   }
 }

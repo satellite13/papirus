@@ -12,12 +12,7 @@ import type {
 } from '@/types';
 import type { StyleManager } from '@/styles/StyleManager';
 import { shallowEqual } from '@/utils/style';
-import {
-  bezierPoint,
-  drawRoundedRectPath,
-  segmentRectIntersections,
-  distance,
-} from '@/utils/geometry';
+import { bezierPoint, segmentRectIntersections, distance } from '@/utils/geometry';
 import {
   type PathStrategy,
   type PathStrategyOptions,
@@ -25,15 +20,14 @@ import {
   PolylinePathStrategy,
   BezierPathStrategy,
 } from './paths';
+import { EDGE_HANDLE_RADIUS, DEFAULT_SELECTION_COLOR, DEFAULT_HOVER_COLOR } from '@/constants';
+import { getCanvasMarkerLength, renderEdgeMarkers } from './edge/EdgeMarkerRenderer';
 import {
-  EDGE_HANDLE_RADIUS,
-  ARROW_SIZE,
-  ARROW_ANGLE,
-  MARKER_SIZES,
-  EDGE_LABEL_BACKGROUND_RADIUS,
-  DEFAULT_SELECTION_COLOR,
-  DEFAULT_HOVER_COLOR,
-} from '@/constants';
+  getEdgeLabelPosition,
+  getEdgeLabelRotation,
+  renderEdgeLabel,
+  type EdgeLabelLayoutOptions,
+} from './edge/EdgeLabelRenderer';
 
 export interface EdgeOptions {
   id?: string;
@@ -316,9 +310,10 @@ export class Edge extends Element {
    * Requires endpoints to be updated (startPoint/endPoint valid).
    */
   getPathVertices(): Point[] {
-    const cps = this._controlPoints && this._controlPoints.length > 0
-      ? this._controlPoints
-      : this.getEditableControlPoints();
+    const cps =
+      this._controlPoints && this._controlPoints.length > 0
+        ? this._controlPoints
+        : this.getEditableControlPoints();
     return [this._fromPoint, ...cps, this._toPoint];
   }
 
@@ -623,11 +618,11 @@ export class Edge extends Element {
     // Calculate how much to shorten the line at each end for markers
     const startOffset =
       this._startMarker && this._startMarker.type !== 'none'
-        ? this.getMarkerLength(this._startMarker)
+        ? getCanvasMarkerLength(this._startMarker)
         : 0;
     const endOffset =
       this._endMarker && this._endMarker.type !== 'none'
-        ? this.getMarkerLength(this._endMarker)
+        ? getCanvasMarkerLength(this._endMarker)
         : 0;
 
     // Helper to build a polyline representation of the path
@@ -886,487 +881,44 @@ export class Edge extends Element {
   }
 
   private renderArrows(ctx: CanvasRenderingContext2D): void {
-    const path = this._path;
-    if (path.length < 2) {
-      return;
-    }
-
-    // Use new marker system if configured, otherwise fall back to legacy arrowType
-    const hasNewMarkers = this._startMarker !== undefined || this._endMarker !== undefined;
-
-    if (hasNewMarkers) {
-      // End marker
-      if (this._endMarker && this._endMarker.type !== 'none') {
-        const points = this.getMarkerPoints('end');
-        if (points) {
-          this.drawMarker(ctx, points.from, points.to, this._endMarker);
-        }
-      }
-
-      // Start marker
-      if (this._startMarker && this._startMarker.type !== 'none') {
-        const points = this.getMarkerPoints('start');
-        if (points) {
-          this.drawMarker(ctx, points.from, points.to, this._startMarker);
-        }
-      }
-    } else {
-      // Legacy arrow type support
-      if (this._arrowType === 'none') {
-        return;
-      }
-
-      // Target arrow
-      const endPoints = this.getMarkerPoints('end');
-      if (endPoints) {
-        this.drawArrowHead(ctx, endPoints.from, endPoints.to);
-      }
-
-      // Source arrow (for double)
-      if (this._arrowType === 'double') {
-        const startPoints = this.getMarkerPoints('start');
-        if (startPoints) {
-          this.drawArrowHead(ctx, startPoints.from, startPoints.to);
-        }
-      }
-    }
-  }
-
-  private getMarkerPoints(position: 'start' | 'end'): { from: Point; to: Point } | null {
-    const path = this._path;
-    if (path.length < 2) {
-      return null;
-    }
-
-    if (this._type === 'bezier' && path.length >= 4) {
-      const start = path[0]!;
-      const cp1 = path[1]!;
-      const cp2 = path[2]!;
-      const end = path[3]!;
-      const epsilon = 0.001;
-
-      const isSame = (a: Point, b: Point): boolean =>
-        Math.abs(a.x - b.x) < epsilon && Math.abs(a.y - b.y) < epsilon;
-
-      if (position === 'end') {
-        const endIndex = path.length - 1;
-        const endPoint = path[endIndex]!;
-        let from = path[endIndex - 1] ?? cp2;
-        if (isSame(from, endPoint)) {
-          from = path[endIndex - 2] ?? cp1;
-          if (isSame(from, endPoint)) {
-            from = start;
-          }
-        }
-        return { from, to: endPoint };
-      }
-
-      let next = cp1;
-      if (isSame(next, start)) {
-        next = cp2;
-        if (isSame(next, start)) {
-          next = end;
-        }
-      }
-      return { from: next, to: start };
-    }
-
-    if (position === 'end') {
-      return { from: path[path.length - 2]!, to: path[path.length - 1]! };
-    }
-
-    return { from: path[1]!, to: path[0]! };
-  }
-
-  /**
-   * Get the length of a marker (how much to shorten the line)
-   */
-  private getMarkerLength(config: ArrowMarkerConfig): number {
-    const size = config.size ?? MARKER_SIZES[config.type] ?? ARROW_SIZE;
-    switch (config.type) {
-      case 'arrow':
-        // Arrow length is size * cos(ARROW_ANGLE) for the back of the triangle
-        return size * Math.cos(ARROW_ANGLE);
-      case 'open':
-        // Do not shorten line for open arrow
-        return 0;
-      case 'diamond':
-        return size; // Diamond length is full size
-      case 'circle':
-        return size * 2; // Circle diameter
-      case 'square':
-        return size * 2; // Square depth along edge (matches circle footprint)
-      default:
-        return 0;
-    }
-  }
-
-  private drawMarker(
-    ctx: CanvasRenderingContext2D,
-    from: Point,
-    to: Point,
-    config: ArrowMarkerConfig
-  ): void {
-    const angle = Math.atan2(to.y - from.y, to.x - from.x);
-    const size = config.size ?? MARKER_SIZES[config.type] ?? ARROW_SIZE;
-    const strokeColor = config.strokeColor ?? (ctx.strokeStyle as string);
-    const fillColor = config.fillColor ?? strokeColor;
-    const fillOpacity = config.fillOpacity ?? 1;
-
-    ctx.save();
-    ctx.setLineDash([]);
-    ctx.lineDashOffset = 0;
-    ctx.strokeStyle = strokeColor;
-
-    switch (config.type) {
-      case 'arrow':
-        this.drawArrowMarker(ctx, to, angle, size, fillColor, fillOpacity);
-        break;
-      case 'open':
-        this.drawOpenArrowMarker(ctx, to, angle, size);
-        break;
-      case 'diamond':
-        this.drawDiamondMarker(ctx, to, angle, size, fillColor, fillOpacity);
-        break;
-      case 'circle':
-        this.drawCircleMarker(ctx, to, angle, size, fillColor, fillOpacity);
-        break;
-      case 'square':
-        this.drawSquareMarker(ctx, to, angle, size, fillColor, fillOpacity);
-        break;
-    }
-
-    ctx.restore();
-  }
-
-  private drawArrowMarker(
-    ctx: CanvasRenderingContext2D,
-    to: Point,
-    angle: number,
-    size: number,
-    fillColor: string,
-    fillOpacity: number
-  ): void {
-    const x1 = to.x - size * Math.cos(angle - ARROW_ANGLE);
-    const y1 = to.y - size * Math.sin(angle - ARROW_ANGLE);
-    const x2 = to.x - size * Math.cos(angle + ARROW_ANGLE);
-    const y2 = to.y - size * Math.sin(angle + ARROW_ANGLE);
-
-    ctx.beginPath();
-    ctx.moveTo(to.x, to.y);
-    ctx.lineTo(x1, y1);
-    ctx.lineTo(x2, y2);
-    ctx.closePath();
-    ctx.globalAlpha = fillOpacity;
-    ctx.fillStyle = fillColor;
-    ctx.fill();
-    ctx.globalAlpha = 1;
-    ctx.stroke();
-  }
-
-  private drawOpenArrowMarker(
-    ctx: CanvasRenderingContext2D,
-    to: Point,
-    angle: number,
-    size: number
-  ): void {
-    const x1 = to.x - size * Math.cos(angle - ARROW_ANGLE);
-    const y1 = to.y - size * Math.sin(angle - ARROW_ANGLE);
-    const x2 = to.x - size * Math.cos(angle + ARROW_ANGLE);
-    const y2 = to.y - size * Math.sin(angle + ARROW_ANGLE);
-
-    ctx.beginPath();
-    ctx.moveTo(to.x, to.y);
-    ctx.lineTo(x1, y1);
-    ctx.moveTo(to.x, to.y);
-    ctx.lineTo(x2, y2);
-    ctx.stroke();
-  }
-
-  private drawDiamondMarker(
-    ctx: CanvasRenderingContext2D,
-    to: Point,
-    angle: number,
-    size: number,
-    fillColor: string,
-    fillOpacity: number
-  ): void {
-    const halfLength = size / 2;
-    const halfWidth = size * 0.3;
-    const cos = Math.cos(angle);
-    const sin = Math.sin(angle);
-
-    // Diamond points relative to the tip
-    const points = [
-      { x: to.x, y: to.y }, // tip
-      {
-        x: to.x - halfLength * cos + halfWidth * sin,
-        y: to.y - halfLength * sin - halfWidth * cos,
-      },
-      { x: to.x - size * cos, y: to.y - size * sin }, // back
-      {
-        x: to.x - halfLength * cos - halfWidth * sin,
-        y: to.y - halfLength * sin + halfWidth * cos,
-      },
-    ];
-
-    ctx.beginPath();
-    ctx.moveTo(points[0]!.x, points[0]!.y);
-    for (let i = 1; i < points.length; i++) {
-      ctx.lineTo(points[i]!.x, points[i]!.y);
-    }
-    ctx.closePath();
-
-    ctx.globalAlpha = fillOpacity;
-    ctx.fillStyle = fillColor;
-    ctx.fill();
-    ctx.globalAlpha = 1;
-    ctx.stroke();
-  }
-
-  private drawCircleMarker(
-    ctx: CanvasRenderingContext2D,
-    to: Point,
-    angle: number,
-    size: number,
-    fillColor: string,
-    fillOpacity: number
-  ): void {
-    // Offset circle center back along the path so it doesn't overlap node
-    const cx = to.x - size * Math.cos(angle);
-    const cy = to.y - size * Math.sin(angle);
-
-    ctx.beginPath();
-    ctx.arc(cx, cy, size, 0, Math.PI * 2);
-
-    ctx.globalAlpha = fillOpacity;
-    ctx.fillStyle = fillColor;
-    ctx.fill();
-    ctx.globalAlpha = 1;
-    ctx.stroke();
-  }
-
-  private drawSquareMarker(
-    ctx: CanvasRenderingContext2D,
-    to: Point,
-    angle: number,
-    size: number,
-    fillColor: string,
-    fillOpacity: number
-  ): void {
-    const cos = Math.cos(angle);
-    const sin = Math.sin(angle);
-    const px = -sin;
-    const py = cos;
-    const p1 = { x: to.x + size * px, y: to.y + size * py };
-    const p2 = { x: to.x - size * px, y: to.y - size * py };
-    const bx = 2 * size * cos;
-    const by = 2 * size * sin;
-    const p3 = { x: p2.x - bx, y: p2.y - by };
-    const p4 = { x: p1.x - bx, y: p1.y - by };
-
-    ctx.beginPath();
-    ctx.moveTo(p1.x, p1.y);
-    ctx.lineTo(p2.x, p2.y);
-    ctx.lineTo(p3.x, p3.y);
-    ctx.lineTo(p4.x, p4.y);
-    ctx.closePath();
-
-    ctx.globalAlpha = fillOpacity;
-    ctx.fillStyle = fillColor;
-    ctx.fill();
-    ctx.globalAlpha = 1;
-    ctx.stroke();
-  }
-
-  private drawArrowHead(ctx: CanvasRenderingContext2D, from: Point, to: Point): void {
-    const angle = Math.atan2(to.y - from.y, to.x - from.x);
-
-    ctx.save();
-    ctx.setLineDash([]);
-    ctx.lineDashOffset = 0;
-    ctx.beginPath();
-    ctx.moveTo(to.x, to.y);
-    ctx.lineTo(
-      to.x - ARROW_SIZE * Math.cos(angle - ARROW_ANGLE),
-      to.y - ARROW_SIZE * Math.sin(angle - ARROW_ANGLE)
-    );
-    ctx.moveTo(to.x, to.y);
-    ctx.lineTo(
-      to.x - ARROW_SIZE * Math.cos(angle + ARROW_ANGLE),
-      to.y - ARROW_SIZE * Math.sin(angle + ARROW_ANGLE)
-    );
-    ctx.stroke();
-    ctx.restore();
+    renderEdgeMarkers(ctx, {
+      path: this._path,
+      type: this._type,
+      arrowType: this._arrowType,
+      startMarker: this._startMarker,
+      endMarker: this._endMarker,
+    });
   }
 
   private renderLabel(ctx: CanvasRenderingContext2D): void {
-    if (this._label === undefined || this._path.length < 2) {
-      return;
-    }
-
-    const { point, angle: pathAngle } = this.getPathPointAt(this._labelPosition);
-    const rotation = this.getLabelRotation();
-    // Apply offset perpendicular to path direction
-    const perpAngle = this._labelFollowPath ? pathAngle + Math.PI / 2 : Math.PI / 2;
-    const labelCenter = {
-      x: point.x + this._labelOffset * Math.cos(perpAngle),
-      y: point.y + this._labelOffset * Math.sin(perpAngle),
-    };
-
-    const labelOpacity = this._label.style.opacity ?? 1;
-
-    this._label.measure(ctx);
-    const labelWidth = this._label.measuredWidth;
-    const labelHeight = this._label.measuredHeight;
-
-    const bgColor = this._labelBackground?.color ?? '#ffffff';
-    const bgOpacity = this._labelBackground?.opacity ?? 1;
-    const bgRadius = this._labelBackground?.borderRadius ?? EDGE_LABEL_BACKGROUND_RADIUS;
-
-    ctx.save();
-    if (rotation !== 0) {
-      ctx.translate(labelCenter.x, labelCenter.y);
-      ctx.rotate(rotation);
-      ctx.translate(-labelCenter.x, -labelCenter.y);
-    }
-
-    const bgX = labelCenter.x - labelWidth / 2;
-    const bgY = labelCenter.y - labelHeight / 2;
-
-    ctx.fillStyle = bgColor;
-    ctx.globalAlpha = bgOpacity;
-
-    if (bgRadius > 0) {
-      this.drawRoundedRect(ctx, bgX, bgY, labelWidth, labelHeight, bgRadius);
-      ctx.fill();
-    } else {
-      ctx.fillRect(bgX, bgY, labelWidth, labelHeight);
-    }
-
-    ctx.globalAlpha = labelOpacity;
-    this._label.renderAt(ctx, labelCenter);
-    ctx.globalAlpha = 1;
-    ctx.restore();
-  }
-
-  private drawRoundedRect(
-    ctx: CanvasRenderingContext2D,
-    x: number,
-    y: number,
-    width: number,
-    height: number,
-    radius: number
-  ): void {
-    drawRoundedRectPath(ctx, x, y, width, height, radius);
-  }
-
-  /**
-   * Get a point along the sampled path at parameter t (0..1).
-   * Also returns the tangent angle in radians at that point.
-   */
-  private getPathPointAt(t: number): { point: Point; angle: number } {
-    const path = this._path;
-    let samples: Point[];
-
-    if (this._type === 'bezier' && path.length >= 4) {
-      samples = [];
-      const steps = 20;
-      for (let i = 1; i + 2 < path.length; i += 3) {
-        const p0 = path[i - 1]!;
-        const p1 = path[i]!;
-        const p2 = path[i + 1]!;
-        const p3 = path[i + 2]!;
-        for (let s = 0; s <= steps; s++) {
-          const st = s / steps;
-          if (samples.length > 0 && st === 0) continue;
-          samples.push(bezierPoint(p0, p1, p2, p3, st));
-        }
-      }
-    } else {
-      samples = path;
-    }
-
-    return this.getPointAlongPolyline(samples, t);
+    renderEdgeLabel(ctx, {
+      ...this.getLabelLayoutOptions(),
+      label: this._label,
+      background: this._labelBackground,
+    });
   }
 
   /**
    * Get world position of label center along path.
    */
   getLabelPosition(): Point | null {
-    if (this._path.length < 2) {
-      return null;
-    }
-
-    const { point, angle: pathAngle } = this.getPathPointAt(this._labelPosition);
-    const perpAngle = this._labelFollowPath ? pathAngle + Math.PI / 2 : Math.PI / 2;
-    return {
-      x: point.x + this._labelOffset * Math.cos(perpAngle),
-      y: point.y + this._labelOffset * Math.sin(perpAngle),
-    };
+    return getEdgeLabelPosition(this.getLabelLayoutOptions());
   }
 
   /**
    * Get label rotation angle in radians (if labelFollowPath is true).
    */
   getLabelRotation(): number {
-    if (!this._labelFollowPath || this._path.length < 2) return 0;
-    const { angle } = this.getPathPointAt(this._labelPosition);
-    // Normalize: keep text readable (flip if pointing left)
-    let a = angle;
-    if (a > Math.PI / 2) a -= Math.PI;
-    if (a < -Math.PI / 2) a += Math.PI;
-    return a;
+    return getEdgeLabelRotation(this.getLabelLayoutOptions());
   }
 
-  /**
-   * Get point and tangent angle at parameter t along a polyline.
-   */
-  private getPointAlongPolyline(
-    path: Point[],
-    t: number,
-  ): { point: Point; angle: number } {
-    if (path.length === 0) {
-      return { point: { x: 0, y: 0 }, angle: 0 };
-    }
-    if (path.length === 1) {
-      return { point: path[0]!, angle: 0 };
-    }
-
-    let totalLength = 0;
-    const segments: { start: Point; end: Point; length: number }[] = [];
-
-    for (let i = 1; i < path.length; i++) {
-      const start = path[i - 1]!;
-      const end = path[i]!;
-      const length = Math.sqrt((end.x - start.x) ** 2 + (end.y - start.y) ** 2);
-      segments.push({ start, end, length });
-      totalLength += length;
-    }
-
-    const targetLength = totalLength * Math.max(0, Math.min(1, t));
-    let accumulated = 0;
-
-    for (const seg of segments) {
-      if (accumulated + seg.length >= targetLength) {
-        const segT = seg.length > 0 ? (targetLength - accumulated) / seg.length : 0;
-        const point = {
-          x: seg.start.x + segT * (seg.end.x - seg.start.x),
-          y: seg.start.y + segT * (seg.end.y - seg.start.y),
-        };
-        const angle = Math.atan2(seg.end.y - seg.start.y, seg.end.x - seg.start.x);
-        return { point, angle };
-      }
-      accumulated += seg.length;
-    }
-
-    const lastSeg = segments[segments.length - 1]!;
+  private getLabelLayoutOptions(): EdgeLabelLayoutOptions {
     return {
-      point: lastSeg.end,
-      angle: Math.atan2(
-        lastSeg.end.y - lastSeg.start.y,
-        lastSeg.end.x - lastSeg.start.x,
-      ),
+      path: this._path,
+      type: this._type,
+      position: this._labelPosition,
+      offset: this._labelOffset,
+      followPath: this._labelFollowPath,
     };
   }
 

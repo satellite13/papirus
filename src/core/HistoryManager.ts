@@ -1,5 +1,6 @@
 import { EventEmitter } from '@/events/EventEmitter';
 import type { Command } from '@/types';
+import { getHistoryShortcut } from '@/utils/keymap';
 
 /**
  * History events
@@ -118,20 +119,14 @@ export class HistoryManager extends EventEmitter<HistoryEvents> {
 
   /**
    * Handle keyboard shortcuts.
-   * Uses event.code for letter keys to work with any keyboard layout (e.g. Russian).
    */
   handleKeyDown(event: KeyboardEvent): boolean {
-    const isCtrlOrMeta = event.ctrlKey || event.metaKey;
-    const key = event.code.startsWith('Key')
-      ? event.code.slice(3).toLowerCase()
-      : event.key.toLowerCase();
-
-    if (isCtrlOrMeta && key === 'z' && !event.shiftKey) {
+    const shortcut = getHistoryShortcut(event);
+    if (shortcut === 'undo') {
       event.preventDefault();
       return this.undo();
     }
-
-    if (isCtrlOrMeta && (key === 'y' || (key === 'z' && event.shiftKey))) {
+    if (shortcut === 'redo') {
       event.preventDefault();
       return this.redo();
     }

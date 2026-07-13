@@ -1,6 +1,11 @@
 import { EventEmitter } from '@/events/EventEmitter';
-import type { DiagramRenderer } from './DiagramRenderer';
-import type { InputEvent, WheelInputEvent, PanInputEvent, PinchInputEvent } from '@/events/InputHandler';
+import type { DiagramSurface } from './DiagramSurface';
+import type {
+  InputEvent,
+  WheelInputEvent,
+  PanInputEvent,
+  PinchInputEvent,
+} from '@/events/InputHandler';
 import type { Bounds, Point } from '@/types';
 import { getContentBounds } from '@/utils/contentBounds';
 
@@ -15,7 +20,7 @@ export interface NavigationEvents {
 }
 
 export interface NavigationManagerOptions {
-  renderer: DiagramRenderer;
+  renderer: DiagramSurface;
   zoomSensitivity?: number;
   panButton?: number;
 }
@@ -24,7 +29,7 @@ export interface NavigationManagerOptions {
  * Manages canvas panning and zooming
  */
 export class NavigationManager extends EventEmitter<NavigationEvents> {
-  private renderer: DiagramRenderer;
+  private renderer: DiagramSurface;
   private readonly zoomSensitivity: number;
   private readonly panButton: number;
 

@@ -71,11 +71,13 @@ export interface CComponent {
   /** Render the component within the given bounds (computed by layout). */
   render(ctx: CanvasRenderingContext2D, bounds: Bounds): void;
 
-  /**
-   * Hit test a point against this component's assigned bounds.
+  /** Hit test a point against this component's assigned bounds.
    * Returns the deepest matching component, or null if not hit.
    */
   hitTest(point: { x: number; y: number }, bounds: Bounds): CComponent | null;
+
+  /** Optional click handler invoked by InteractionManager. */
+  onClick?: (component: CComponent) => void;
 
   /** Set dirty callback — called when any property changes. */
   setOnChange(cb: (() => void) | undefined): void;

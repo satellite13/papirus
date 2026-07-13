@@ -58,9 +58,19 @@ describe('CDivider', () => {
   });
 
   describe('hitTest', () => {
-    it('always returns null (dividers are not interactive)', () => {
+    it('returns this when point is inside bounds', () => {
       const d = new CDivider();
-      expect(d.hitTest({ x: 50, y: 50 }, { x: 0, y: 0, width: 100, height: 1 })).toBeNull();
+      expect(d.hitTest({ x: 50, y: 0.5 }, { x: 0, y: 0, width: 100, height: 1 })).toBe(d);
+    });
+
+    it('returns null when point is outside bounds', () => {
+      const d = new CDivider();
+      expect(d.hitTest({ x: 50, y: 2 }, { x: 0, y: 0, width: 100, height: 1 })).toBeNull();
+    });
+
+    it('returns null when invisible', () => {
+      const d = new CDivider({ style: { visible: false } });
+      expect(d.hitTest({ x: 50, y: 0.5 }, { x: 0, y: 0, width: 100, height: 1 })).toBeNull();
     });
   });
 

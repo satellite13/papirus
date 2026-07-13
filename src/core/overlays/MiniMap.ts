@@ -1,11 +1,11 @@
-import type { DiagramPlugin, DiagramRenderer } from '../DiagramRenderer';
+import type { DiagramRenderer } from '../DiagramRenderer';
 import type { Bounds, Point } from '@/types';
 import { getContentBounds } from '@/utils/contentBounds';
+import { BaseOverlay, type BaseOverlayOptions } from './BaseOverlay';
 
 export type MiniMapAnchor = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
 
-export interface MiniMapOptions {
-  enabled?: boolean;
+export interface MiniMapOptions extends BaseOverlayOptions {
   width?: number;
   height?: number;
   padding?: number;
@@ -34,13 +34,12 @@ type MiniMapDragPayload =
   | { kind: 'viewport'; pointerOffsetX: number; pointerOffsetY: number }
   | { kind: 'block' };
 
-export class MiniMap implements DiagramPlugin {
-  private readonly options: Required<MiniMapOptions>;
-  private removeOverlay: (() => void) | null = null;
+export class MiniMap extends BaseOverlay {
+  private readonly options: Required<Omit<MiniMapOptions, 'enabled'>>;
 
   constructor(options: MiniMapOptions = {}) {
+    super(options.enabled ?? true);
     this.options = {
-      enabled: options.enabled ?? true,
       width: options.width ?? 180,
       height: options.height ?? 120,
       padding: options.padding ?? 12,
@@ -54,7 +53,7 @@ export class MiniMap implements DiagramPlugin {
 
   install(renderer: DiagramRenderer): void {
     this.removeOverlay = renderer.addTopOverlayRenderer((ctx) => {
-      if (!this.options.enabled) return;
+      if (!this.enabled) return;
       const layout = this.computeLayout(renderer);
       if (!layout) return;
       const { x, y, width, height, bounds, scale, mapOffsetX, mapOffsetY, viewRect } = layout;
@@ -117,15 +116,6 @@ export class MiniMap implements DiagramPlugin {
     });
   }
 
-  destroy(): void {
-    this.removeOverlay?.();
-    this.removeOverlay = null;
-  }
-
-  setEnabled(enabled: boolean): void {
-    this.options.enabled = enabled;
-  }
-
   beginOverlayDrag(
     renderer: DiagramRenderer,
     screenX: number,
@@ -170,7 +160,7 @@ export class MiniMap implements DiagramPlugin {
     screenY: number,
     payload: unknown
   ): boolean {
-    if (!this.options.enabled) {
+    if (!this.enabled) {
       return false;
     }
     if (typeof payload !== 'object' || payload === null || !('kind' in payload)) {
@@ -217,7 +207,7 @@ export class MiniMap implements DiagramPlugin {
     screenX: number,
     screenY: number
   ): { layout: MiniMapLayout; canvasPoint: Point } | null {
-    if (!this.options.enabled) {
+    if (!this.enabled) {
       return null;
     }
     const layout = this.computeLayout(renderer);

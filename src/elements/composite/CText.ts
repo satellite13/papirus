@@ -1,5 +1,7 @@
 import type { Bounds, Size } from '@/types';
-import type { CComponent, CComponentStyle, SerializedCComponent } from './CComponent';
+import { measureTextLines, wrapMeasuredText } from '@/utils/textMeasurer';
+import type { CComponentStyle, SerializedCComponent } from './CComponent';
+import { CompositeComponentBase } from './CompositeComponentBase';
 
 export interface CTextOptions {
   id?: string;
@@ -31,7 +33,7 @@ const DEFAULT_COLOR = '#000000';
  * Lightweight text component for CompositeNode.
  * Renders directly via canvas ctx without delegating to TextLabel.
  */
-export class CText implements CComponent {
+export class CText extends CompositeComponentBase {
   readonly type = 'text' as const;
   readonly id?: string;
   style: CComponentStyle;
@@ -49,10 +51,10 @@ export class CText implements CComponent {
   private _role?: string;
   private _bindToProperty?: string;
   private _rotation: number;
-  private _onChange?: () => void;
   private _cachedLines: string[] | null = null;
 
   constructor(options: CTextOptions) {
+    super();
     this.id = options.id;
     this._text = options.text;
     this._fontFamily = options.fontFamily ?? DEFAULT_FONT_FAMILY;
@@ -79,7 +81,7 @@ export class CText implements CComponent {
     if (this._text !== value) {
       this._text = value;
       this._cachedLines = null;
-      this._onChange?.();
+      this.markChanged();
     }
   }
 
@@ -89,7 +91,7 @@ export class CText implements CComponent {
   set fontFamily(value: string) {
     if (this._fontFamily !== value) {
       this._fontFamily = value;
-      this._onChange?.();
+      this.markChanged();
     }
   }
 
@@ -99,7 +101,7 @@ export class CText implements CComponent {
   set fontWeight(value: string) {
     if (this._fontWeight !== value) {
       this._fontWeight = value;
-      this._onChange?.();
+      this.markChanged();
     }
   }
 
@@ -109,7 +111,7 @@ export class CText implements CComponent {
   set fontStyle(value: string) {
     if (this._fontStyle !== value) {
       this._fontStyle = value;
-      this._onChange?.();
+      this.markChanged();
     }
   }
 
@@ -119,7 +121,7 @@ export class CText implements CComponent {
   set fontSize(value: number) {
     if (this._fontSize !== value) {
       this._fontSize = value;
-      this._onChange?.();
+      this.markChanged();
     }
   }
 
@@ -129,7 +131,7 @@ export class CText implements CComponent {
   set color(value: string) {
     if (this._color !== value) {
       this._color = value;
-      this._onChange?.();
+      this.markChanged();
     }
   }
 
@@ -139,7 +141,7 @@ export class CText implements CComponent {
   set align(value: 'left' | 'center' | 'right') {
     if (this._align !== value) {
       this._align = value;
-      this._onChange?.();
+      this.markChanged();
     }
   }
 
@@ -149,7 +151,7 @@ export class CText implements CComponent {
   set verticalAlign(value: 'top' | 'middle' | 'bottom') {
     if (this._verticalAlign !== value) {
       this._verticalAlign = value;
-      this._onChange?.();
+      this.markChanged();
     }
   }
 
@@ -159,7 +161,7 @@ export class CText implements CComponent {
   set maxLines(value: number | undefined) {
     if (this._maxLines !== value) {
       this._maxLines = value;
-      this._onChange?.();
+      this.markChanged();
     }
   }
 
@@ -181,12 +183,8 @@ export class CText implements CComponent {
   set rotation(value: number) {
     if (this._rotation !== value) {
       this._rotation = value;
-      this._onChange?.();
+      this.markChanged();
     }
-  }
-
-  setOnChange(cb: (() => void) | undefined): void {
-    this._onChange = cb;
   }
 
   private getFont(): string {
@@ -202,34 +200,10 @@ export class CText implements CComponent {
    */
   wrapText(ctx: CanvasRenderingContext2D, maxWidth: number): string[] {
     ctx.font = this.getFont();
-    const words = this._text.split(' ');
-    const lines: string[] = [];
-    let currentLine = '';
-
-    for (const word of words) {
-      const testLine = currentLine ? `${currentLine} ${word}` : word;
-      const metrics = ctx.measureText(testLine);
-      if (metrics.width > maxWidth && currentLine) {
-        lines.push(currentLine);
-        currentLine = word;
-      } else {
-        currentLine = testLine;
-      }
-    }
-    if (currentLine) {
-      lines.push(currentLine);
-    }
-
-    if (this._maxLines !== undefined && lines.length > this._maxLines) {
-      const truncated = lines.slice(0, this._maxLines);
-      const lastLine = truncated[truncated.length - 1];
-      if (lastLine !== undefined) {
-        truncated[truncated.length - 1] = lastLine + '…';
-      }
-      return truncated;
-    }
-
-    return lines;
+    return wrapMeasuredText(ctx, this._text, maxWidth, {
+      maxLines: this._maxLines,
+      appendEllipsis: true,
+    });
   }
 
   measure(ctx: CanvasRenderingContext2D): Size {
@@ -238,13 +212,7 @@ export class CText implements CComponent {
 
     // Split by newlines first, then measure each
     const rawLines = this._text.split('\n');
-    let maxWidth = 0;
-    for (const line of rawLines) {
-      const metrics = ctx.measureText(line);
-      if (metrics.width > maxWidth) {
-        maxWidth = metrics.width;
-      }
-    }
+    const maxWidth = measureTextLines(ctx, rawLines);
 
     let lineCount = rawLines.length;
     if (this._maxLines !== undefined && lineCount > this._maxLines) {
@@ -313,8 +281,7 @@ export class CText implements CComponent {
         yStart = textBounds.y + textBounds.height - totalTextHeight + lineHeightPx / 2;
         break;
       default: // middle
-        yStart =
-          textBounds.y + (textBounds.height - totalTextHeight) / 2 + lineHeightPx / 2;
+        yStart = textBounds.y + (textBounds.height - totalTextHeight) / 2 + lineHeightPx / 2;
         break;
     }
 
@@ -340,22 +307,6 @@ export class CText implements CComponent {
     }
 
     ctx.restore();
-  }
-
-  hitTest(
-    point: { x: number; y: number },
-    bounds: Bounds
-  ): CComponent | null {
-    if (this.style.visible === false) return null;
-    if (
-      point.x >= bounds.x &&
-      point.x <= bounds.x + bounds.width &&
-      point.y >= bounds.y &&
-      point.y <= bounds.y + bounds.height
-    ) {
-      return this;
-    }
-    return null;
   }
 
   serialize(): SerializedCComponent {
@@ -414,8 +365,7 @@ export class CText implements CComponent {
         yStart = bounds.y + bounds.height - totalTextHeight + lineHeightPx * 0.75;
         break;
       default:
-        yStart =
-          bounds.y + (bounds.height - totalTextHeight) / 2 + lineHeightPx * 0.75;
+        yStart = bounds.y + (bounds.height - totalTextHeight) / 2 + lineHeightPx * 0.75;
         break;
     }
 

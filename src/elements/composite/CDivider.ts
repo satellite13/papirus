@@ -1,5 +1,6 @@
 import type { Bounds, Size } from '@/types';
-import type { CComponent, CComponentStyle, SerializedCComponent } from './CComponent';
+import type { CComponentStyle, SerializedCComponent } from './CComponent';
+import { CompositeComponentBase } from './CompositeComponentBase';
 
 export interface CDividerOptions {
   id?: string;
@@ -17,16 +18,16 @@ const DEFAULT_THICKNESS = 1;
  * - In a column container → horizontal line
  * - In a row container → vertical line
  */
-export class CDivider implements CComponent {
+export class CDivider extends CompositeComponentBase {
   readonly type = 'divider' as const;
   readonly id?: string;
   style: CComponentStyle;
 
   private _color: string;
   private _thickness: number;
-  private _onChange?: () => void;
 
   constructor(options: CDividerOptions = {}) {
+    super();
     this.id = options.id;
     this._color = options.color ?? DEFAULT_COLOR;
     this._thickness = options.thickness ?? DEFAULT_THICKNESS;
@@ -39,7 +40,7 @@ export class CDivider implements CComponent {
   set color(value: string) {
     if (this._color !== value) {
       this._color = value;
-      this._onChange?.();
+      this.markChanged();
     }
   }
 
@@ -49,12 +50,8 @@ export class CDivider implements CComponent {
   set thickness(value: number) {
     if (this._thickness !== value) {
       this._thickness = value;
-      this._onChange?.();
+      this.markChanged();
     }
-  }
-
-  setOnChange(cb: (() => void) | undefined): void {
-    this._onChange = cb;
   }
 
   measure(_ctx: CanvasRenderingContext2D): Size {
@@ -86,14 +83,6 @@ export class CDivider implements CComponent {
     }
     ctx.stroke();
     ctx.restore();
-  }
-
-  hitTest(
-    _point: { x: number; y: number },
-    _bounds: Bounds
-  ): CComponent | null {
-    // Dividers are not interactive
-    return null;
   }
 
   serialize(): SerializedCComponent {

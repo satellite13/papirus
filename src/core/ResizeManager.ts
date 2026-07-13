@@ -1,5 +1,5 @@
 import { EventEmitter } from '@/events/EventEmitter';
-import type { DiagramRenderer } from './DiagramRenderer';
+import type { DiagramSurface } from './DiagramSurface';
 import type { SelectionManager } from './SelectionManager';
 import type { InputEvent } from '@/events/InputHandler';
 import type { Bounds, Point } from '@/types';
@@ -16,7 +16,7 @@ export interface ResizeEvents {
 }
 
 export interface ResizeManagerOptions {
-  renderer: DiagramRenderer;
+  renderer: DiagramSurface;
   selectionManager: SelectionManager;
   snapToGrid?: boolean;
   gridSize?: number;
@@ -27,7 +27,7 @@ export interface ResizeManagerOptions {
  * Manages node resizing via corner handles
  */
 export class ResizeManager extends EventEmitter<ResizeEvents> {
-  private renderer: DiagramRenderer;
+  private renderer: DiagramSurface;
   private selectionManager: SelectionManager;
   private snapToGrid: boolean;
   private gridSize: number;
