@@ -9,6 +9,16 @@
 
 ## [Unreleased]
 
+## [0.6.5] - 2026-07-14
+
+### Добавлено
+- Типизированный `onClick` у composite `CComponent`.
+- Публичные экспорты path strategies, batching для property-change history и дополнительные geometry helpers.
+
+### Изменено
+- Общая загрузка и tinting SVG для иконок узлов/composite и SVG-экспорта.
+- `MiniMap` наследует `BaseOverlay`.
+
 ### Documentation
 - Расширена `docs/`: новый `composite.md`, обновлены разделы API/elements/interactions/overlays/renderer/utils и индекс; исправлены примеры на `bindToProperty: '__name__'`; описаны бейджи, типы маркеров, хуки `DiagramPlugin` для указателя, события контрольных точек `ConnectionManager` и сериализация composite.
 
@@ -332,7 +342,8 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.4...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.5...HEAD
+[0.6.5]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.4...v0.6.5
 [0.6.4]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.3...v0.6.4
 [0.6.3]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.6.3
 [0.6.2]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.6.2

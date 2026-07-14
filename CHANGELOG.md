@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.5] - 2026-07-14
+
+### Added
+- Typed `onClick` on composite `CComponent`.
+- Public exports for path strategies, property-change history batching, and additional geometry helpers.
+
+### Changed
+- Shared SVG asset loading and tinting for node icons, composite icons, and SVG export.
+- `MiniMap` now extends `BaseOverlay`.
+
 ### Documentation
 - Expanded `docs/`: new `composite.md`, updated API/elements/interactions/overlays/renderer/utils indexes; fixed `bindToProperty: '__name__'` examples; documented badges, marker types, `DiagramPlugin` pointer hooks, `ConnectionManager` control-point events, and composite serialization.
 
@@ -325,7 +335,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Edge animations (flow effect)
 - Context menu and search/filter
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.4...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.5...HEAD
+[0.6.5]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.4...v0.6.5
 [0.6.4]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.3...v0.6.4
 [0.6.3]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.6.3
 [0.6.2]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.6.2
