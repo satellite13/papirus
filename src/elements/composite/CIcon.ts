@@ -1,7 +1,6 @@
 import type { Bounds, Size } from '@/types';
 import type { CComponent, CComponentStyle, SerializedCComponent } from './CComponent';
-import { tintSvg, isSvgMarkup, svgToDataUrl, isSvgUrl } from '@/utils/svgTint';
-import { fetchSvgText } from '@/utils/svgAssetLoader';
+import { resolveTintedSvgDataUrl, resolveTintedSvgDataUrlSync } from '@/utils/svgAssetLoader';
 import { CompositeComponentBase } from './CompositeComponentBase';
 
 export interface CIconOptions {
@@ -132,20 +131,8 @@ export class CIcon extends CompositeComponentBase {
   }
 
   private async loadSource(source: string): Promise<void> {
-    if (isSvgMarkup(source)) {
-      const tinted = this._fillColor ? tintSvg(source, undefined, this._fillColor) : source;
-      this._image.src = svgToDataUrl(tinted);
-    } else if (isSvgUrl(source) && this._fillColor) {
-      try {
-        const svgText = await fetchSvgText(source);
-        const tinted = tintSvg(svgText, undefined, this._fillColor);
-        this._image.src = svgToDataUrl(tinted);
-      } catch {
-        this._image.src = source;
-      }
-    } else {
-      this._image.src = source;
-    }
+    const resolvedSource = await resolveTintedSvgDataUrl(source, { fillColor: this._fillColor });
+    this._image.src = resolvedSource ?? source;
   }
 
   measure(_ctx: CanvasRenderingContext2D): Size {
@@ -208,8 +195,9 @@ export class CIcon extends CompositeComponentBase {
     const dx = bounds.x + (bounds.width - drawWidth) / 2;
     const dy = bounds.y + (bounds.height - drawHeight) / 2;
 
-    // For SVG export, reference the source as an image
-    svg += `<image href="${escapeXmlAttr(this._source)}" x="${dx}" y="${dy}" width="${drawWidth}" height="${drawHeight}" />`;
+    const source =
+      resolveTintedSvgDataUrlSync(this._source, { fillColor: this._fillColor }) ?? this._source;
+    svg += `<image href="${escapeXmlAttr(source)}" x="${dx}" y="${dy}" width="${drawWidth}" height="${drawHeight}" />`;
 
     return svg;
   }

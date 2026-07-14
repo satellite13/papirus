@@ -11,8 +11,7 @@ import { getContentBounds } from './contentBounds';
 import { downloadBlob } from './download';
 import { generateSvgMarker, calculateMarkerPoints } from './markers';
 import { bezierPoint, segmentRectIntersections } from './geometry';
-import { isSvgMarkup, tintSvg, svgToDataUrl } from './svgTint';
-import { readSvgFromUrlSync } from './svgAssetLoader';
+import { resolveTintedSvgDataUrlSync } from './svgAssetLoader';
 import { getIconBoxSize, getIconBounds, computeIconDrawRectFromOptions } from './iconLayout';
 
 export interface SvgExportOptions {
@@ -807,19 +806,12 @@ export class SvgExporter {
       return '';
     }
 
-    if (isSvgMarkup(source)) {
-      return svgToDataUrl(tintSvg(source, opts.strokeColor, opts.fillColor));
-    }
-
-    const shouldInlineSvg = source.toLowerCase().endsWith('.svg');
-    if (shouldInlineSvg) {
-      const svgText = readSvgFromUrlSync(source);
-      if (svgText) {
-        return svgToDataUrl(tintSvg(svgText, opts.strokeColor, opts.fillColor));
-      }
-    }
-
-    return source;
+    return (
+      resolveTintedSvgDataUrlSync(source, {
+        strokeColor: opts.strokeColor,
+        fillColor: opts.fillColor,
+      }) ?? source
+    );
   }
 
   private escapeAttribute(value: string): string {

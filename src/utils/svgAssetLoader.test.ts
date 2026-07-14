@@ -32,6 +32,12 @@ describe('svgAssetLoader', () => {
     await expect(fetchSvgText('/missing.svg')).resolves.toBe('');
   });
 
+  it('returns empty text when fetching SVG rejects', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Invalid URL')));
+
+    await expect(fetchSvgText('/icon.svg')).resolves.toBe('');
+  });
+
   it('clears the shared fetch cache', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,

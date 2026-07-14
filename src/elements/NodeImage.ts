@@ -1,6 +1,6 @@
 import type { Bounds } from '@/types';
-import { tintSvg, isSvgMarkup, svgToDataUrl } from '@/utils/svgTint';
-import { fetchSvgText } from '@/utils/svgAssetLoader';
+import { isSvgMarkup } from '@/utils/svgTint';
+import { resolveTintedSvgDataUrl, resolveTintedSvgDataUrlSync } from '@/utils/svgAssetLoader';
 import { computeIconDrawRect } from '@/utils/iconLayout';
 
 export type NodeImageCornerPlacement = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
@@ -144,28 +144,23 @@ export class NodeImage {
     }
     const version = ++this._sourceVersion;
 
-    // Inline SVG markup source
     if (isSvgMarkup(source)) {
-      const tinted = tintSvg(source, this._options.strokeColor, this._options.fillColor);
+      const resolvedSource = resolveTintedSvgDataUrlSync(source, {
+        strokeColor: this._options.strokeColor,
+        fillColor: this._options.fillColor,
+      });
       if (version !== this._sourceVersion) return;
-      this._image.src = svgToDataUrl(tinted);
+      this._image.src = resolvedSource ?? source;
       return;
     }
 
-    // URL source with optional SVG tinting
-    const shouldTint = !!this._options.strokeColor || !!this._options.fillColor;
-    if (shouldTint && source.toLowerCase().endsWith('.svg')) {
-      const svgText = await fetchSvgText(source);
-      if (version !== this._sourceVersion) return;
-      if (svgText) {
-        const tinted = tintSvg(svgText, this._options.strokeColor, this._options.fillColor);
-        this._image.src = svgToDataUrl(tinted);
-        return;
-      }
-    }
+    const resolvedSource = await resolveTintedSvgDataUrl(source, {
+      strokeColor: this._options.strokeColor,
+      fillColor: this._options.fillColor,
+    });
 
     if (version !== this._sourceVersion) return;
-    this._image.src = source;
+    this._image.src = resolvedSource ?? source;
   }
 
   private attachHandlers(): void {

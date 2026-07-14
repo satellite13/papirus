@@ -157,6 +157,20 @@ describe('CIcon', () => {
   });
 
   describe('toSVG', () => {
+    it('embeds a tinted inline SVG icon as a data URL', () => {
+      const icon = new CIcon({
+        source: '<svg xmlns="http://www.w3.org/2000/svg"><path fill="#000"/></svg>',
+        fillColor: '#ff0000',
+      });
+
+      const result = icon.toSVG({ x: 0, y: 0, width: 24, height: 24 });
+
+      expect(result).toContain('href="data:image/svg+xml')
+      expect(result).toContain('%23ff0000')
+    })
+  })
+
+  describe('toSVG', () => {
     it('generates image element', () => {
       const icon = new CIcon({ source: '/test.png', width: 16, height: 16 });
       const svg = icon.toSVG({ x: 10, y: 20, width: 16, height: 16 });

@@ -12,7 +12,9 @@ const svgTextCache = new LRUCache<string, Promise<string>>(DEFAULT_CACHE_SIZE);
 export function fetchSvgText(url: string): Promise<string> {
   let promise = svgTextCache.get(url);
   if (!promise) {
-    promise = fetch(url).then((r) => (r.ok ? r.text() : ''));
+    promise = fetch(url)
+      .then((r) => (r.ok ? r.text() : ''))
+      .catch(() => '');
     svgTextCache.set(url, promise);
   }
   return promise;
