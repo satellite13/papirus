@@ -1,6 +1,7 @@
 // Core
 export { DiagramRenderer } from './core/DiagramRenderer';
 export type { DiagramEvents, DiagramPlugin } from './core/DiagramRenderer';
+export type { DiagramSurface, OverlayDragSession } from './core/DiagramSurface';
 
 export { SelectionManager } from './core/SelectionManager';
 export type { SelectionEvents } from './core/SelectionManager';
@@ -24,6 +25,16 @@ export type {
 
 export { InteractionManager } from './core/InteractionManager';
 export type { InteractionManagerOptions, InteractionKeymap } from './core/InteractionManager';
+
+export { ClipboardManager } from './core/ClipboardManager';
+export type { ClipboardManagerOptions } from './core/ClipboardManager';
+
+export { PropertyChangeBatcher } from './core/PropertyChangeBatcher';
+export type {
+  PropertyChangeBatcherOptions,
+  PropertyChangeKind,
+  PropertySnapshot,
+} from './core/PropertyChangeBatcher';
 
 export { ContextMenuManager } from './core/ContextMenuManager';
 export type {
@@ -55,13 +66,21 @@ export {
   RemoveNodeCommand,
   CompositeCommand,
   ChangeEditablePolylineControlPointsCommand,
+  ChangeNodePropertiesCommand,
+  ChangeEdgePropertiesCommand,
+  ChangeGroupPropertiesCommand,
 } from './core/history/commands';
 export type { HistoryEvents, HistoryManagerOptions } from './core/HistoryManager';
 
 // Elements
 export { Element, generateId, resetIdCounter } from './elements/Element';
 export { Node } from './elements/Node';
-export type { NodeOptions, NodeBadgeOption, ResizeHandle, AnchorPointsConfig } from './elements/Node';
+export type {
+  NodeOptions,
+  NodeBadgeOption,
+  ResizeHandle,
+  AnchorPointsConfig,
+} from './elements/Node';
 
 export { Port, resetPortIdCounter } from './elements/Port';
 export type { PortOptions } from './elements/Port';
@@ -70,10 +89,23 @@ export { TextLabel } from './elements/TextLabel';
 export type { TextLabelOptions } from './elements/TextLabel';
 
 export { NodeImage, isCornerPlacement } from './elements/NodeImage';
-export type { NodeImageOptions, NodeImageFit, NodeImagePlacement, NodeImageCornerPlacement, NodeImageEdgePlacement } from './elements/NodeImage';
+export type {
+  NodeImageOptions,
+  NodeImageFit,
+  NodeImagePlacement,
+  NodeImageCornerPlacement,
+  NodeImageEdgePlacement,
+} from './elements/NodeImage';
 
 export { Edge } from './elements/Edge';
-export type { EdgeOptions, PathStrategy } from './elements/Edge';
+export type { EdgeOptions } from './elements/Edge';
+
+export {
+  StraightPathStrategy,
+  PolylinePathStrategy,
+  BezierPathStrategy,
+} from './elements/paths';
+export type { PathStrategy, PathStrategyOptions, PathObstacle } from './elements/paths';
 
 export { Group } from './elements/Group';
 export type { GroupOptions } from './elements/Group';
@@ -169,9 +201,31 @@ export type { GuidesOverlayOptions } from './core/overlays/GuidesOverlay';
 export { MiniMap } from './core/overlays/MiniMap';
 export type { MiniMapOptions } from './core/overlays/MiniMap';
 
-export * from './utils/geometry';
+export {
+  distance,
+  distanceToSegment,
+  pointInRect,
+  rectsIntersect,
+  rectIntersection,
+  rectUnion,
+  segmentRectIntersections,
+  pointInEllipse,
+  angle,
+  rotatePoint,
+  lerp,
+  clamp,
+  snapToGrid,
+  snapPointToGrid,
+  expandBounds,
+  boundsCenter,
+  calculateBezierControlPoints,
+  bezierPoint,
+  mergeBounds,
+  clonePoints,
+  drawRoundedRectPath,
+} from './utils/geometry';
+export type { SegmentRectIntersection } from './utils/geometry';
 export { applyNodeStyle, renderFillAndStroke, applyEdgeStyle } from './utils/canvas';
-export type { PathStrategyOptions } from './elements/paths/PathStrategy';
 
 // Types
 export type {

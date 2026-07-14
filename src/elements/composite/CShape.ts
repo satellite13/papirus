@@ -7,6 +7,7 @@ import {
   type SidesConfig,
 } from './CComponent';
 import type { CContainer } from './CContainer';
+import { CompositeComponentBase } from './CompositeComponentBase';
 
 export interface CShapeOptions {
   id?: string;
@@ -15,7 +16,7 @@ export interface CShapeOptions {
   backgroundColor?: string;
   cornerRadius?: number;
   padding?: number | SidesConfig;
-  onClick?: (component: CShape) => void;
+  onClick?: (component: CComponent) => void;
   content?: CContainer;
   style?: CComponentStyle;
 }
@@ -24,11 +25,11 @@ export interface CShapeOptions {
  * A bordered box component for CompositeNode.
  * Can contain a CContainer for recursive composition (e.g. UML class sections).
  */
-export class CShape implements CComponent {
+export class CShape extends CompositeComponentBase {
   readonly type = 'shape' as const;
   readonly id?: string;
   style: CComponentStyle;
-  onClick?: (component: CShape) => void;
+  onClick?: (component: CComponent) => void;
 
   private _borderColor?: string;
   private _borderWidth: number;
@@ -36,9 +37,9 @@ export class CShape implements CComponent {
   private _cornerRadius: number;
   private _padding: number | SidesConfig;
   private _content?: CContainer;
-  private _onChange?: () => void;
 
   constructor(options: CShapeOptions = {}) {
+    super();
     this.id = options.id;
     this._borderColor = options.borderColor;
     this._borderWidth = options.borderWidth ?? 0;
@@ -50,7 +51,7 @@ export class CShape implements CComponent {
     this.style = options.style ?? {};
 
     if (this._content) {
-      this._content.setOnChange(() => this._onChange?.());
+      this._content.setOnChange(() => this.markChanged());
     }
   }
 
@@ -60,7 +61,7 @@ export class CShape implements CComponent {
   set borderColor(value: string | undefined) {
     if (this._borderColor !== value) {
       this._borderColor = value;
-      this._onChange?.();
+      this.markChanged();
     }
   }
 
@@ -70,7 +71,7 @@ export class CShape implements CComponent {
   set borderWidth(value: number) {
     if (this._borderWidth !== value) {
       this._borderWidth = value;
-      this._onChange?.();
+      this.markChanged();
     }
   }
 
@@ -80,7 +81,7 @@ export class CShape implements CComponent {
   set backgroundColor(value: string | undefined) {
     if (this._backgroundColor !== value) {
       this._backgroundColor = value;
-      this._onChange?.();
+      this.markChanged();
     }
   }
 
@@ -94,10 +95,6 @@ export class CShape implements CComponent {
 
   get content(): CContainer | undefined {
     return this._content;
-  }
-
-  setOnChange(cb: (() => void) | undefined): void {
-    this._onChange = cb;
   }
 
   measure(ctx: CanvasRenderingContext2D): Size {
@@ -166,21 +163,8 @@ export class CShape implements CComponent {
     ctx.restore();
   }
 
-  hitTest(
-    point: { x: number; y: number },
-    bounds: Bounds
-  ): CComponent | null {
-    if (this.style.visible === false) return null;
-
-    // Check if point is within our bounds
-    if (
-      point.x < bounds.x ||
-      point.x > bounds.x + bounds.width ||
-      point.y < bounds.y ||
-      point.y > bounds.y + bounds.height
-    ) {
-      return null;
-    }
+  hitTest(point: { x: number; y: number }, bounds: Bounds): CComponent | null {
+    if (!super.hitTest(point, bounds)) return null;
 
     // Try to hit test content first
     if (this._content) {

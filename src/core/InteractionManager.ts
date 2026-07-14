@@ -5,7 +5,7 @@ import type {
   PanInputEvent,
   PinchInputEvent,
 } from '@/events/InputHandler';
-import type { DiagramRenderer, OverlayDragSession } from './DiagramRenderer';
+import type { DiagramSurface, OverlayDragSession } from './DiagramSurface';
 import { SelectionManager } from './SelectionManager';
 import { DragManager } from './DragManager';
 import { ResizeManager } from './ResizeManager';
@@ -13,9 +13,6 @@ import { NavigationManager } from './NavigationManager';
 import { ConnectionManager } from './ConnectionManager';
 import type { ConnectionPreviewPathType } from './ConnectionManager';
 import {
-  ChangeEdgePropertiesCommand,
-  ChangeGroupPropertiesCommand,
-  ChangeNodePropertiesCommand,
   HistoryManager,
   MoveNodesCommand,
   RemoveNodeFromGroupsCommand,
@@ -27,14 +24,18 @@ import type { Bounds, EdgeEndpoint, Point, SerializedEdge, SerializedNode } from
 import { Edge } from '@/elements/Edge';
 import type { Group } from '@/elements/Group';
 import type { Node } from '@/elements/Node';
-import {
-  ChangeEditablePolylineControlPointsCommand,
-  CompositeCommand,
-} from './history/commands';
+import { ChangeEditablePolylineControlPointsCommand, CompositeCommand } from './history/commands';
 import { LabelEditor } from './LabelEditor';
 import { shallowEqual } from '@/utils/style';
 import { clonePoints, mergeBounds } from '@/utils/geometry';
 import type { Command } from '@/types';
+import type { CompositeNode } from '@/elements/composite/CompositeNode';
+import type { CContainer } from '@/elements/composite/CContainer';
+import type { CText } from '@/elements/composite/CText';
+import type { CShape } from '@/elements/composite/CShape';
+import { ClipboardManager } from './ClipboardManager';
+import { PropertyChangeBatcher } from './PropertyChangeBatcher';
+import { getHistoryShortcut, getShortcutKey } from '@/utils/keymap';
 
 export interface InteractionKeymap {
   deleteKeys: string[];
@@ -45,7 +46,7 @@ export interface InteractionKeymap {
 }
 
 export interface InteractionManagerOptions {
-  renderer: DiagramRenderer;
+  renderer: DiagramSurface;
   createEdge?: (from: EdgeEndpoint, to: EdgeEndpoint) => Edge;
   nodeFactory?: (data: SerializedNode) => Node;
   edgeFactory?: (data: SerializedEdge) => Edge;
@@ -72,7 +73,7 @@ const DEFAULT_KEYMAP: InteractionKeymap = {
 };
 
 export class InteractionManager {
-  private readonly renderer: DiagramRenderer;
+  private readonly renderer: DiagramSurface;
   private inputHandler: InputHandler;
   private readonly selectionManager: SelectionManager;
   private readonly dragManager: DragManager;
@@ -80,6 +81,8 @@ export class InteractionManager {
   private readonly navigationManager: NavigationManager;
   private readonly connectionManager: ConnectionManager;
   private readonly historyManager: HistoryManager;
+  private readonly clipboardManager: ClipboardManager;
+  private readonly propertyChangeBatcher: PropertyChangeBatcher;
   private readonly navigationOnly: boolean;
   private keymap: InteractionKeymap;
   private overlayCleanup: (() => void) | null = null;
@@ -91,28 +94,6 @@ export class InteractionManager {
     { endpoint: 'start' | 'end'; original: EdgeEndpoint }
   >();
 
-  private clipboard: {
-    nodes: SerializedNode[];
-    edges: SerializedEdge[];
-  } | null = null;
-
-  private pendingPropertyChanges = new Map<
-    string,
-    {
-      kind: 'node' | 'edge' | 'group';
-      id: string;
-      before:
-        | ReturnType<typeof createNodeSnapshot>
-        | ReturnType<typeof createEdgeSnapshot>
-        | ReturnType<typeof createGroupSnapshot>;
-      after:
-        | ReturnType<typeof createNodeSnapshot>
-        | ReturnType<typeof createEdgeSnapshot>
-        | ReturnType<typeof createGroupSnapshot>;
-      timerId: number;
-    }
-  >();
-  private propertyChangeDebounceMs = 350;
   private labelEditor = new LabelEditor();
   private scrollbarDragState: { axis: 'horizontal' | 'vertical'; pointerOffset: number } | null =
     null;
@@ -145,6 +126,17 @@ export class InteractionManager {
     });
     this.navigationManager = new NavigationManager({ renderer: this.renderer });
     this.historyManager = new HistoryManager();
+    this.clipboardManager = new ClipboardManager({
+      renderer: this.renderer,
+      selectionManager: this.selectionManager,
+      historyManager: this.historyManager,
+      nodeFactory: options.nodeFactory,
+      edgeFactory: options.edgeFactory,
+    });
+    this.propertyChangeBatcher = new PropertyChangeBatcher({
+      renderer: this.renderer,
+      historyManager: this.historyManager,
+    });
 
     this.keymap = { ...DEFAULT_KEYMAP, ...options.keymap };
 
@@ -169,7 +161,7 @@ export class InteractionManager {
       },
     });
 
-    this.setupEvents(options);
+    this.setupEvents();
   }
 
   get selection(): SelectionManager {
@@ -215,7 +207,9 @@ export class InteractionManager {
     this.snapshotEditablePolylineControlPointsForEdgesTouchingNodes(nodeIds);
   }
 
-  private snapshotEditablePolylineControlPointsForEdgesTouchingNodes(nodeIds: Iterable<string>): void {
+  private snapshotEditablePolylineControlPointsForEdgesTouchingNodes(
+    nodeIds: Iterable<string>
+  ): void {
     const idSet = new Set(nodeIds);
     for (const edge of this.renderer.edges.values()) {
       if (!edge.hasEditableControlPoints()) {
@@ -257,7 +251,7 @@ export class InteractionManager {
       return;
     }
     this.renderer.markStyleDirty();
-    this.queuePropertyChange('node', nodeId, before, after);
+    this.propertyChangeBatcher.queue('node', nodeId, before, after);
   }
 
   changeEdgeProperties(edgeId: string, apply: (edge: Edge) => void): void {
@@ -272,7 +266,7 @@ export class InteractionManager {
       return;
     }
     this.renderer.markStyleDirty();
-    this.queuePropertyChange('edge', edgeId, before, after);
+    this.propertyChangeBatcher.queue('edge', edgeId, before, after);
   }
 
   changeGroupProperties(groupId: string, apply: (group: Group) => void): void {
@@ -287,7 +281,7 @@ export class InteractionManager {
       return;
     }
     this.renderer.markStyleDirty();
-    this.queuePropertyChange('group', groupId, before, after);
+    this.propertyChangeBatcher.queue('group', groupId, before, after);
   }
 
   removeNodeFromGroups(nodeId: string, groupIds?: string[]): void {
@@ -347,7 +341,7 @@ export class InteractionManager {
     this.overlayCleanup = null;
   }
 
-  private setupEvents(options: InteractionManagerOptions): void {
+  private setupEvents(): void {
     this.overlayCleanup = this.renderer.addOverlayRenderer((ctx) => {
       this.selectionManager.renderSelectionRect(ctx);
       if (!this.navigationOnly) {
@@ -371,7 +365,7 @@ export class InteractionManager {
     this.inputHandler.on('wheel', (event) => this.handleWheel(event));
     this.inputHandler.on('pan', (event) => this.handlePan(event));
     this.inputHandler.on('pinch', (event) => this.handlePinch(event));
-    this.inputHandler.on('keydown', (event) => this.handleKeyDown(event, options));
+    this.inputHandler.on('keydown', (event) => this.handleKeyDown(event));
     this.inputHandler.on('keyup', (event) => this.handleKeyUp(event));
 
     if (!this.navigationOnly) {
@@ -525,7 +519,11 @@ export class InteractionManager {
     }
 
     const point = { x: event.worldX, y: event.worldY };
-    const hitElement = this.renderer.getInteractableElementAtPoint(point, event.screenX, event.screenY);
+    const hitElement = this.renderer.getInteractableElementAtPoint(
+      point,
+      event.screenX,
+      event.screenY
+    );
 
     if (event.button === 0) {
       if (this.navigationOnly) {
@@ -722,21 +720,22 @@ export class InteractionManager {
 
   private emitComponentClick(event: InputEvent): void {
     const point = { x: event.worldX, y: event.worldY };
-    const hitElement = this.renderer.getInteractableElementAtPoint(point, event.screenX, event.screenY);
+    const hitElement = this.renderer.getInteractableElementAtPoint(
+      point,
+      event.screenX,
+      event.screenY
+    );
     if (!hitElement || !('typeName' in hitElement)) return;
     const node = hitElement;
     if (node.typeName !== 'composite') return;
-    const compositeNode = node as import('@/elements/composite/CompositeNode').CompositeNode;
+    const compositeNode = node as CompositeNode;
     const component = compositeNode.getComponentAtPoint(point);
     if (!component) return;
     if (component.id !== undefined) {
       this.renderer.emit('componentClick', node.id, component, point);
     }
     // Invoke onClick callback if component has one
-    const asAny = component as unknown as Record<string, unknown>;
-    if (typeof asAny['onClick'] === 'function') {
-      (asAny['onClick'] as (c: unknown) => void)(component);
-    }
+    component.onClick?.(component);
   }
 
   private handleDoubleClick(event: InputEvent): void {
@@ -768,7 +767,11 @@ export class InteractionManager {
       return;
     }
 
-    const hitElement = this.renderer.getInteractableElementAtPoint(point, event.screenX, event.screenY);
+    const hitElement = this.renderer.getInteractableElementAtPoint(
+      point,
+      event.screenX,
+      event.screenY
+    );
     if (!hitElement) {
       this.labelEditor.finish(true, (kind, id, value) => this.handleLabelCommit(kind, id, value));
       return;
@@ -777,7 +780,7 @@ export class InteractionManager {
     if ('typeName' in hitElement) {
       // CompositeNode: edit CText bound to display name (`bindToProperty === '__name__'`)
       if (hitElement.typeName === 'composite') {
-        this.startCompositeNameEdit(hitElement as import('@/elements/composite/CompositeNode').CompositeNode);
+        this.startCompositeNameEdit(hitElement as CompositeNode);
         return;
       }
       const editText = hitElement.label?.editableText ?? hitElement.label?.text ?? '';
@@ -844,12 +847,9 @@ export class InteractionManager {
     this.navigationManager.handlePinch(event);
   }
 
-  private handleKeyDown(event: KeyboardEvent, options: InteractionManagerOptions): void {
+  private handleKeyDown(event: KeyboardEvent): void {
     const isCtrlOrMeta = event.ctrlKey || event.metaKey;
-    // Use event.code for letter keys to work with any keyboard layout (e.g. Russian)
-    const key = event.code.startsWith('Key')
-      ? event.code.slice(3).toLowerCase()
-      : event.key.toLowerCase();
+    const key = getShortcutKey(event);
 
     this.navigationManager.handleKeyDown(event);
 
@@ -861,8 +861,8 @@ export class InteractionManager {
       return;
     }
 
-    if (isCtrlOrMeta && (key === 'z' || key === 'y')) {
-      this.flushPendingPropertyChanges();
+    if (getHistoryShortcut(event) !== null) {
+      this.propertyChangeBatcher.flush();
     }
 
     if (this.historyManager.handleKeyDown(event)) {
@@ -877,13 +877,13 @@ export class InteractionManager {
 
     if (isCtrlOrMeta && key === this.keymap.copyKey) {
       event.preventDefault();
-      this.copySelection();
+      this.clipboardManager.copySelection();
       return;
     }
 
     if (isCtrlOrMeta && key === this.keymap.pasteKey) {
       event.preventDefault();
-      this.pasteSelection(options);
+      this.clipboardManager.pasteSelection();
       return;
     }
   }
@@ -931,9 +931,7 @@ export class InteractionManager {
     );
   }
 
-  private startCompositeNameEdit(
-    node: import('@/elements/composite/CompositeNode').CompositeNode
-  ): void {
+  private startCompositeNameEdit(node: CompositeNode): void {
     const nameText = this.findNameComponent(node.content);
     if (!nameText) return;
 
@@ -965,23 +963,19 @@ export class InteractionManager {
     );
   }
 
-  private findNameComponent(
-    container: import('@/elements/composite/CContainer').CContainer
-  ): import('@/elements/composite/CText').CText | null {
+  private findNameComponent(container: CContainer): CText | null {
     const bindToDisplayName = '__name__';
     for (const child of container.children) {
       if (child.type === 'text') {
-        const ctext = child as import('@/elements/composite/CText').CText;
+        const ctext = child as CText;
         if (ctext.bindToProperty === bindToDisplayName) return ctext;
       }
       if (child.type === 'container') {
-        const found = this.findNameComponent(
-          child as import('@/elements/composite/CContainer').CContainer
-        );
+        const found = this.findNameComponent(child as CContainer);
         if (found) return found;
       }
       if (child.type === 'shape') {
-        const content = (child as import('@/elements/composite/CShape').CShape).content;
+        const content = (child as CShape).content;
         if (content) {
           const found = this.findNameComponent(content);
           if (found) return found;
@@ -1025,92 +1019,6 @@ export class InteractionManager {
       }
       edge.label.text = value;
     });
-  }
-
-  private queuePropertyChange(
-    kind: 'node' | 'edge' | 'group',
-    id: string,
-    before:
-      | ReturnType<typeof createNodeSnapshot>
-      | ReturnType<typeof createEdgeSnapshot>
-      | ReturnType<typeof createGroupSnapshot>,
-    after:
-      | ReturnType<typeof createNodeSnapshot>
-      | ReturnType<typeof createEdgeSnapshot>
-      | ReturnType<typeof createGroupSnapshot>
-  ): void {
-    const key = `${kind}:${id}`;
-    const existing = this.pendingPropertyChanges.get(key);
-    if (existing) {
-      existing.after = after;
-      window.clearTimeout(existing.timerId);
-      existing.timerId = window.setTimeout(
-        () => this.flushPendingPropertyChange(key),
-        this.propertyChangeDebounceMs
-      );
-      return;
-    }
-
-    const timerId = window.setTimeout(
-      () => this.flushPendingPropertyChange(key),
-      this.propertyChangeDebounceMs
-    );
-    this.pendingPropertyChanges.set(key, { kind, id, before, after, timerId });
-  }
-
-  private flushPendingPropertyChanges(): void {
-    const keys = Array.from(this.pendingPropertyChanges.keys());
-    for (const key of keys) {
-      this.flushPendingPropertyChange(key);
-    }
-  }
-
-  private flushPendingPropertyChange(key: string): void {
-    const pending = this.pendingPropertyChanges.get(key);
-    if (!pending) {
-      return;
-    }
-    window.clearTimeout(pending.timerId);
-    this.pendingPropertyChanges.delete(key);
-    if (shallowEqual(pending.before as object, pending.after as object)) {
-      return;
-    }
-
-    switch (pending.kind) {
-      case 'node':
-        this.historyManager.execute(
-          new ChangeNodePropertiesCommand(
-            (id) => this.renderer.getNode(id),
-            pending.id,
-            pending.before as ReturnType<typeof createNodeSnapshot>,
-            pending.after as ReturnType<typeof createNodeSnapshot>
-          )
-        );
-        this.renderer.markStyleDirty();
-        break;
-      case 'edge':
-        this.historyManager.execute(
-          new ChangeEdgePropertiesCommand(
-            (id) => this.renderer.getEdge(id),
-            pending.id,
-            pending.before as ReturnType<typeof createEdgeSnapshot>,
-            pending.after as ReturnType<typeof createEdgeSnapshot>
-          )
-        );
-        this.renderer.markStyleDirty();
-        break;
-      case 'group':
-        this.historyManager.execute(
-          new ChangeGroupPropertiesCommand(
-            (id) => this.renderer.getGroup(id),
-            pending.id,
-            pending.before as ReturnType<typeof createGroupSnapshot>,
-            pending.after as ReturnType<typeof createGroupSnapshot>
-          )
-        );
-        this.renderer.markStyleDirty();
-        break;
-    }
   }
 
   private deleteSelection(): void {
@@ -1193,128 +1101,6 @@ export class InteractionManager {
         },
       },
     ]);
-  }
-
-  private copySelection(): void {
-    const selectedIds = new Set(this.selectionManager.selectedIds);
-    if (selectedIds.size === 0) {
-      return;
-    }
-
-    const nodes: SerializedNode[] = [];
-    const edges: SerializedEdge[] = [];
-    const nodeIds = new Set<string>();
-
-    for (const id of selectedIds) {
-      const node = this.renderer.getNode(id);
-      if (node) {
-        nodes.push({
-          id: node.id,
-          type: node.typeName,
-          x: node.x,
-          y: node.y,
-          width: node.width,
-          height: node.height,
-          style: node.style,
-          styleClass: node.styleClass,
-          label: node.label?.text,
-          labelStyleClass: node.label?.styleClass,
-          ports: node.ports.map((port) => ({
-            id: port.id,
-            type: port.type,
-            position: port.position,
-            styleClass: port.styleClass,
-          })),
-          data: Object.keys(node.data).length > 0 ? node.data : undefined,
-        });
-        nodeIds.add(node.id);
-      }
-    }
-
-    for (const edge of this.renderer.edges.values()) {
-      if (nodeIds.has(edge.from.nodeId) && nodeIds.has(edge.to.nodeId)) {
-        edges.push({
-          id: edge.id,
-          from: edge.from,
-          to: edge.to,
-          type: edge.type,
-          controlPoints: edge.controlPoints,
-          arrowType: edge.arrowType,
-          style: edge.style,
-          styleClass: edge.styleClass,
-          label: edge.label?.text,
-          labelStyleClass: edge.label?.styleClass,
-          labelOffset: edge.labelOffset !== 0 ? edge.labelOffset : undefined,
-          labelBackground: edge.labelBackground,
-          labelLineGap: edge.labelLineGap ? true : undefined,
-          data: Object.keys(edge.data).length > 0 ? edge.data : undefined,
-        });
-      }
-    }
-
-    this.clipboard = { nodes, edges };
-  }
-
-  private pasteSelection(options: InteractionManagerOptions): void {
-    if (!this.clipboard || !options.nodeFactory || !options.edgeFactory) {
-      return;
-    }
-
-    const offset: Point = { x: 20, y: 20 };
-    const idMap = new Map<string, string>();
-    const newNodes: Node[] = [];
-    const newEdges: Edge[] = [];
-
-    for (const nodeData of this.clipboard.nodes) {
-      const newId = `${nodeData.id}_copy_${Date.now()}`;
-      idMap.set(nodeData.id, newId);
-      const copyData: SerializedNode = {
-        ...nodeData,
-        id: newId,
-        x: nodeData.x + offset.x,
-        y: nodeData.y + offset.y,
-      };
-      newNodes.push(options.nodeFactory(copyData));
-    }
-
-    for (const edgeData of this.clipboard.edges) {
-      const fromNodeId = idMap.get(edgeData.from.nodeId);
-      const toNodeId = idMap.get(edgeData.to.nodeId);
-      if (!fromNodeId || !toNodeId) {
-        continue;
-      }
-      const newId = `${edgeData.id}_copy_${Date.now()}`;
-      const copyEdge: SerializedEdge = {
-        ...edgeData,
-        id: newId,
-        from: { ...edgeData.from, nodeId: fromNodeId },
-        to: { ...edgeData.to, nodeId: toNodeId },
-      };
-      newEdges.push(options.edgeFactory(copyEdge));
-    }
-
-    if (newNodes.length === 0 && newEdges.length === 0) {
-      return;
-    }
-
-    this.historyManager.execute({
-      execute: () => {
-        for (const node of newNodes) {
-          this.renderer.addNode(node);
-        }
-        for (const edge of newEdges) {
-          this.renderer.addEdge(edge);
-        }
-      },
-      undo: () => {
-        for (const edge of newEdges) {
-          this.renderer.removeEdge(edge.id);
-        }
-        for (const node of newNodes) {
-          this.renderer.removeNode(node.id);
-        }
-      },
-    });
   }
 
   private endpointsEqual(a: EdgeEndpoint, b: EdgeEndpoint): boolean {

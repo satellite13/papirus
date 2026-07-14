@@ -1,6 +1,7 @@
 import type { Bounds, ContentInsetSides, Point, TextStyle } from '@/types';
 import type { StyleManager } from '@/styles/StyleManager';
 import { shallowEqual } from '@/utils/style';
+import { measureTextLines, wrapMeasuredText } from '@/utils/textMeasurer';
 
 const DEFAULT_INSET = 8;
 
@@ -261,25 +262,17 @@ export class TextLabel {
 
     const text = this._text ?? '';
     if (effectiveMaxWidth !== undefined) {
-      const maxWidth = Math.max(
-        0,
-        effectiveMaxWidth - this._inset.left - this._inset.right
-      );
-      this._lines = this.wrapText(ctx, text, maxWidth);
+      const maxWidth = Math.max(0, effectiveMaxWidth - this._inset.left - this._inset.right);
+      this._lines = wrapMeasuredText(ctx, text, maxWidth);
     } else {
       this._lines = text.split('\n');
     }
 
     // Calculate dimensions
-    let maxLineWidth = 0;
-    for (const line of this._lines) {
-      const metrics = ctx.measureText(line);
-      maxLineWidth = Math.max(maxLineWidth, metrics.width);
-    }
+    const maxLineWidth = measureTextLines(ctx, this._lines);
 
     this._measuredWidth = maxLineWidth + this._inset.left + this._inset.right;
-    this._measuredHeight =
-      this._lines.length * lineHeight + this._inset.top + this._inset.bottom;
+    this._measuredHeight = this._lines.length * lineHeight + this._inset.top + this._inset.bottom;
     this._measureDirty = false;
 
     return {
@@ -291,7 +284,11 @@ export class TextLabel {
   /**
    * Render the label within bounds
    */
-  render(ctx: CanvasRenderingContext2D, bounds: Bounds, alignOverride?: 'left' | 'center' | 'right'): void {
+  render(
+    ctx: CanvasRenderingContext2D,
+    bounds: Bounds,
+    alignOverride?: 'left' | 'center' | 'right'
+  ): void {
     if (this._lines.length === 0) {
       this.measure(ctx);
     }
@@ -309,14 +306,8 @@ export class TextLabel {
     const innerBounds: Bounds = {
       x: bounds.x + this._inset.left,
       y: bounds.y + this._inset.top,
-      width: Math.max(
-        0,
-        bounds.width - this._inset.left - this._inset.right
-      ),
-      height: Math.max(
-        0,
-        bounds.height - this._inset.top - this._inset.bottom
-      ),
+      width: Math.max(0, bounds.width - this._inset.left - this._inset.right),
+      height: Math.max(0, bounds.height - this._inset.top - this._inset.bottom),
     };
 
     // Horizontal position inside innerBounds
@@ -339,17 +330,10 @@ export class TextLabel {
         startY = innerBounds.y + lineHeight / 2;
         break;
       case 'bottom':
-        startY =
-          innerBounds.y +
-          innerBounds.height -
-          totalHeight +
-          lineHeight / 2;
+        startY = innerBounds.y + innerBounds.height - totalHeight + lineHeight / 2;
         break;
       default:
-        startY =
-          innerBounds.y +
-          (innerBounds.height - totalHeight) / 2 +
-          lineHeight / 2;
+        startY = innerBounds.y + (innerBounds.height - totalHeight) / 2 + lineHeight / 2;
     }
 
     ctx.fillStyle = this._style.color ?? '#000000';
@@ -390,33 +374,5 @@ export class TextLabel {
     ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
     ctx.textAlign = this._style.align ?? 'center';
     ctx.textBaseline = this._style.baseline ?? 'middle';
-  }
-
-  private wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
-    const lines: string[] = [];
-    const paragraphs = text.split('\n');
-
-    for (const paragraph of paragraphs) {
-      const words = paragraph.split(' ');
-      let currentLine = '';
-
-      for (const word of words) {
-        const testLine = currentLine.length > 0 ? `${currentLine} ${word}` : word;
-        const metrics = ctx.measureText(testLine);
-
-        if (metrics.width > maxWidth && currentLine.length > 0) {
-          lines.push(currentLine);
-          currentLine = word;
-        } else {
-          currentLine = testLine;
-        }
-      }
-
-      if (currentLine.length > 0) {
-        lines.push(currentLine);
-      }
-    }
-
-    return lines.length > 0 ? lines : [''];
   }
 }

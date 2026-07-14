@@ -1,7 +1,8 @@
 import type { Bounds, Size } from '@/types';
 import type { CComponent, CComponentStyle, SerializedCComponent } from './CComponent';
 import { tintSvg, isSvgMarkup, svgToDataUrl, isSvgUrl } from '@/utils/svgTint';
-import { LRUCache } from '@/utils/LRUCache';
+import { fetchSvgText } from '@/utils/svgAssetLoader';
+import { CompositeComponentBase } from './CompositeComponentBase';
 
 export interface CIconOptions {
   id?: string;
@@ -12,23 +13,20 @@ export interface CIconOptions {
   fillColor?: string;
   bindsNotationIcon?: boolean;
   visible?: boolean;
-  onClick?: (component: CIcon) => void;
+  onClick?: (component: CComponent) => void;
   style?: CComponentStyle;
 }
 
 const DEFAULT_ICON_SIZE = 24;
 
-// Shared cache for fetched SVG text (separate from NodeImage's cache)
-const svgFetchCache = new LRUCache<string, Promise<string>>(100);
-
 /**
  * Lightweight SVG/image icon component for CompositeNode.
  */
-export class CIcon implements CComponent {
+export class CIcon extends CompositeComponentBase {
   readonly type = 'icon' as const;
   readonly id?: string;
   style: CComponentStyle;
-  onClick?: (component: CIcon) => void;
+  onClick?: (component: CComponent) => void;
 
   private _source: string;
   private _width: number;
@@ -38,9 +36,9 @@ export class CIcon implements CComponent {
   private _bindsNotationIcon: boolean;
   private _image: HTMLImageElement;
   private _loaded = false;
-  private _onChange?: () => void;
 
   constructor(options: CIconOptions) {
+    super();
     this.id = options.id;
     this._source = options.source;
     this._width = options.width ?? DEFAULT_ICON_SIZE;
@@ -57,10 +55,10 @@ export class CIcon implements CComponent {
     this._image = new Image();
     this._image.onload = (): void => {
       this._loaded = true;
-      this._onChange?.();
+      this.markChanged();
     };
     this._image.onerror = (): void => {
-      this._onChange?.();
+      this.markChanged();
     };
     void this.loadSource(this._source);
   }
@@ -73,7 +71,7 @@ export class CIcon implements CComponent {
       this._source = value;
       this._loaded = false;
       void this.loadSource(value);
-      this._onChange?.();
+      this.markChanged();
     }
   }
 
@@ -83,7 +81,7 @@ export class CIcon implements CComponent {
   set width(value: number) {
     if (this._width !== value) {
       this._width = value;
-      this._onChange?.();
+      this.markChanged();
     }
   }
 
@@ -93,7 +91,7 @@ export class CIcon implements CComponent {
   set height(value: number) {
     if (this._height !== value) {
       this._height = value;
-      this._onChange?.();
+      this.markChanged();
     }
   }
 
@@ -103,7 +101,7 @@ export class CIcon implements CComponent {
   set backgroundColor(value: string | undefined) {
     if (this._backgroundColor !== value) {
       this._backgroundColor = value;
-      this._onChange?.();
+      this.markChanged();
     }
   }
 
@@ -115,7 +113,7 @@ export class CIcon implements CComponent {
       this._fillColor = value;
       // Re-tint the SVG
       void this.loadSource(this._source);
-      this._onChange?.();
+      this.markChanged();
     }
   }
 
@@ -129,12 +127,8 @@ export class CIcon implements CComponent {
   set bindsNotationIcon(value: boolean) {
     if (this._bindsNotationIcon !== value) {
       this._bindsNotationIcon = value;
-      this._onChange?.();
+      this.markChanged();
     }
-  }
-
-  setOnChange(cb: (() => void) | undefined): void {
-    this._onChange = cb;
   }
 
   private async loadSource(source: string): Promise<void> {
@@ -143,7 +137,7 @@ export class CIcon implements CComponent {
       this._image.src = svgToDataUrl(tinted);
     } else if (isSvgUrl(source) && this._fillColor) {
       try {
-        const svgText = await this.fetchSvg(source);
+        const svgText = await fetchSvgText(source);
         const tinted = tintSvg(svgText, undefined, this._fillColor);
         this._image.src = svgToDataUrl(tinted);
       } catch {
@@ -152,15 +146,6 @@ export class CIcon implements CComponent {
     } else {
       this._image.src = source;
     }
-  }
-
-  private async fetchSvg(url: string): Promise<string> {
-    let promise = svgFetchCache.get(url);
-    if (!promise) {
-      promise = fetch(url).then((r) => r.text());
-      svgFetchCache.set(url, promise);
-    }
-    return promise;
   }
 
   measure(_ctx: CanvasRenderingContext2D): Size {
@@ -192,22 +177,6 @@ export class CIcon implements CComponent {
     }
 
     ctx.restore();
-  }
-
-  hitTest(
-    point: { x: number; y: number },
-    bounds: Bounds
-  ): CComponent | null {
-    if (this.style.visible === false) return null;
-    if (
-      point.x >= bounds.x &&
-      point.x <= bounds.x + bounds.width &&
-      point.y >= bounds.y &&
-      point.y <= bounds.y + bounds.height
-    ) {
-      return this;
-    }
-    return null;
   }
 
   serialize(): SerializedCComponent {

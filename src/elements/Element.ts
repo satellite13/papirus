@@ -11,6 +11,7 @@ export function generateId(prefix = 'el'): string {
 
 /**
  * Reset ID counter (for testing)
+ * @internal
  */
 export function resetIdCounter(): void {
   nextId = 1;

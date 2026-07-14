@@ -1,5 +1,5 @@
 import { EventEmitter } from '@/events/EventEmitter';
-import type { DiagramRenderer } from './DiagramRenderer';
+import type { DiagramSurface } from './DiagramSurface';
 import type { InputEvent } from '@/events/InputHandler';
 import type { AnchorId, Node } from '@/elements/Node';
 import type { Edge } from '@/elements/Edge';
@@ -17,6 +17,7 @@ import {
   BEZIER_MAX_OFFSET,
 } from '@/constants';
 import { clonePoints, distance } from '@/utils/geometry';
+import { getDirectionFromOutlineParam } from '@/utils/direction';
 
 /**
  * Connection events
@@ -36,7 +37,7 @@ export type ConnectionValidator = (sourceNodeId: string, targetNodeId: string) =
 export type ConnectionPreviewPathType = 'straight' | 'bezier';
 
 export interface ConnectionManagerOptions {
-  renderer: DiagramRenderer;
+  renderer: DiagramSurface;
   createEdge: (from: EdgeEndpoint, to: EdgeEndpoint) => Edge;
   addEdge?: (edge: Edge) => void;
   snapToGrid?: boolean;
@@ -51,7 +52,7 @@ export interface ConnectionManagerOptions {
  * Manages port-to-port connection creation
  */
 export class ConnectionManager extends EventEmitter<ConnectionEvents> {
-  private renderer: DiagramRenderer;
+  private renderer: DiagramSurface;
   private readonly createEdge: (from: EdgeEndpoint, to: EdgeEndpoint) => Edge;
   private readonly addEdge: (edge: Edge) => void;
   private _connectionValidator: ConnectionValidator | null = null;
@@ -323,7 +324,7 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
         snappedPoint = bestResult.point;
         this.reconnectingOutlineParam = bestResult.param;
         this.reconnectingTargetNodeId = bestResult.node.id;
-        snappedDir = this.getDirectionFromOutlineParam(bestResult.param, bestResult.node);
+        snappedDir = getDirectionFromOutlineParam(bestResult.param);
 
         const otherNode = this.reconnectingEndpoint === 'start' ? toNode : fromNode;
         if (otherNode) {
@@ -336,7 +337,7 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
           const reprojected = targetNode.getClosestPointOnOutline(snappedPoint);
           snappedPoint = reprojected.point;
           this.reconnectingOutlineParam = reprojected.param;
-          snappedDir = this.getDirectionFromOutlineParam(reprojected.param, targetNode);
+          snappedDir = getDirectionFromOutlineParam(reprojected.param);
         }
       } else {
         this.reconnectingOutlineParam = null;
@@ -360,13 +361,13 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     if (this.reconnectingEndpoint === 'start') {
       if (toNode) {
         const target = this.getTargetPointForReconnect(edge, toNode, 'to', snappedPoint);
-        const toDir = this.getTargetDirForReconnect(edge, toNode, 'to');
+        const toDir = this.getTargetDirForReconnect(edge, 'to');
         edge.updateEndpoints(snappedPoint, target, snappedDir, toDir);
       }
     } else {
       if (fromNode) {
         const start = this.getTargetPointForReconnect(edge, fromNode, 'from', snappedPoint);
-        const fromDir = this.getTargetDirForReconnect(edge, fromNode, 'from');
+        const fromDir = this.getTargetDirForReconnect(edge, 'from');
         edge.updateEndpoints(start, snappedPoint, fromDir, snappedDir);
       }
     }
@@ -391,25 +392,13 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     return node.getConnectionPoint(fallbackPoint);
   }
 
-  private getTargetDirForReconnect(
-    edge: Edge,
-    node: Node,
-    endpoint: 'from' | 'to'
-  ): string | undefined {
+  private getTargetDirForReconnect(edge: Edge, endpoint: 'from' | 'to'): string | undefined {
     const ep = endpoint === 'from' ? edge.from : edge.to;
     if (this.attachToOutline && ep.outlineParam !== undefined) {
-      return this.getDirectionFromOutlineParam(ep.outlineParam, node);
+      return getDirectionFromOutlineParam(ep.outlineParam);
     }
     const anchorId = ep.portId?.replace(ANCHOR_PORT_PREFIX, '');
     return anchorId?.split(':')[0];
-  }
-
-  private getDirectionFromOutlineParam(param: number, _node: Node): string {
-    const p = ((param % 1) + 1) % 1;
-    if (p < 0.25) return 'top';
-    if (p < 0.5) return 'right';
-    if (p < 0.75) return 'bottom';
-    return 'left';
   }
 
   /**
@@ -762,11 +751,11 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     } else {
       const fromDir =
         this.sourceOutlineParam !== null
-          ? this.getDirectionFromOutlineParam(this.sourceOutlineParam, this.sourceNode!)
+          ? getDirectionFromOutlineParam(this.sourceOutlineParam)
           : this.sourceAnchorId?.split(':')[0];
       const toDir =
         this.previewTargetOutlineParam !== null
-          ? this.getDirectionFromOutlineParam(this.previewTargetOutlineParam, this.sourceNode!)
+          ? getDirectionFromOutlineParam(this.previewTargetOutlineParam)
           : this.previewTargetAnchorId?.split(':')[0];
       this.drawBezierPreview(ctx, start, end, fromDir, toDir);
     }
@@ -980,7 +969,9 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
           continue;
         }
 
-        const materialized = edge.controlPoints ? clonePoints(edge.controlPoints) : clonePoints(controlPoints);
+        const materialized = edge.controlPoints
+          ? clonePoints(edge.controlPoints)
+          : clonePoints(controlPoints);
         materialized.splice(insertControl.index, 0, this.snapPoint(insertControl.point));
         edge.controlPoints = materialized;
         this.activeControlPointDrag = { edge, index: insertControl.index };
@@ -1240,10 +1231,9 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
 
   private getAnchorAtPoint(node: Node, point: Point): { id: string; point: Point } | null {
     // Get only port-side anchors if attachToOutline is disabled and node has ports
-    const anchorIds = !this.attachToOutline && node.ports.length > 0
-      ? node.getPortAnchorIds()
-      : null;
-    
+    const anchorIds =
+      !this.attachToOutline && node.ports.length > 0 ? node.getPortAnchorIds() : null;
+
     const anchors = node.getAnchors();
     if (anchors.length === 0) {
       return null;

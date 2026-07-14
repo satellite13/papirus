@@ -1,10 +1,14 @@
 import { EventEmitter } from '@/events/EventEmitter';
-import type { DiagramRenderer } from './DiagramRenderer';
+import type { DiagramSurface } from './DiagramSurface';
 import type { SelectionManager } from './SelectionManager';
 import type { InputEvent } from '@/events/InputHandler';
 import type { Node } from '@/elements/Node';
 import type { Bounds, Point } from '@/types';
-import { ALIGNMENT_SCREEN_TOLERANCE, DRAG_START_THRESHOLD, EDITABLE_POLYLINE_ORTHOGONAL_TOLERANCE } from '@/constants';
+import {
+  ALIGNMENT_SCREEN_TOLERANCE,
+  DRAG_START_THRESHOLD,
+  EDITABLE_POLYLINE_ORTHOGONAL_TOLERANCE,
+} from '@/constants';
 import { distance, mergeBounds, clonePoints, rectsIntersect } from '@/utils/geometry';
 
 interface AlignmentGuide {
@@ -24,7 +28,7 @@ export interface DragEvents {
 }
 
 export interface DragManagerOptions {
-  renderer: DiagramRenderer;
+  renderer: DiagramSurface;
   selectionManager: SelectionManager;
   snapToGrid?: boolean;
   gridSize?: number;
@@ -37,7 +41,7 @@ export interface DragManagerOptions {
  * Manages node dragging
  */
 export class DragManager extends EventEmitter<DragEvents> {
-  private renderer: DiagramRenderer;
+  private renderer: DiagramSurface;
   private selectionManager: SelectionManager;
   private snapToGrid: boolean;
   private gridSize: number;
@@ -68,8 +72,7 @@ export class DragManager extends EventEmitter<DragEvents> {
     this.snapToGrid = options.snapToGrid ?? false;
     this.gridSize = options.gridSize ?? 20;
     this.alignToNodes = options.alignToNodes ?? true;
-    this.alignmentScreenTolerance =
-      options.alignmentScreenTolerance ?? ALIGNMENT_SCREEN_TOLERANCE;
+    this.alignmentScreenTolerance = options.alignmentScreenTolerance ?? ALIGNMENT_SCREEN_TOLERANCE;
   }
 
   /**
@@ -141,7 +144,11 @@ export class DragManager extends EventEmitter<DragEvents> {
     this._handledMouseDown = false;
 
     const point = { x: event.worldX, y: event.worldY };
-    const element = this.renderer.getInteractableElementAtPoint(point, event.screenX, event.screenY);
+    const element = this.renderer.getInteractableElementAtPoint(
+      point,
+      event.screenX,
+      event.screenY
+    );
 
     if (element === undefined) {
       return false;
@@ -404,7 +411,10 @@ export class DragManager extends EventEmitter<DragEvents> {
     this.editablePolylineFullyConnectedEdges.clear();
     this.initialControlPointsForFullyConnected.clear();
     const draggedIds = new Set(this.draggedNodes.map((node) => node.id));
-    const nodeBindings = new Map<string, Array<{ edgeId: string; controlPointIndex: number; axis: 'vertical' | 'horizontal' }>>();
+    const nodeBindings = new Map<
+      string,
+      Array<{ edgeId: string; controlPointIndex: number; axis: 'vertical' | 'horizontal' }>
+    >();
 
     // Single pass: collect fully-connected edges and single-node bindings
     for (const edge of this.renderer.edges.values()) {
@@ -439,7 +449,10 @@ export class DragManager extends EventEmitter<DragEvents> {
         const deltaX = Math.abs(nearestPoint.x - endpoint.x);
         const deltaY = Math.abs(nearestPoint.y - endpoint.y);
 
-        if (deltaX <= EDITABLE_POLYLINE_ORTHOGONAL_TOLERANCE && deltaY <= EDITABLE_POLYLINE_ORTHOGONAL_TOLERANCE) {
+        if (
+          deltaX <= EDITABLE_POLYLINE_ORTHOGONAL_TOLERANCE &&
+          deltaY <= EDITABLE_POLYLINE_ORTHOGONAL_TOLERANCE
+        ) {
           continue;
         }
 

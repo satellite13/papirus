@@ -4,13 +4,16 @@ import type { Edge } from '@/elements/Edge';
 import type { Node } from '@/elements/Node';
 import type { Group } from '@/elements/Group';
 import type { ArrowMarkerConfig, TextStyle } from '@/types';
-import type { NodeImageOptions, NodeImagePlacement } from '@/elements/NodeImage';
+import type { NodeImageOptions } from '@/elements/NodeImage';
 import { EDGE_LABEL_BACKGROUND_RADIUS } from '@/constants';
 import { applyStyleManagerToElements } from './style';
 import { getContentBounds } from './contentBounds';
 import { downloadBlob } from './download';
 import { generateSvgMarker, calculateMarkerPoints } from './markers';
 import { bezierPoint, segmentRectIntersections } from './geometry';
+import { isSvgMarkup, tintSvg, svgToDataUrl } from './svgTint';
+import { readSvgFromUrlSync } from './svgAssetLoader';
+import { getIconBoxSize, getIconBounds, computeIconDrawRectFromOptions } from './iconLayout';
 
 export interface SvgExportOptions {
   padding?: number;
@@ -772,14 +775,14 @@ export class SvgExporter {
     }
 
     const iconInset = icon.inset;
-    const iconBoxSize = this.getIconBoxSize(iconSize, iconInset);
-    const iconBounds = this.getIconBounds(
+    const iconBoxSize = getIconBoxSize(iconSize, iconInset);
+    const iconBounds = getIconBounds(
       nodeBounds,
       iconBoxSize,
       opts.placement ?? 'center',
       iconInset
     );
-    const drawRect = this.getIconDrawRect(iconBounds, opts, iconSize, iconInset);
+    const drawRect = computeIconDrawRectFromOptions(iconBounds, opts, iconSize, iconInset);
     if (drawRect.width <= 0 || drawRect.height <= 0) {
       return '';
     }
@@ -794,123 +797,6 @@ export class SvgExporter {
     return `<image href="${escapedHref}" xlink:href="${escapedHref}" x="${drawRect.x}" y="${drawRect.y}" width="${drawRect.width}" height="${drawRect.height}" opacity="${opacity}" preserveAspectRatio="none"/>`;
   }
 
-  private getIconBoxSize(
-    imageSize: { width: number; height: number },
-    inset: number
-  ): { width: number; height: number } {
-    return {
-      width: imageSize.width + inset * 2,
-      height: imageSize.height + inset * 2,
-    };
-  }
-
-  private getIconBounds(
-    bounds: { x: number; y: number; width: number; height: number },
-    iconBoxSize: { width: number; height: number },
-    placement: NodeImagePlacement,
-    inset: number
-  ): { x: number; y: number; width: number; height: number } {
-    switch (placement) {
-      case 'top':
-        return { x: bounds.x, y: bounds.y, width: bounds.width, height: iconBoxSize.height };
-      case 'bottom':
-        return {
-          x: bounds.x,
-          y: bounds.y + bounds.height - iconBoxSize.height,
-          width: bounds.width,
-          height: iconBoxSize.height,
-        };
-      case 'left':
-        return { x: bounds.x, y: bounds.y, width: iconBoxSize.width, height: bounds.height };
-      case 'right':
-        return {
-          x: bounds.x + bounds.width - iconBoxSize.width,
-          y: bounds.y,
-          width: iconBoxSize.width,
-          height: bounds.height,
-        };
-      case 'top-left':
-        return {
-          x: bounds.x + inset,
-          y: bounds.y + inset,
-          width: iconBoxSize.width,
-          height: iconBoxSize.height,
-        };
-      case 'top-right':
-        return {
-          x: bounds.x + bounds.width - iconBoxSize.width - inset,
-          y: bounds.y + inset,
-          width: iconBoxSize.width,
-          height: iconBoxSize.height,
-        };
-      case 'bottom-left':
-        return {
-          x: bounds.x + inset,
-          y: bounds.y + bounds.height - iconBoxSize.height - inset,
-          width: iconBoxSize.width,
-          height: iconBoxSize.height,
-        };
-      case 'bottom-right':
-        return {
-          x: bounds.x + bounds.width - iconBoxSize.width - inset,
-          y: bounds.y + bounds.height - iconBoxSize.height - inset,
-          width: iconBoxSize.width,
-          height: iconBoxSize.height,
-        };
-      case 'center':
-      default:
-        return bounds;
-    }
-  }
-
-  private getIconDrawRect(
-    bounds: { x: number; y: number; width: number; height: number },
-    opts: NodeImageOptions,
-    imageSize: { width: number; height: number },
-    inset: number
-  ): { x: number; y: number; width: number; height: number } {
-    const fit = opts.fit ?? 'none';
-    const scaleWithBounds = opts.scaleWithBounds ?? false;
-
-    const innerBounds = {
-      x: bounds.x + inset,
-      y: bounds.y + inset,
-      width: Math.max(0, bounds.width - inset * 2),
-      height: Math.max(0, bounds.height - inset * 2),
-    };
-    const availableWidth = Math.max(0, innerBounds.width);
-    const availableHeight = Math.max(0, innerBounds.height);
-
-    let drawWidth = opts.width ?? imageSize.width;
-    let drawHeight = opts.height ?? imageSize.height;
-
-    if (scaleWithBounds) {
-      if ((fit === 'contain' || fit === 'cover') && imageSize.width > 0 && imageSize.height > 0) {
-        const scaleX = availableWidth / imageSize.width;
-        const scaleY = availableHeight / imageSize.height;
-        const scale = fit === 'contain' ? Math.min(scaleX, scaleY) : Math.max(scaleX, scaleY);
-        drawWidth = imageSize.width * scale;
-        drawHeight = imageSize.height * scale;
-      } else if (fit === 'stretch') {
-        drawWidth = availableWidth;
-        drawHeight = availableHeight;
-      }
-    }
-
-    drawWidth = Math.min(Math.max(0, drawWidth), Math.max(0, availableWidth));
-    drawHeight = Math.min(Math.max(0, drawHeight), Math.max(0, availableHeight));
-
-    const x = innerBounds.x + (innerBounds.width - drawWidth) / 2;
-    const y = innerBounds.y + (innerBounds.height - drawHeight) / 2;
-
-    return {
-      x,
-      y,
-      width: drawWidth,
-      height: drawHeight,
-    };
-  }
-
   private resolveIconHref(opts: NodeImageOptions): string {
     const source = opts.source;
     if (source instanceof HTMLImageElement) {
@@ -921,99 +807,19 @@ export class SvgExporter {
       return '';
     }
 
-    if (this.isSvgMarkup(source)) {
-      return this.svgToDataUrl(this.tintSvg(source, opts.strokeColor, opts.fillColor));
+    if (isSvgMarkup(source)) {
+      return svgToDataUrl(tintSvg(source, opts.strokeColor, opts.fillColor));
     }
 
     const shouldInlineSvg = source.toLowerCase().endsWith('.svg');
     if (shouldInlineSvg) {
-      const svgText = this.readSvgFromUrlSync(source);
+      const svgText = readSvgFromUrlSync(source);
       if (svgText) {
-        return this.svgToDataUrl(this.tintSvg(svgText, opts.strokeColor, opts.fillColor));
+        return svgToDataUrl(tintSvg(svgText, opts.strokeColor, opts.fillColor));
       }
     }
 
     return source;
-  }
-
-  private readSvgFromUrlSync(url: string): string | null {
-    if (typeof XMLHttpRequest === 'undefined') {
-      return null;
-    }
-
-    try {
-      const xhr = new XMLHttpRequest();
-      xhr.open('GET', url, false);
-      xhr.send();
-      if (xhr.status >= 200 && xhr.status < 300) {
-        return xhr.responseText || null;
-      }
-    } catch {
-      // Ignore and fallback to raw URL source.
-    }
-
-    return null;
-  }
-
-  private isSvgMarkup(value: string): boolean {
-    const trimmed = value.trim().toLowerCase();
-    return trimmed.startsWith('<svg') || trimmed.includes('<svg');
-  }
-
-  private styleSetColor(style: string, key: 'stroke' | 'fill', color: string): string {
-    const hasKey = new RegExp(`${key}\\s*:`).test(style);
-    if (hasKey) {
-      return style.replace(new RegExp(`${key}\\s*:[^;]+`), `${key}:${color}`);
-    }
-    const suffix = style.trim().endsWith(';') || style.trim() === '' ? '' : ';';
-    return `${style}${suffix}${key}:${color};`;
-  }
-
-  private tintSvg(svgText: string, strokeColor?: string, fillColor?: string): string {
-    if (!strokeColor && !fillColor) return svgText;
-
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(svgText, 'image/svg+xml');
-    const root = doc.documentElement;
-    if (!root || root.nodeName.toLowerCase() === 'parsererror') {
-      return svgText;
-    }
-
-    const all = [root, ...Array.from(root.querySelectorAll('*'))] as Element[];
-    for (const el of all) {
-      const stroke = el.getAttribute('stroke');
-      if (strokeColor && stroke !== null && stroke.toLowerCase() !== 'none') {
-        el.setAttribute('stroke', strokeColor);
-      }
-      const fill = el.getAttribute('fill');
-      if (fillColor && fill !== null && fill.toLowerCase() !== 'none') {
-        el.setAttribute('fill', fillColor);
-      }
-      const style = el.getAttribute('style');
-      if (style) {
-        let next = style;
-        if (strokeColor && /stroke\s*:\s*(?!none)/.test(style)) {
-          next = this.styleSetColor(next, 'stroke', strokeColor);
-        }
-        if (fillColor && /fill\s*:\s*(?!none)/.test(style)) {
-          next = this.styleSetColor(next, 'fill', fillColor);
-        }
-        if (next !== style) {
-          el.setAttribute('style', next);
-        }
-      }
-    }
-
-    return new XMLSerializer().serializeToString(root);
-  }
-
-  private svgToDataUrl(svg: string): string {
-    const encoded = encodeURIComponent(svg)
-      .replace(/%0A/g, '')
-      .replace(/%0D/g, '')
-      .replace(/%09/g, ' ')
-      .replace(/%20/g, ' ');
-    return `data:image/svg+xml;utf8,${encoded}`;
   }
 
   private escapeAttribute(value: string): string {

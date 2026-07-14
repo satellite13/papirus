@@ -6,7 +6,17 @@ import {
   type SerializedCComponent,
   type SidesConfig,
 } from './CComponent';
+import { CompositeComponentBase } from './CompositeComponentBase';
 import { flexLayout, type FlexChild, type FlexConfig } from './FlexLayout';
+import type { CShape } from './CShape';
+
+function isCContainer(component: CComponent): component is CContainer {
+  return component.type === 'container';
+}
+
+function isCShape(component: CComponent): component is CShape {
+  return component.type === 'shape';
+}
 
 export interface CContainerOptions {
   id?: string;
@@ -23,7 +33,7 @@ export interface CContainerOptions {
  * Flex container component for CompositeNode.
  * Lays out children using a flexbox-like algorithm.
  */
-export class CContainer implements CComponent {
+export class CContainer extends CompositeComponentBase {
   readonly type = 'container' as const;
   readonly id?: string;
   style: CComponentStyle;
@@ -34,13 +44,13 @@ export class CContainer implements CComponent {
   private _gap: number;
   private _padding: number | SidesConfig;
   private _children: CComponent[];
-  private _onChange?: () => void;
 
   // Cached layout results from last render (used by hitTest and toSVG)
   private _cachedBounds: Bounds[] | null = null;
   private _cachedContainerBounds: Bounds | null = null;
 
   constructor(options: CContainerOptions = {}) {
+    super();
     this.id = options.id;
     this._direction = options.direction ?? 'column';
     this._justifyContent = options.justifyContent ?? 'start';
@@ -101,13 +111,9 @@ export class CContainer implements CComponent {
     this.handleChildChange();
   }
 
-  setOnChange(cb: (() => void) | undefined): void {
-    this._onChange = cb;
-  }
-
   private handleChildChange(): void {
     this._cachedBounds = null;
-    this._onChange?.();
+    this.markChanged();
   }
 
   private getFlexConfig(): FlexConfig {
@@ -153,11 +159,7 @@ export class CContainer implements CComponent {
       flexGrow: 0,
       alignSelf: 'start' as const,
     }));
-    const result = flexLayout(
-      { width: 100000, height: 100000 },
-      measureConfig,
-      measureChildren
-    );
+    const result = flexLayout({ width: 100000, height: 100000 }, measureConfig, measureChildren);
     return result.contentSize;
   }
 
@@ -198,10 +200,7 @@ export class CContainer implements CComponent {
     }
   }
 
-  hitTest(
-    point: { x: number; y: number },
-    bounds: Bounds
-  ): CComponent | null {
+  hitTest(point: { x: number; y: number }, bounds: Bounds): CComponent | null {
     if (this.style.visible === false) return null;
 
     // Use cached bounds if available, otherwise can't hit test children
@@ -231,13 +230,13 @@ export class CContainer implements CComponent {
   findById(id: string): CComponent | undefined {
     for (const child of this._children) {
       if (child.id === id) return child;
-      if (child.type === 'container') {
-        const found = (child as CContainer).findById(id);
+      if (isCContainer(child)) {
+        const found = child.findById(id);
         if (found) return found;
       }
-      if (child.type === 'shape') {
+      if (isCShape(child)) {
         // CShape has a content container — search recursively is handled in CShape
-        const content = (child as { content?: CContainer }).content;
+        const content = child.content;
         if (content) {
           const found = content.findById(id);
           if (found) return found;

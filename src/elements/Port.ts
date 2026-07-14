@@ -13,6 +13,7 @@ function generatePortId(): string {
 
 /**
  * Reset port ID counter (for testing)
+ * @internal
  */
 export function resetPortIdCounter(): void {
   portIdCounter = 1;

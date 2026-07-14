@@ -11,6 +11,7 @@ import type {
   Size,
 } from '@/types';
 import { shallowEqual } from '@/utils/style';
+import { getIconBoxSize, getIconBounds } from '@/utils/iconLayout';
 import {
   DEFAULT_SELECTION_COLOR,
   NODE_HITBOX_PADDING,
@@ -1027,75 +1028,12 @@ export abstract class Node extends Element {
       return undefined;
     }
 
-    const ins = this._icon.inset;
-    return {
-      width: width + ins * 2,
-      height: height + ins * 2,
-    };
+    return getIconBoxSize({ width, height }, this._icon.inset);
   }
 
   private getIconBounds(bounds: Bounds, iconBoxSize: Size, placement: NodeImagePlacement): Bounds {
     const ins = this._icon?.inset ?? 0;
-    switch (placement) {
-      case 'top':
-        return {
-          x: bounds.x,
-          y: bounds.y,
-          width: bounds.width,
-          height: iconBoxSize.height,
-        };
-      case 'bottom':
-        return {
-          x: bounds.x,
-          y: bounds.y + bounds.height - iconBoxSize.height,
-          width: bounds.width,
-          height: iconBoxSize.height,
-        };
-      case 'left':
-        return {
-          x: bounds.x,
-          y: bounds.y,
-          width: iconBoxSize.width,
-          height: bounds.height,
-        };
-      case 'right':
-        return {
-          x: bounds.x + bounds.width - iconBoxSize.width,
-          y: bounds.y,
-          width: iconBoxSize.width,
-          height: bounds.height,
-        };
-      case 'top-left':
-        return {
-          x: bounds.x + ins,
-          y: bounds.y + ins,
-          width: iconBoxSize.width,
-          height: iconBoxSize.height,
-        };
-      case 'top-right':
-        return {
-          x: bounds.x + bounds.width - iconBoxSize.width - ins,
-          y: bounds.y + ins,
-          width: iconBoxSize.width,
-          height: iconBoxSize.height,
-        };
-      case 'bottom-left':
-        return {
-          x: bounds.x + ins,
-          y: bounds.y + bounds.height - iconBoxSize.height - ins,
-          width: iconBoxSize.width,
-          height: iconBoxSize.height,
-        };
-      case 'bottom-right':
-        return {
-          x: bounds.x + bounds.width - iconBoxSize.width - ins,
-          y: bounds.y + bounds.height - iconBoxSize.height - ins,
-          width: iconBoxSize.width,
-          height: iconBoxSize.height,
-        };
-      default:
-        return bounds;
-    }
+    return getIconBounds(bounds, iconBoxSize, placement, ins);
   }
 
   private normalizeAnchorPoints(config?: AnchorPointsConfig): Required<AnchorPointsConfig> {

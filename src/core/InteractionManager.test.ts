@@ -5,12 +5,78 @@ import { RectangleNode } from '../elements/nodes/RectangleNode';
 import { Edge } from '../elements/Edge';
 import { MiniMap } from './overlays/MiniMap';
 import { stubCanvasContext, stubAnimationFrame } from '../test/testUtils';
+import { ClipboardManager } from './ClipboardManager';
+import { HistoryManager, createNodeSnapshot } from './HistoryManager';
+import { PropertyChangeBatcher } from './PropertyChangeBatcher';
 
 describe('InteractionManager', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
     stubCanvasContext();
     stubAnimationFrame();
+  });
+
+  it('copies and pastes selected nodes through ClipboardManager', () => {
+    const canvas = document.createElement('canvas');
+    const renderer = new DiagramRenderer(canvas, { width: 200, height: 100, retina: false });
+    const history = new HistoryManager();
+    const interaction = new InteractionManager({ renderer });
+    const clipboard = new ClipboardManager({
+      renderer,
+      selectionManager: interaction.selection,
+      historyManager: history,
+      nodeFactory: (data) => new RectangleNode(data),
+      edgeFactory: (data) => new Edge(data),
+    });
+    const node = new RectangleNode({
+      id: 'source',
+      x: 10,
+      y: 15,
+      width: 20,
+      height: 25,
+    });
+    renderer.addNode(node);
+    interaction.selection.select(node.id);
+
+    clipboard.copySelection();
+    clipboard.pasteSelection();
+
+    expect(renderer.nodes.size).toBe(2);
+    expect(history.undoCount).toBe(1);
+    const pasted = Array.from(renderer.nodes.values()).find(
+      (candidate) => candidate.id !== node.id
+    );
+    expect(pasted).toMatchObject({ x: 30, y: 35 });
+  });
+
+  it('batches property changes through PropertyChangeBatcher', () => {
+    vi.useFakeTimers();
+    try {
+      const canvas = document.createElement('canvas');
+      const renderer = new DiagramRenderer(canvas, { width: 200, height: 100, retina: false });
+      const history = new HistoryManager();
+      const batcher = new PropertyChangeBatcher({ renderer, historyManager: history });
+      const node = new RectangleNode({
+        id: 'batched-node',
+        x: 10,
+        y: 15,
+        width: 20,
+        height: 25,
+      });
+      renderer.addNode(node);
+      const before = createNodeSnapshot(node);
+      node.style = { fill: '#123456' };
+      const after = createNodeSnapshot(node);
+
+      batcher.queue('node', node.id, before, after);
+      vi.runAllTimers();
+
+      expect(history.undoCount).toBe(1);
+      history.undo();
+      expect(node.style.fill).toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('deletes selected nodes on Delete key', () => {
@@ -162,7 +228,10 @@ describe('InteractionManager', () => {
       from: { nodeId: nodeA.id },
       to: { nodeId: nodeB.id },
       type: 'editable-polyline',
-      controlPoints: [{ x: 150, y: 50 }, { x: 200, y: 120 }],
+      controlPoints: [
+        { x: 150, y: 50 },
+        { x: 200, y: 120 },
+      ],
     });
     renderer.addEdge(edge);
     edge.updateEndpoints({ x: 110, y: 100 }, { x: 250, y: 100 });
@@ -226,7 +295,10 @@ describe('InteractionManager', () => {
       from: { nodeId: nodeA.id },
       to: { nodeId: nodeB.id },
       type: 'editable-polyline',
-      controlPoints: [{ x: 150, y: 50 }, { x: 200, y: 120 }],
+      controlPoints: [
+        { x: 150, y: 50 },
+        { x: 200, y: 120 },
+      ],
     });
     renderer.addEdge(edge);
     edge.updateEndpoints({ x: 110, y: 100 }, { x: 250, y: 100 });
@@ -293,12 +365,16 @@ describe('InteractionManager', () => {
     const renderer = new DiagramRenderer(canvas, { width: 300, height: 200, retina: false });
     new InteractionManager({ renderer });
 
-    const node = new RectangleNode({ x: 20, y: 20, width: 80, height: 40, label: 'Old node label' });
+    const node = new RectangleNode({
+      x: 20,
+      y: 20,
+      width: 80,
+      height: 40,
+      label: 'Old node label',
+    });
     renderer.addNode(node);
 
-    canvas.dispatchEvent(
-      new MouseEvent('dblclick', { clientX: 40, clientY: 40, bubbles: true })
-    );
+    canvas.dispatchEvent(new MouseEvent('dblclick', { clientX: 40, clientY: 40, bubbles: true }));
 
     const editor = document.body.querySelector('textarea[aria-label="Edit label"]');
     expect(editor).toBeInstanceOf(HTMLTextAreaElement);
@@ -342,9 +418,7 @@ describe('InteractionManager', () => {
     renderer.addEdge(edge);
     edge.updateEndpoints({ x: 80, y: 60 }, { x: 220, y: 60 });
 
-    canvas.dispatchEvent(
-      new MouseEvent('dblclick', { clientX: 150, clientY: 60, bubbles: true })
-    );
+    canvas.dispatchEvent(new MouseEvent('dblclick', { clientX: 150, clientY: 60, bubbles: true }));
 
     const editor = document.body.querySelector('textarea[aria-label="Edit label"]');
     expect(editor).toBeInstanceOf(HTMLTextAreaElement);
@@ -448,7 +522,13 @@ describe('InteractionManager', () => {
       new MouseEvent('mousedown', { clientX: 10, clientY: 112, button: 0, bubbles: true })
     );
     canvas.dispatchEvent(
-      new MouseEvent('mousemove', { clientX: 170, clientY: 112, button: 0, buttons: 1, bubbles: true })
+      new MouseEvent('mousemove', {
+        clientX: 170,
+        clientY: 112,
+        button: 0,
+        buttons: 1,
+        bubbles: true,
+      })
     );
     canvas.dispatchEvent(
       new MouseEvent('mouseup', { clientX: 170, clientY: 112, button: 0, bubbles: true })
@@ -475,12 +555,24 @@ describe('InteractionManager', () => {
 
     renderer.addNode(new RectangleNode({ x: 420, y: 20, width: 80, height: 40 }));
     canvas.dispatchEvent(
-      new MouseEvent('mousedown', { clientX: 10, clientY: 112, button: 0, buttons: 1, bubbles: true })
+      new MouseEvent('mousedown', {
+        clientX: 10,
+        clientY: 112,
+        button: 0,
+        buttons: 1,
+        bubbles: true,
+      })
     );
 
     const offsetBeforeReenter = renderer.offsetX;
     canvas.dispatchEvent(
-      new MouseEvent('mousemove', { clientX: 170, clientY: 112, button: 0, buttons: 0, bubbles: true })
+      new MouseEvent('mousemove', {
+        clientX: 170,
+        clientY: 112,
+        button: 0,
+        buttons: 0,
+        bubbles: true,
+      })
     );
 
     expect(renderer.offsetX).toBe(offsetBeforeReenter);
@@ -503,13 +595,25 @@ describe('InteractionManager', () => {
     new InteractionManager({ renderer });
 
     canvas.dispatchEvent(
-      new MouseEvent('mousedown', { clientX: 40, clientY: 40, button: 0, buttons: 1, bubbles: true })
+      new MouseEvent('mousedown', {
+        clientX: 40,
+        clientY: 40,
+        button: 0,
+        buttons: 1,
+        bubbles: true,
+      })
     );
 
     const offsetBeforeReenterX = renderer.offsetX;
     const offsetBeforeReenterY = renderer.offsetY;
     canvas.dispatchEvent(
-      new MouseEvent('mousemove', { clientX: 120, clientY: 120, button: 0, buttons: 0, bubbles: true })
+      new MouseEvent('mousemove', {
+        clientX: 120,
+        clientY: 120,
+        button: 0,
+        buttons: 0,
+        bubbles: true,
+      })
     );
 
     expect(renderer.offsetX).toBe(offsetBeforeReenterX);
@@ -624,7 +728,13 @@ describe('InteractionManager', () => {
       new MouseEvent('mousedown', { clientX: 250, clientY: 156, button: 0, bubbles: true })
     );
     canvas.dispatchEvent(
-      new MouseEvent('mousemove', { clientX: 330, clientY: 156, button: 0, buttons: 1, bubbles: true })
+      new MouseEvent('mousemove', {
+        clientX: 330,
+        clientY: 156,
+        button: 0,
+        buttons: 1,
+        bubbles: true,
+      })
     );
     canvas.dispatchEvent(
       new MouseEvent('mouseup', { clientX: 330, clientY: 156, button: 0, bubbles: true })
@@ -799,7 +909,13 @@ describe('InteractionManager', () => {
     renderer.addNode(nodeB);
 
     canvas.dispatchEvent(
-      new MouseEvent('mousedown', { clientX: 10, clientY: 10, button: 0, ctrlKey: true, bubbles: true })
+      new MouseEvent('mousedown', {
+        clientX: 10,
+        clientY: 10,
+        button: 0,
+        ctrlKey: true,
+        bubbles: true,
+      })
     );
     canvas.dispatchEvent(
       new MouseEvent('mousemove', {

@@ -1,5 +1,5 @@
 import { EventEmitter } from '@/events/EventEmitter';
-import type { DiagramRenderer } from './DiagramRenderer';
+import type { DiagramSurface } from './DiagramSurface';
 import type { Node } from '@/elements/Node';
 import type { InputEvent } from '@/events/InputHandler';
 import type { Bounds, Point } from '@/types';
@@ -20,12 +20,12 @@ export interface SelectionEvents {
  * Manages element selection
  */
 export class SelectionManager extends EventEmitter<SelectionEvents> {
-  private renderer: DiagramRenderer;
+  private renderer: DiagramSurface;
   private _selectedIds = new Set<string>();
   private selectionStart: Point | null = null;
   private selectionRect: Bounds | null = null;
 
-  constructor(renderer: DiagramRenderer) {
+  constructor(renderer: DiagramSurface) {
     super();
     this.renderer = renderer;
   }
@@ -120,7 +120,11 @@ export class SelectionManager extends EventEmitter<SelectionEvents> {
    */
   handleClick(event: InputEvent): void {
     const point = { x: event.worldX, y: event.worldY };
-    const element = this.renderer.getInteractableElementAtPoint(point, event.screenX, event.screenY);
+    const element = this.renderer.getInteractableElementAtPoint(
+      point,
+      event.screenX,
+      event.screenY
+    );
 
     if (element === undefined) {
       if (!event.ctrlKey && !event.metaKey) {
