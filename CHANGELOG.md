@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-07-21
+
+### Fixed
+- Changing an edge path type recalculates the path immediately (bezier → straight no longer keeps old control points visually).
+- With `lockAnchors` off, endpoints float to the nearest port/outline toward the other end instead of staying on a stored port or jumping to the node center.
+
 ## [0.7.0] - 2026-07-21
 
 ### Added
@@ -345,7 +351,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Edge animations (flow effect)
 - Context menu and search/filter
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.7.0...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.7.1...HEAD
+[0.7.1]: https://gitverse.ru/ngroznykh/papirus/compare/v0.7.0...v0.7.1
 [0.7.0]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.5...v0.7.0
 [0.6.5]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.4...v0.6.5
 [0.6.4]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.3...v0.6.4

@@ -9,6 +9,12 @@
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-07-21
+
+### Исправлено
+- Смена типа пути связи сразу пересчитывает геометрию (bezier → straight больше не оставляет старые контрольные точки визуально).
+- При `lockAnchors: false` концы «плавают» к ближайшему порту/контуру в сторону другого конца, а не остаются на сохранённом порте и не уходят в центр ноды.
+
 ## [0.7.0] - 2026-07-21
 
 ### Добавлено
@@ -352,7 +358,8 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.7.0...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.7.1...HEAD
+[0.7.1]: https://gitverse.ru/ngroznykh/papirus/compare/v0.7.0...v0.7.1
 [0.7.0]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.5...v0.7.0
 [0.6.5]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.4...v0.6.5
 [0.6.4]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.3...v0.6.4
