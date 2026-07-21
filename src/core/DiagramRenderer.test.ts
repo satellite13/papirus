@@ -18,10 +18,42 @@ describe('DiagramRenderer', () => {
 
     renderer.addNode(node);
     (renderer as unknown as { _dirty: boolean })._dirty = false;
+    (renderer as unknown as { _contentDirty: boolean })._contentDirty = false;
 
     node.x = 20;
 
     expect((renderer as unknown as { _dirty: boolean })._dirty).toBe(true);
+    expect((renderer as unknown as { _contentDirty: boolean })._contentDirty).toBe(true);
+  });
+
+  it('does not mark content dirty on viewport-only pan/zoom', () => {
+    const canvas = document.createElement('canvas');
+    const renderer = new DiagramRenderer(canvas, { width: 200, height: 100, retina: false });
+    const updateAll = vi.fn();
+    (renderer as unknown as { edgeEndpointUpdater: { updateAll: () => void } }).edgeEndpointUpdater =
+      { updateAll };
+    (renderer as unknown as { _contentDirty: boolean })._contentDirty = false;
+    (renderer as unknown as { _dirty: boolean })._dirty = true;
+
+    renderer.offsetX += 12;
+    renderer.zoom = 1.2;
+    (renderer as unknown as { renderFrame: (now: number) => void }).renderFrame(0);
+
+    expect(updateAll).not.toHaveBeenCalled();
+    expect((renderer as unknown as { _contentDirty: boolean })._contentDirty).toBe(false);
+  });
+
+  it('resyncs edge endpoints after layout changes', () => {
+    const canvas = document.createElement('canvas');
+    const renderer = new DiagramRenderer(canvas, { width: 200, height: 100, retina: false });
+    const updateAll = vi.fn();
+    (renderer as unknown as { edgeEndpointUpdater: { updateAll: () => void } }).edgeEndpointUpdater =
+      { updateAll };
+    const node = new RectangleNode({ x: 0, y: 0, width: 10, height: 10 });
+    renderer.addNode(node);
+    (renderer as unknown as { renderFrame: (now: number) => void }).renderFrame(0);
+
+    expect(updateAll).toHaveBeenCalledTimes(1);
   });
 
   it('adds and removes nodes', () => {

@@ -41,14 +41,32 @@ export type PortType = 'input' | 'output';
 
 /**
  * Edge connection endpoint.
- * When attachToOutline is enabled, outlineParam (0-1 along shape perimeter) can be used
- * instead of portId to attach the edge anywhere on the shape outline.
+ *
+ * Node attachment: set `nodeId` (optionally `portId` / `outlineParam`).
+ * Edge attachment (junction / relation→relation): set `edgeId` + optional `pathParam` (0..1).
+ * `nodeId` and `edgeId` are mutually exclusive.
  */
 export interface EdgeEndpoint {
-  nodeId: string;
+  nodeId?: string;
   portId?: string;
   /** Position along shape outline (0-1), used when attachToOutline mode is on */
   outlineParam?: number;
+  /** Host edge id for edge-to-edge attachment */
+  edgeId?: string;
+  /** Position along host edge path length (0-1). Default 0.5 when edgeId is set. */
+  pathParam?: number;
+}
+
+export function isNodeEdgeEndpoint(
+  endpoint: EdgeEndpoint
+): endpoint is EdgeEndpoint & { nodeId: string } {
+  return typeof endpoint.nodeId === 'string' && endpoint.nodeId.length > 0;
+}
+
+export function isEdgeEdgeEndpoint(
+  endpoint: EdgeEndpoint
+): endpoint is EdgeEndpoint & { edgeId: string } {
+  return typeof endpoint.edgeId === 'string' && endpoint.edgeId.length > 0;
 }
 
 /**

@@ -172,8 +172,10 @@ export class SearchManager {
         continue;
       }
       const matchesEdge = this.matchesEdge(edge, options);
-      const fromVisible = this.renderer.getNode(edge.from.nodeId)?.visible ?? true;
-      const toVisible = this.renderer.getNode(edge.to.nodeId)?.visible ?? true;
+      const fromId = edge.from.nodeId;
+      const toId = edge.to.nodeId;
+      const fromVisible = fromId ? (this.renderer.getNode(fromId)?.visible ?? true) : true;
+      const toVisible = toId ? (this.renderer.getNode(toId)?.visible ?? true) : true;
       edge.visible = matchesEdge && fromVisible && toVisible;
     }
 

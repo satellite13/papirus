@@ -70,6 +70,8 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
   private sourceOutlineParam: number | null = null;
   private previewTargetOutlineParam: number | null = null;
   private previewTargetNodeId: string | null = null;
+  private previewTargetEdgeId: string | null = null;
+  private previewTargetPathParam: number | null = null;
 
   // Edge reconnection state
   private isReconnecting = false;
@@ -294,8 +296,8 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     if (!this.reconnectingEdge) return;
 
     const edge = this.reconnectingEdge;
-    const fromNode = this.renderer.getNode(edge.from.nodeId);
-    const toNode = this.renderer.getNode(edge.to.nodeId);
+    const fromNode = edge.from.nodeId ? this.renderer.getNode(edge.from.nodeId) : undefined;
+    const toNode = edge.to.nodeId ? this.renderer.getNode(edge.to.nodeId) : undefined;
 
     let snappedPoint = point;
     let snappedDir: string | undefined;
@@ -474,6 +476,8 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     this.previewTargetAnchorId = null;
     this.previewTargetOutlineParam = null;
     this.previewTargetNodeId = null;
+    this.previewTargetEdgeId = null;
+    this.previewTargetPathParam = null;
     let targetNode = this.getNodeAtPoint(cursorPoint, false);
 
     if (this.attachToOutline) {
@@ -524,6 +528,26 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
           snappedPoint = nearestAnchor.point;
           this.previewTargetAnchorId = nearestAnchor.id;
         }
+      }
+    }
+
+    // Prefer edge drop when closer than outline/node snap (outline tolerance is larger).
+    const edgeDrop = this.findEdgeDropTarget(cursorPoint);
+    if (edgeDrop) {
+      let nodeDistance = Infinity;
+      if (targetNode) {
+        const dx = cursorPoint.x - snappedPoint.x;
+        const dy = cursorPoint.y - snappedPoint.y;
+        nodeDistance = Math.sqrt(dx * dx + dy * dy);
+      }
+      if (!targetNode || edgeDrop.distance < nodeDistance) {
+        targetNode = null;
+        this.previewTargetNodeId = null;
+        this.previewTargetOutlineParam = null;
+        this.previewTargetAnchorId = null;
+        snappedPoint = edgeDrop.point;
+        this.previewTargetEdgeId = edgeDrop.edge.id;
+        this.previewTargetPathParam = edgeDrop.pathParam;
       }
     }
 
@@ -661,11 +685,41 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     const point = { x: event.worldX, y: event.worldY };
     let createdEdge: Edge | null = null;
 
+    const edgeDrop =
+      this.previewTargetEdgeId != null && this.previewTargetPathParam != null
+        ? {
+            edgeId: this.previewTargetEdgeId,
+            pathParam: this.previewTargetPathParam,
+            point,
+          }
+        : this.findEdgeDropTarget(point);
+
     let targetNode = this.getNodeAtPoint(point, false);
     if (!targetNode && this.attachToOutline && this.previewTargetNodeId) {
       targetNode = this.renderer.getNode(this.previewTargetNodeId) ?? null;
     }
-    if (targetNode) {
+
+    // Preview edge snap wins over a node under the cursor (note→relation).
+    if (edgeDrop && this.sourceNode && (!targetNode || this.previewTargetEdgeId != null)) {
+      const from: EdgeEndpoint = this.attachToOutline
+        ? {
+            nodeId: this.sourceNode.id,
+            outlineParam: this.sourceOutlineParam ?? undefined,
+          }
+        : {
+            nodeId: this.sourceNode.id,
+            portId: this.sourceAnchorId
+              ? `${ANCHOR_PORT_PREFIX}${this.sourceAnchorId}`
+              : undefined,
+          };
+      const to: EdgeEndpoint = {
+        edgeId: edgeDrop.edgeId,
+        pathParam: edgeDrop.pathParam,
+      };
+      createdEdge = this.createEdge(from, to);
+      this.addEdge(createdEdge);
+      this.emit('connect', createdEdge);
+    } else if (targetNode) {
       const allowed =
         !this._connectionValidator || this._connectionValidator(this.sourceNode!.id, targetNode.id);
       if (allowed) {
@@ -861,7 +915,40 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     this.sourceOutlineParam = null;
     this.previewTargetOutlineParam = null;
     this.previewTargetNodeId = null;
+    this.previewTargetEdgeId = null;
+    this.previewTargetPathParam = null;
     this.setCursor('');
+  }
+
+  /**
+   * Find the nearest edge under the cursor for junction / note→relation drops.
+   */
+  private findEdgeDropTarget(
+    point: Point
+  ): { edge: Edge; edgeId: string; pathParam: number; point: Point; distance: number } | null {
+    const tolerance = Math.max(14, 20 / Math.max(this.renderer.zoom, 0.0001));
+    let best: { edge: Edge; pathParam: number; point: Point; distance: number } | null = null;
+    for (const edge of this.renderer.edges.values()) {
+      if (!edge.visible || edge.path.length < 2) continue;
+      const closest = edge.getClosestPointOnPath(point);
+      if (!closest || closest.distance > tolerance) continue;
+      if (!best || closest.distance < best.distance) {
+        best = {
+          edge,
+          pathParam: closest.pathParam,
+          point: closest.point,
+          distance: closest.distance,
+        };
+      }
+    }
+    if (!best) return null;
+    return {
+      edge: best.edge,
+      edgeId: best.edge.id,
+      pathParam: best.pathParam,
+      point: best.point,
+      distance: best.distance,
+    };
   }
 
   private resetReconnection(): void {

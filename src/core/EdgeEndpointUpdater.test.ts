@@ -1,0 +1,46 @@
+import { beforeEach, describe, expect, it } from 'vitest';
+import { Edge } from '@/elements/Edge';
+import { RectangleNode } from '@/elements/nodes/RectangleNode';
+import { stubAnimationFrame, stubCanvasContext } from '@/test/testUtils';
+import { DiagramRenderer } from './DiagramRenderer';
+
+describe('EdgeEndpointUpdater edge attachments', () => {
+  beforeEach(() => {
+    stubCanvasContext();
+    stubAnimationFrame();
+  });
+
+  it('places a junction endpoint on the host edge path', () => {
+    const canvas = document.createElement('canvas');
+    const renderer = new DiagramRenderer(canvas, { width: 400, height: 300, retina: false });
+    const a = new RectangleNode({ id: 'a', x: 0, y: 40, width: 40, height: 40 });
+    const b = new RectangleNode({ id: 'b', x: 200, y: 40, width: 40, height: 40 });
+    const c = new RectangleNode({ id: 'c', x: 100, y: 160, width: 40, height: 40 });
+    renderer.addNode(a);
+    renderer.addNode(b);
+    renderer.addNode(c);
+
+    const host = new Edge({
+      id: 'host',
+      from: { nodeId: 'a' },
+      to: { nodeId: 'b' },
+      type: 'straight',
+    });
+    const junction = new Edge({
+      id: 'junction',
+      from: { nodeId: 'c' },
+      to: { edgeId: 'host', pathParam: 0.5 },
+      type: 'straight',
+      arrowType: 'none',
+    });
+    renderer.addEdge(host);
+    renderer.addEdge(junction);
+    renderer.render();
+
+    const hostMid = host.getPointAt(0.5)?.point;
+    expect(hostMid).toBeTruthy();
+    const tip = junction.path[junction.path.length - 1]!;
+    expect(tip.x).toBeCloseTo(hostMid!.x, 0);
+    expect(tip.y).toBeCloseTo(hostMid!.y, 0);
+  });
+});

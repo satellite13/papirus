@@ -105,6 +105,8 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> implements Diag
   private _offsetY = 0;
   private _dirty = true;
   private _styleDirty = true;
+  /** Node/edge layout changed — edge endpoints must be resynced before paint. */
+  private _contentDirty = true;
   private _destroyed = false;
   private _canvasRect: DOMRectReadOnly | null = null;
   private _nodeObstaclesCache: PathObstacle[] | null = null;
@@ -467,12 +469,11 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> implements Diag
    * Add a node to the diagram
    */
   addNode(node: Node): void {
-    node.setDirtyListener(() => this.markDirty());
+    node.setDirtyListener(() => this.markContentDirty());
     node.setAttachToOutlineGetter(() => this._attachToOutline);
     this._nodes.set(node.id, node);
-    this._nodeObstaclesCache = null;
     this.animationManager.registerEnter(node.id);
-    this.markDirty();
+    this.markContentDirty();
     this.emit('nodeAdd', node);
   }
 
@@ -518,13 +519,15 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> implements Diag
    * Add an edge to the diagram
    */
   addEdge(edge: Edge): void {
+    // Style/label dirty → repaint only. Binding changes go through markContentDirty below.
     edge.setDirtyListener(() => this.markDirty());
+    edge.setBindingListener(() => this.markContentDirty());
     this._edges.set(edge.id, edge);
-    // Update reverse index
-    this._updateEdgeIndex(edge.id, edge.from.nodeId, true);
-    this._updateEdgeIndex(edge.id, edge.to.nodeId, true);
+    // Update reverse index (node ends only; edge-attached ends use edgeId)
+    if (edge.from.nodeId) this._updateEdgeIndex(edge.id, edge.from.nodeId, true);
+    if (edge.to.nodeId) this._updateEdgeIndex(edge.id, edge.to.nodeId, true);
     this.animationManager.registerEnter(edge.id);
-    this.markDirty();
+    this.markContentDirty();
     this.emit('edgeAdd', edge);
   }
 
@@ -587,10 +590,9 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> implements Diag
     }
 
     this._nodes.delete(nodeId);
-    this._nodeObstaclesCache = null;
     node.setDirtyListener(undefined);
     node.setAttachToOutlineGetter(undefined);
-    this.markDirty();
+    this.markContentDirty();
     this.emit('nodeRemove', node);
     return true;
   }
@@ -601,13 +603,26 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> implements Diag
       return false;
     }
 
+    // Edges attached to this edge (junctions) must go with the host.
+    const dependents: string[] = [];
+    for (const other of this._edges.values()) {
+      if (other.id === edgeId) continue;
+      if (other.from.edgeId === edgeId || other.to.edgeId === edgeId) {
+        dependents.push(other.id);
+      }
+    }
+    for (const dependentId of dependents) {
+      this.removeEdgeImmediate(dependentId);
+    }
+
     // Clean up reverse index
-    this._updateEdgeIndex(edgeId, edge.from.nodeId, false);
-    this._updateEdgeIndex(edgeId, edge.to.nodeId, false);
+    if (edge.from.nodeId) this._updateEdgeIndex(edgeId, edge.from.nodeId, false);
+    if (edge.to.nodeId) this._updateEdgeIndex(edgeId, edge.to.nodeId, false);
 
     this._edges.delete(edgeId);
     edge.setDirtyListener(undefined);
-    this.markDirty();
+    edge.setBindingListener(undefined);
+    this.markContentDirty();
     this.emit('edgeRemove', edge);
     return true;
   }
@@ -726,9 +741,20 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> implements Diag
   }
 
   /**
-   * Mark the diagram as needing re-render
+   * Mark the diagram as needing re-render (viewport / cosmetics).
+   * Does not resync edge endpoints — use {@link markContentDirty} after layout changes.
    */
   markDirty(): void {
+    this._dirty = true;
+  }
+
+  /**
+   * Mark that node/edge layout changed and edge endpoints must be recalculated.
+   * Pan/zoom should call {@link markDirty} only so path routing is not redone every frame.
+   */
+  markContentDirty(): void {
+    this._contentDirty = true;
+    this._nodeObstaclesCache = null;
     this._dirty = true;
   }
 
@@ -859,7 +885,6 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> implements Diag
 
   private renderFrame(now: number): void {
     this.frameTime = now;
-    this._nodeObstaclesCache = null;
     const ctx = this.ctx;
     const { width, height, backgroundColor } = this.options;
 
@@ -902,8 +927,11 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> implements Diag
       }
     }
 
-    // Sync edge endpoints with node positions
-    this.edgeEndpointUpdater.updateAll();
+    // Sync edge endpoints only after layout changes — not on every pan/zoom frame.
+    if (this._contentDirty) {
+      this.edgeEndpointUpdater.updateAll();
+      this._contentDirty = false;
+    }
 
     // Render nodes (middle layer)
     for (const node of this._nodes.values()) {

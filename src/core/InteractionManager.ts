@@ -215,7 +215,9 @@ export class InteractionManager {
       if (!edge.hasEditableControlPoints()) {
         continue;
       }
-      if (!idSet.has(edge.from.nodeId) && !idSet.has(edge.to.nodeId)) {
+      const fromId = edge.from.nodeId;
+      const toId = edge.to.nodeId;
+      if ((!fromId || !idSet.has(fromId)) && (!toId || !idSet.has(toId))) {
         continue;
       }
       if (this.dragStartEditablePolylinePoints.has(edge.id)) {
@@ -1061,7 +1063,9 @@ export class InteractionManager {
     }
 
     for (const edge of this.renderer.edges.values()) {
-      if (nodeIds.has(edge.from.nodeId) || nodeIds.has(edge.to.nodeId)) {
+      const fromId = edge.from.nodeId;
+      const toId = edge.to.nodeId;
+      if ((fromId && nodeIds.has(fromId)) || (toId && nodeIds.has(toId))) {
         if (!edgeIds.has(edge.id)) {
           edgeIds.add(edge.id);
           edges.push(edge);
@@ -1104,8 +1108,15 @@ export class InteractionManager {
   }
 
   private endpointsEqual(a: EdgeEndpoint, b: EdgeEndpoint): boolean {
-    if (a.nodeId !== b.nodeId) return false;
+    if ((a.edgeId ?? null) !== (b.edgeId ?? null)) return false;
+    if ((a.nodeId ?? null) !== (b.nodeId ?? null)) return false;
     if ((a.portId ?? null) !== (b.portId ?? null)) return false;
+    const aPath = a.pathParam;
+    const bPath = b.pathParam;
+    if (aPath !== undefined || bPath !== undefined) {
+      if (aPath === undefined || bPath === undefined) return false;
+      if (Math.abs(aPath - bPath) >= 1e-9) return false;
+    }
     const aParam = a.outlineParam;
     const bParam = b.outlineParam;
     if (aParam === undefined && bParam === undefined) return true;
