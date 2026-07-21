@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-07-21
+
+### Added
+- Edge endpoints can attach to another edge via `edgeId` + `pathParam` (junction / note→relation).
+- `ConnectionManager` accepts a connection drop onto an existing edge path.
+- `Edge.getPointAt` / `getClosestPointOnPath` helpers and `docs/edge-endpoints.md`.
+
+### Changed
+- `EdgeEndpointUpdater` resolves edge-attached ends in a second pass after node-anchored edges.
+
 ## [0.6.5] - 2026-07-14
 
 ### Added
@@ -335,7 +345,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Edge animations (flow effect)
 - Context menu and search/filter
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.5...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.7.0...HEAD
+[0.7.0]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.5...v0.7.0
 [0.6.5]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.4...v0.6.5
 [0.6.4]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.3...v0.6.4
 [0.6.3]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.6.3

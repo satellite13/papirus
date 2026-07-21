@@ -9,6 +9,16 @@
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-07-21
+
+### Добавлено
+- Конец связи может крепиться к другой связи через `edgeId` + `pathParam` (junction / note→relation).
+- `ConnectionManager` завершает протягивание связи drop’ом на путь существующего ребра.
+- Хелперы `Edge.getPointAt` / `getClosestPointOnPath` и `docs/edge-endpoints.md`.
+
+### Изменено
+- `EdgeEndpointUpdater` считает концы на рёбрах вторым проходом после node-привязок.
+
 ## [0.6.5] - 2026-07-14
 
 ### Добавлено
@@ -342,7 +352,8 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.5...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.7.0...HEAD
+[0.7.0]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.5...v0.7.0
 [0.6.5]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.4...v0.6.5
 [0.6.4]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.3...v0.6.4
 [0.6.3]: https://gitverse.ru/ngroznykh/papirus/releases/tag/v0.6.3
