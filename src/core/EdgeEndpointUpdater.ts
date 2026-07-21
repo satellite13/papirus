@@ -73,8 +73,8 @@ export class EdgeEndpointUpdater {
     if (includeRoutingObstacles) {
       this.lockAnchors(edge, fromNode, toNode);
     }
-    const from = this.resolveNodeEndpoint(fromNode, edge.from);
-    const to = this.resolveNodeEndpoint(toNode, edge.to);
+    const from = this.resolveNodeEndpoint(fromNode, edge.from, toNode.getCenter(), edge.lockAnchors);
+    const to = this.resolveNodeEndpoint(toNode, edge.to, fromNode.getCenter(), edge.lockAnchors);
     edge.updateEndpoints(
       from.point,
       to.point,
@@ -93,8 +93,22 @@ export class EdgeEndpointUpdater {
     edges: ReadonlyMap<string, Edge>,
     obstacles: PathObstacle[] | undefined
   ): boolean {
-    const from = this.resolveAnyEndpoint(edge.from, nodes, edges);
-    const to = this.resolveAnyEndpoint(edge.to, nodes, edges);
+    // Resolve path-attached ends first so floating node ends can aim at them.
+    const fromEdge = isEdgeEdgeEndpoint(edge.from)
+      ? this.resolveEdgeEndpoint(edge.from, edges)
+      : null;
+    const toEdge = isEdgeEdgeEndpoint(edge.to) ? this.resolveEdgeEndpoint(edge.to, edges) : null;
+
+    const from =
+      fromEdge ??
+      (isNodeEdgeEndpoint(edge.from)
+        ? this.resolveNodeEnd(edge.from, nodes, toEdge?.point, edge.lockAnchors)
+        : null);
+    const to =
+      toEdge ??
+      (isNodeEdgeEndpoint(edge.to)
+        ? this.resolveNodeEnd(edge.to, nodes, from?.point, edge.lockAnchors)
+        : null);
     if (!from || !to) return false;
 
     const before = edge.path;
@@ -119,20 +133,15 @@ export class EdgeEndpointUpdater {
     return beforeKey !== afterKey;
   }
 
-  private resolveAnyEndpoint(
-    endpoint: EdgeEndpoint,
+  private resolveNodeEnd(
+    endpoint: EdgeEndpoint & { nodeId: string },
     nodes: ReadonlyMap<string, Node>,
-    edges: ReadonlyMap<string, Edge>
+    toward: Point | undefined,
+    lockAnchors: boolean
   ): ResolvedEnd | null {
-    if (isEdgeEdgeEndpoint(endpoint)) {
-      return this.resolveEdgeEndpoint(endpoint, edges);
-    }
-    if (isNodeEdgeEndpoint(endpoint)) {
-      const node = nodes.get(endpoint.nodeId);
-      if (!node) return null;
-      return this.resolveNodeEndpoint(node, endpoint);
-    }
-    return null;
+    const node = nodes.get(endpoint.nodeId);
+    if (!node) return null;
+    return this.resolveNodeEndpoint(node, endpoint, toward, lockAnchors);
   }
 
   private resolveEdgeEndpoint(
@@ -171,18 +180,45 @@ export class EdgeEndpointUpdater {
     }
   }
 
-  private resolveNodeEndpoint(node: Node, endpoint: EdgeEndpoint): ResolvedEnd {
-    if (endpoint.portId) {
+  /**
+   * Resolve a node endpoint:
+   * - lockAnchors + portId → fixed side port (wins over leftover outlineParam)
+   * - outlineParam → fixed point on outline (attach-to-outline)
+   * - otherwise → floating nearest port/outline toward the other end
+   */
+  private resolveNodeEndpoint(
+    node: Node,
+    endpoint: EdgeEndpoint,
+    toward: Point | undefined,
+    lockAnchors: boolean
+  ): ResolvedEnd {
+    if (lockAnchors && isNodeEdgeEndpoint(endpoint) && endpoint.portId) {
       const anchorId = endpoint.portId.slice(ANCHOR_PORT_PREFIX.length);
       const point = node.getAnchorPointById(anchorId);
-      return point ? { point, direction: anchorId.split(':')[0] } : { point: node.getCenter() };
+      if (point) {
+        return { point, direction: anchorId.split(':')[0] };
+      }
     }
-    if (endpoint.outlineParam !== undefined) {
+
+    if (isNodeEdgeEndpoint(endpoint) && endpoint.outlineParam !== undefined) {
       return {
         point: node.getConnectionPointAtOutlineParam(endpoint.outlineParam),
         direction: getDirectionFromOutlineParam(endpoint.outlineParam),
       };
     }
+
+    if (toward) {
+      return this.resolveFloatingEndpoint(node, toward);
+    }
+
     return { point: node.getCenter() };
+  }
+
+  private resolveFloatingEndpoint(node: Node, toward: Point): ResolvedEnd {
+    const anchor = node.getNearestAnchor(toward);
+    if (anchor) {
+      return { point: anchor.point, direction: anchor.id.split(':')[0] };
+    }
+    return { point: node.getConnectionPoint(toward) };
   }
 }
