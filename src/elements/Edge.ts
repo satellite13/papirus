@@ -176,9 +176,13 @@ export class Edge extends Element {
       this._type = value;
       this._pathStrategy = this.getPathStrategy(value);
       if (value !== 'editable-polyline' && this._controlPoints?.length) {
+        // Clears control points and recalculates via the controlPoints setter.
         this.controlPoints = undefined;
+      } else {
+        // Strategy changed (e.g. bezier → straight): rebuild path immediately so
+        // render does not keep drawing the previous multi-point curve as a polyline.
+        this.recalculatePath();
       }
-      this.markDirty();
     }
   }
 

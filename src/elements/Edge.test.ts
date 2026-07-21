@@ -25,6 +25,25 @@ describe('Edge', () => {
     expect(edge.path.length).toBe(4);
   });
 
+  it('recalculates path immediately when type changes from bezier to straight', () => {
+    const edge = new Edge({
+      from: { nodeId: 'a' },
+      to: { nodeId: 'b' },
+      type: 'bezier',
+    });
+
+    edge.updateEndpoints({ x: 0, y: 0 }, { x: 100, y: 40 }, 'right', 'left');
+    expect(edge.path.length).toBe(4);
+
+    edge.type = 'straight';
+
+    expect(edge.type).toBe('straight');
+    expect(edge.path).toEqual([
+      { x: 0, y: 0 },
+      { x: 100, y: 40 },
+    ]);
+  });
+
   it('builds an outer self-loop for bezier edges', () => {
     const edge = new Edge({
       from: { nodeId: 'a', portId: 'anchor:top:1' },
