@@ -2,7 +2,9 @@ import { ANCHOR_PORT_PREFIX } from '@/constants';
 import type { Edge } from '@/elements/Edge';
 import type { Node } from '@/elements/Node';
 import type { PathObstacle } from '@/elements/paths';
-import type { Point } from '@/types';
+import type { EdgeEndpoint, Point } from '@/types';
+import { isEdgeEdgeEndpoint, isNodeEdgeEndpoint } from '@/types';
+import { directionFromAngle } from '@/utils/edgePath';
 import { getDirectionFromOutlineParam } from '@/utils/direction';
 
 export interface EdgeEndpointUpdaterHost {
@@ -10,6 +12,10 @@ export interface EdgeEndpointUpdaterHost {
   getEdges(): ReadonlyMap<string, Edge>;
   getNodeObstacles(): PathObstacle[];
 }
+
+type ResolvedEnd = { point: Point; direction?: string };
+
+const EDGE_ATTACH_MAX_PASSES = 3;
 
 export class EdgeEndpointUpdater {
   constructor(private readonly host: EdgeEndpointUpdaterHost) {}
@@ -25,52 +31,156 @@ export class EdgeEndpointUpdater {
   private update(includeRoutingObstacles: boolean): void {
     const obstacles = includeRoutingObstacles ? this.host.getNodeObstacles() : undefined;
     const nodes = this.host.getNodes();
-    for (const edge of this.host.getEdges().values()) {
-      if (!edge.autoUpdateEndpoints) continue;
-      const fromNode = nodes.get(edge.from.nodeId);
-      const toNode = nodes.get(edge.to.nodeId);
-      if (!fromNode || !toNode) continue;
+    const edges = this.host.getEdges();
 
-      if (includeRoutingObstacles) {
-        this.lockAnchors(edge, fromNode, toNode);
+    const nodeNode: Edge[] = [];
+    const edgeAttached: Edge[] = [];
+    for (const edge of edges.values()) {
+      if (!edge.autoUpdateEndpoints) continue;
+      if (isEdgeEdgeEndpoint(edge.from) || isEdgeEdgeEndpoint(edge.to)) {
+        edgeAttached.push(edge);
+      } else {
+        nodeNode.push(edge);
       }
-      const from = this.resolveEndpoint(fromNode, edge.from.portId, edge.from.outlineParam);
-      const to = this.resolveEndpoint(toNode, edge.to.portId, edge.to.outlineParam);
-      edge.updateEndpoints(
-        from.point,
-        to.point,
-        from.direction,
-        to.direction,
-        obstacles ? { obstacles } : undefined
-      );
+    }
+
+    for (const edge of nodeNode) {
+      this.updateNodeNodeEdge(edge, nodes, includeRoutingObstacles, obstacles);
+    }
+
+    for (let pass = 0; pass < EDGE_ATTACH_MAX_PASSES; pass++) {
+      let changed = false;
+      for (const edge of edgeAttached) {
+        if (this.updateEdgeAttachedEdge(edge, nodes, edges, obstacles)) {
+          changed = true;
+        }
+      }
+      if (!changed) break;
     }
   }
 
+  private updateNodeNodeEdge(
+    edge: Edge,
+    nodes: ReadonlyMap<string, Node>,
+    includeRoutingObstacles: boolean,
+    obstacles: PathObstacle[] | undefined
+  ): void {
+    if (!isNodeEdgeEndpoint(edge.from) || !isNodeEdgeEndpoint(edge.to)) return;
+    const fromNode = nodes.get(edge.from.nodeId);
+    const toNode = nodes.get(edge.to.nodeId);
+    if (!fromNode || !toNode) return;
+
+    if (includeRoutingObstacles) {
+      this.lockAnchors(edge, fromNode, toNode);
+    }
+    const from = this.resolveNodeEndpoint(fromNode, edge.from);
+    const to = this.resolveNodeEndpoint(toNode, edge.to);
+    edge.updateEndpoints(
+      from.point,
+      to.point,
+      from.direction,
+      to.direction,
+      obstacles ? { obstacles } : undefined
+    );
+  }
+
+  /**
+   * @returns true when the resolved geometry changed enough to warrant another pass
+   */
+  private updateEdgeAttachedEdge(
+    edge: Edge,
+    nodes: ReadonlyMap<string, Node>,
+    edges: ReadonlyMap<string, Edge>,
+    obstacles: PathObstacle[] | undefined
+  ): boolean {
+    const from = this.resolveAnyEndpoint(edge.from, nodes, edges);
+    const to = this.resolveAnyEndpoint(edge.to, nodes, edges);
+    if (!from || !to) return false;
+
+    const before = edge.path;
+    const beforeKey =
+      before.length >= 2
+        ? `${before[0]!.x},${before[0]!.y}:${before[before.length - 1]!.x},${before[before.length - 1]!.y}`
+        : '';
+
+    edge.updateEndpoints(
+      from.point,
+      to.point,
+      from.direction,
+      to.direction,
+      obstacles ? { obstacles } : undefined
+    );
+
+    const after = edge.path;
+    const afterKey =
+      after.length >= 2
+        ? `${after[0]!.x},${after[0]!.y}:${after[after.length - 1]!.x},${after[after.length - 1]!.y}`
+        : '';
+    return beforeKey !== afterKey;
+  }
+
+  private resolveAnyEndpoint(
+    endpoint: EdgeEndpoint,
+    nodes: ReadonlyMap<string, Node>,
+    edges: ReadonlyMap<string, Edge>
+  ): ResolvedEnd | null {
+    if (isEdgeEdgeEndpoint(endpoint)) {
+      return this.resolveEdgeEndpoint(endpoint, edges);
+    }
+    if (isNodeEdgeEndpoint(endpoint)) {
+      const node = nodes.get(endpoint.nodeId);
+      if (!node) return null;
+      return this.resolveNodeEndpoint(node, endpoint);
+    }
+    return null;
+  }
+
+  private resolveEdgeEndpoint(
+    endpoint: EdgeEndpoint & { edgeId: string },
+    edges: ReadonlyMap<string, Edge>
+  ): ResolvedEnd | null {
+    const host = edges.get(endpoint.edgeId);
+    if (!host) return null;
+    const pathParam = endpoint.pathParam ?? 0.5;
+    const at = host.getPointAt(pathParam);
+    if (!at) return null;
+    return {
+      point: at.point,
+      direction: directionFromAngle(at.angle),
+    };
+  }
+
   private lockAnchors(edge: Edge, fromNode: Node, toNode: Node): void {
-    if (edge.lockAnchors && edge.from.outlineParam === undefined && !edge.from.portId) {
+    if (
+      isNodeEdgeEndpoint(edge.from) &&
+      edge.lockAnchors &&
+      edge.from.outlineParam === undefined &&
+      !edge.from.portId
+    ) {
       const anchor = fromNode.getNearestAnchor(toNode.getCenter());
       if (anchor) edge.from = { ...edge.from, portId: `${ANCHOR_PORT_PREFIX}${anchor.id}` };
     }
-    if (edge.lockAnchors && edge.to.outlineParam === undefined && !edge.to.portId) {
+    if (
+      isNodeEdgeEndpoint(edge.to) &&
+      edge.lockAnchors &&
+      edge.to.outlineParam === undefined &&
+      !edge.to.portId
+    ) {
       const anchor = toNode.getNearestAnchor(fromNode.getCenter());
       if (anchor) edge.to = { ...edge.to, portId: `${ANCHOR_PORT_PREFIX}${anchor.id}` };
     }
   }
 
-  private resolveEndpoint(
-    node: Node,
-    portId: string | undefined,
-    outlineParam: number | undefined
-  ): { point: Point; direction?: string } {
-    if (portId) {
-      const anchorId = portId.slice(ANCHOR_PORT_PREFIX.length);
+  private resolveNodeEndpoint(node: Node, endpoint: EdgeEndpoint): ResolvedEnd {
+    if (endpoint.portId) {
+      const anchorId = endpoint.portId.slice(ANCHOR_PORT_PREFIX.length);
       const point = node.getAnchorPointById(anchorId);
       return point ? { point, direction: anchorId.split(':')[0] } : { point: node.getCenter() };
     }
-    if (outlineParam !== undefined) {
+    if (endpoint.outlineParam !== undefined) {
       return {
-        point: node.getConnectionPointAtOutlineParam(outlineParam),
-        direction: getDirectionFromOutlineParam(outlineParam),
+        point: node.getConnectionPointAtOutlineParam(endpoint.outlineParam),
+        direction: getDirectionFromOutlineParam(endpoint.outlineParam),
       };
     }
     return { point: node.getCenter() };

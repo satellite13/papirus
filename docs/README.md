@@ -6,6 +6,7 @@
 - [CompositeNode](./composite.md)
 - [DiagramRenderer](./renderer.md)
 - [Элементы диаграммы](./elements.md)
+- [Edge-to-edge endpoints (junctions)](./edge-endpoints.md)
 - [Интерактивность и менеджеры](./interactions.md)
 - [InputHandler](./input.md)
 - [SearchManager](./search.md)

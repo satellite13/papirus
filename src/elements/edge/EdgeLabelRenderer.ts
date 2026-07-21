@@ -1,6 +1,7 @@
 import { EDGE_LABEL_BACKGROUND_RADIUS } from '@/constants';
 import type { EdgeLabelBackground, EdgePathType, Point } from '@/types';
-import { bezierPoint, drawRoundedRectPath } from '@/utils/geometry';
+import { getPathPointAt } from '@/utils/edgePath';
+import { drawRoundedRectPath } from '@/utils/geometry';
 import type { TextLabel } from '../TextLabel';
 
 export interface EdgeLabelLayoutOptions {
@@ -93,77 +94,3 @@ export function getEdgeLabelRotation(options: EdgeLabelLayoutOptions): number {
   return angle;
 }
 
-function getPathPointAt(
-  path: readonly Point[],
-  type: EdgePathType,
-  position: number
-): { point: Point; angle: number } {
-  if (type !== 'bezier' || path.length < 4) {
-    return getPointAlongPolyline(path, position);
-  }
-
-  const samples: Point[] = [];
-  const steps = 20;
-  for (let i = 1; i + 2 < path.length; i += 3) {
-    const start = path[i - 1]!;
-    const control1 = path[i]!;
-    const control2 = path[i + 1]!;
-    const end = path[i + 2]!;
-    for (let sample = 0; sample <= steps; sample++) {
-      const t = sample / steps;
-      if (samples.length > 0 && t === 0) {
-        continue;
-      }
-      samples.push(bezierPoint(start, control1, control2, end, t));
-    }
-  }
-  return getPointAlongPolyline(samples, position);
-}
-
-function getPointAlongPolyline(
-  path: readonly Point[],
-  position: number
-): { point: Point; angle: number } {
-  if (path.length === 0) {
-    return { point: { x: 0, y: 0 }, angle: 0 };
-  }
-  if (path.length === 1) {
-    return { point: path[0]!, angle: 0 };
-  }
-
-  let totalLength = 0;
-  const segments: { start: Point; end: Point; length: number }[] = [];
-  for (let i = 1; i < path.length; i++) {
-    const start = path[i - 1]!;
-    const end = path[i]!;
-    const length = Math.hypot(end.x - start.x, end.y - start.y);
-    segments.push({ start, end, length });
-    totalLength += length;
-  }
-
-  const targetLength = totalLength * Math.max(0, Math.min(1, position));
-  let accumulated = 0;
-  for (const segment of segments) {
-    if (accumulated + segment.length >= targetLength) {
-      const segmentPosition =
-        segment.length > 0 ? (targetLength - accumulated) / segment.length : 0;
-      return {
-        point: {
-          x: segment.start.x + segmentPosition * (segment.end.x - segment.start.x),
-          y: segment.start.y + segmentPosition * (segment.end.y - segment.start.y),
-        },
-        angle: Math.atan2(segment.end.y - segment.start.y, segment.end.x - segment.start.x),
-      };
-    }
-    accumulated += segment.length;
-  }
-
-  const lastSegment = segments[segments.length - 1]!;
-  return {
-    point: lastSegment.end,
-    angle: Math.atan2(
-      lastSegment.end.y - lastSegment.start.y,
-      lastSegment.end.x - lastSegment.start.x
-    ),
-  };
-}

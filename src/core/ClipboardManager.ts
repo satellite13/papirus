@@ -71,24 +71,28 @@ export class ClipboardManager {
     }
 
     for (const edge of this.renderer.edges.values()) {
-      if (nodeIds.has(edge.from.nodeId) && nodeIds.has(edge.to.nodeId)) {
-        edges.push({
-          id: edge.id,
-          from: edge.from,
-          to: edge.to,
-          type: edge.type,
-          controlPoints: edge.controlPoints,
-          arrowType: edge.arrowType,
-          style: edge.style,
-          styleClass: edge.styleClass,
-          label: edge.label?.text,
-          labelStyleClass: edge.label?.styleClass,
-          labelOffset: edge.labelOffset !== 0 ? edge.labelOffset : undefined,
-          labelBackground: edge.labelBackground,
-          labelLineGap: edge.labelLineGap ? true : undefined,
-          data: Object.keys(edge.data).length > 0 ? edge.data : undefined,
-        });
+      const fromId = edge.from.nodeId;
+      const toId = edge.to.nodeId;
+      // Clipboard v1: only fully node-attached edges (junctions need host remapping).
+      if (!fromId || !toId || !nodeIds.has(fromId) || !nodeIds.has(toId)) {
+        continue;
       }
+      edges.push({
+        id: edge.id,
+        from: edge.from,
+        to: edge.to,
+        type: edge.type,
+        controlPoints: edge.controlPoints,
+        arrowType: edge.arrowType,
+        style: edge.style,
+        styleClass: edge.styleClass,
+        label: edge.label?.text,
+        labelStyleClass: edge.label?.styleClass,
+        labelOffset: edge.labelOffset !== 0 ? edge.labelOffset : undefined,
+        labelBackground: edge.labelBackground,
+        labelLineGap: edge.labelLineGap ? true : undefined,
+        data: Object.keys(edge.data).length > 0 ? edge.data : undefined,
+      });
     }
 
     this.clipboard = { nodes, edges };
@@ -117,8 +121,13 @@ export class ClipboardManager {
     }
 
     for (const edgeData of this.clipboard.edges) {
-      const fromNodeId = idMap.get(edgeData.from.nodeId);
-      const toNodeId = idMap.get(edgeData.to.nodeId);
+      const fromKey = edgeData.from.nodeId;
+      const toKey = edgeData.to.nodeId;
+      if (!fromKey || !toKey) {
+        continue;
+      }
+      const fromNodeId = idMap.get(fromKey);
+      const toNodeId = idMap.get(toKey);
       if (!fromNodeId || !toNodeId) {
         continue;
       }

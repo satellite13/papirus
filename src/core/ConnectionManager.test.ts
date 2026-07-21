@@ -114,6 +114,70 @@ describe('ConnectionManager', () => {
     expect(interaction.connection.reconnecting).toBe(true);
   });
 
+  it('creates edge when connection completed onto another edge', () => {
+    const canvas = createCanvas(400, 200);
+    const renderer = new DiagramRenderer(canvas, { width: 400, height: 200, retina: false });
+    renderer.enableInteractions({
+      attachToOutline: true,
+      createEdge: (from, to) => new Edge({ from, to, type: 'straight' }),
+    });
+
+    const nodeA = new RectangleNode({ x: 40, y: 80, width: 50, height: 40 });
+    const nodeB = new RectangleNode({ x: 300, y: 80, width: 50, height: 40 });
+    const note = new RectangleNode({ x: 160, y: 20, width: 60, height: 40 });
+    renderer.addNode(nodeA);
+    renderer.addNode(nodeB);
+    renderer.addNode(note);
+
+    const host = new Edge({
+      from: { nodeId: nodeA.id },
+      to: { nodeId: nodeB.id },
+      type: 'straight',
+    });
+    renderer.addEdge(host);
+    host.updateEndpoints({ x: 90, y: 100 }, { x: 300, y: 100 });
+
+    const startX = 190;
+    const startY = 40;
+    const endX = 195;
+    const endY = 100;
+
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', {
+        clientX: startX,
+        clientY: startY,
+        button: 0,
+        shiftKey: true,
+        bubbles: true,
+      })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mousemove', {
+        clientX: endX,
+        clientY: endY,
+        button: 0,
+        buttons: 1,
+        shiftKey: true,
+        bubbles: true,
+      })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mouseup', {
+        clientX: endX,
+        clientY: endY,
+        button: 0,
+        bubbles: true,
+      })
+    );
+
+    expect(renderer.edges.size).toBe(2);
+    const created = Array.from(renderer.edges.values()).find(edge => edge.id !== host.id)!;
+    expect(created.from.nodeId).toBe(note.id);
+    expect(created.to.edgeId).toBe(host.id);
+    expect(created.to.pathParam).toBeGreaterThan(0.2);
+    expect(created.to.pathParam).toBeLessThan(0.8);
+  });
+
   it('supports configurable connection preview path type', () => {
     const canvas = createCanvas(400, 220);
     const renderer = new DiagramRenderer(canvas, { width: 400, height: 220, retina: false });

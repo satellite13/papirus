@@ -304,6 +304,20 @@ describe('Edge', () => {
     });
   });
 
+  describe('updateEndpoints', () => {
+    it('skips path rebuild when endpoints are unchanged', () => {
+      const edge = new Edge({
+        from: { nodeId: 'a' },
+        to: { nodeId: 'b' },
+        type: 'straight',
+      });
+      edge.updateEndpoints({ x: 0, y: 0 }, { x: 100, y: 0 }, 'right', 'left');
+      const pathAfterFirst = edge.path;
+      edge.updateEndpoints({ x: 0, y: 0 }, { x: 100, y: 0 }, 'right', 'left');
+      expect(edge.path).toBe(pathAfterFirst);
+    });
+  });
+
   describe('markers', () => {
     it('supports start and end marker configuration', () => {
       const edge = new Edge({

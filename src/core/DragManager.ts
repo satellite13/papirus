@@ -422,8 +422,10 @@ export class DragManager extends EventEmitter<DragEvents> {
         continue;
       }
 
-      const isFromDragged = draggedIds.has(edge.from.nodeId);
-      const isToDragged = draggedIds.has(edge.to.nodeId);
+      const fromId = edge.from.nodeId;
+      const toId = edge.to.nodeId;
+      const isFromDragged = !!fromId && draggedIds.has(fromId);
+      const isToDragged = !!toId && draggedIds.has(toId);
 
       if (isFromDragged && isToDragged) {
         this.editablePolylineFullyConnectedEdges.add(edge.id);
@@ -432,14 +434,14 @@ export class DragManager extends EventEmitter<DragEvents> {
       }
 
       for (const node of this.draggedNodes) {
-        const isFrom = edge.from.nodeId === node.id;
-        const isTo = edge.to.nodeId === node.id;
+        const isFrom = fromId === node.id;
+        const isTo = toId === node.id;
         if (!isFrom && !isTo) {
           continue;
         }
 
-        const oppositeNodeId = isFrom ? edge.to.nodeId : edge.from.nodeId;
-        if (draggedIds.has(oppositeNodeId)) {
+        const oppositeNodeId = isFrom ? toId : fromId;
+        if (!oppositeNodeId || draggedIds.has(oppositeNodeId)) {
           continue;
         }
 

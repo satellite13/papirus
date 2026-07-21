@@ -15,8 +15,11 @@ export class AutoRouting {
     for (const edge of renderer.edges.values()) {
       edge.type = type;
 
-      const fromNode = renderer.getNode(edge.from.nodeId);
-      const toNode = renderer.getNode(edge.to.nodeId);
+      const fromId = edge.from.nodeId;
+      const toId = edge.to.nodeId;
+      if (!fromId || !toId) continue;
+      const fromNode = renderer.getNode(fromId);
+      const toNode = renderer.getNode(toId);
       if (!fromNode || !toNode) continue;
 
       const fromPoint: Point =

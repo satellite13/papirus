@@ -12,6 +12,7 @@ import type {
 } from '@/types';
 import type { StyleManager } from '@/styles/StyleManager';
 import { shallowEqual } from '@/utils/style';
+import { getClosestPointOnPath, getPathPointAt } from '@/utils/edgePath';
 import { bezierPoint, segmentRectIntersections, distance } from '@/utils/geometry';
 import {
   type PathStrategy,
@@ -88,6 +89,7 @@ export class Edge extends Element {
   private _toPoint: Point = { x: 0, y: 0 };
   private _fromDir?: string;
   private _toDir?: string;
+  private _bindingListener?: () => void;
 
   constructor(options: EdgeOptions) {
     super({
@@ -137,6 +139,7 @@ export class Edge extends Element {
 
   set from(value: EdgeEndpoint) {
     this._from = value;
+    this._bindingListener?.();
     this.markDirty();
   }
 
@@ -149,7 +152,16 @@ export class Edge extends Element {
 
   set to(value: EdgeEndpoint) {
     this._to = value;
+    this._bindingListener?.();
     this.markDirty();
+  }
+
+  /**
+   * Notified when from/to binding changes (ports / outline params / node ids).
+   * Used by DiagramRenderer to resync endpoints without doing so on every pan frame.
+   */
+  setBindingListener(listener?: () => void): void {
+    this._bindingListener = listener;
   }
 
   /**
@@ -468,6 +480,20 @@ export class Edge extends Element {
     toDir?: string,
     options?: PathStrategyOptions
   ): void {
+    // Skip path rebuild when nothing moved — critical for pan/zoom frames where
+    // DiagramRenderer still syncs endpoints for every edge.
+    if (
+      this._path.length > 0 &&
+      this._fromPoint.x === fromPoint.x &&
+      this._fromPoint.y === fromPoint.y &&
+      this._toPoint.x === toPoint.x &&
+      this._toPoint.y === toPoint.y &&
+      this._fromDir === fromDir &&
+      this._toDir === toDir
+    ) {
+      this._pathOptions = options;
+      return;
+    }
     this._fromPoint = fromPoint;
     this._toPoint = toPoint;
     this._fromDir = fromDir;
@@ -896,6 +922,25 @@ export class Edge extends Element {
       label: this._label,
       background: this._labelBackground,
     });
+  }
+
+  /**
+   * Point and tangent on the current path at a normalized length position (0..1).
+   */
+  getPointAt(pathParam = 0.5): { point: Point; angle: number } | null {
+    if (this._path.length < 2) {
+      return null;
+    }
+    return getPathPointAt(this._path, this._type, pathParam);
+  }
+
+  /**
+   * Nearest point on this edge's path to `point` (world coordinates).
+   */
+  getClosestPointOnPath(
+    point: Point
+  ): { point: Point; pathParam: number; distance: number } | null {
+    return getClosestPointOnPath(this._path, this._type, point);
   }
 
   /**

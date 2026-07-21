@@ -257,3 +257,5 @@ export type {
   Command,
   SerializedCompositeNode,
 } from './types';
+export { isEdgeEdgeEndpoint, isNodeEdgeEndpoint } from './types';
+export { getPathPointAt, getClosestPointOnPath, directionFromAngle } from './utils/edgePath';

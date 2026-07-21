@@ -169,14 +169,27 @@ export class Serializer {
     // Build a set of node IDs for edge validation
     const nodeIds = new Set(data.nodes.map((n) => n.id));
 
-    // Validate edges reference existing nodes
+    // Validate edges reference existing nodes (edge-attached ends use edgeId instead)
+    const edgeIds = new Set(data.edges.map((e) => e.id));
     for (const edge of data.edges) {
-      if (!nodeIds.has(edge.from.nodeId)) {
+      if (edge.from.edgeId) {
+        if (!edgeIds.has(edge.from.edgeId)) {
+          throw new SerializerValidationError(
+            `Edge "${edge.id}" references non-existent host edge "${edge.from.edgeId}"`
+          );
+        }
+      } else if (!edge.from.nodeId || !nodeIds.has(edge.from.nodeId)) {
         throw new SerializerValidationError(
           `Edge "${edge.id}" references non-existent source node "${edge.from.nodeId}"`
         );
       }
-      if (!nodeIds.has(edge.to.nodeId)) {
+      if (edge.to.edgeId) {
+        if (!edgeIds.has(edge.to.edgeId)) {
+          throw new SerializerValidationError(
+            `Edge "${edge.id}" references non-existent host edge "${edge.to.edgeId}"`
+          );
+        }
+      } else if (!edge.to.nodeId || !nodeIds.has(edge.to.nodeId)) {
         throw new SerializerValidationError(
           `Edge "${edge.id}" references non-existent target node "${edge.to.nodeId}"`
         );
