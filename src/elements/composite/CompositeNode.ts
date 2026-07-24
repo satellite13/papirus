@@ -257,6 +257,9 @@ export class CompositeNode extends Node {
     ctx.setLineDash([]);
     ctx.lineDashOffset = 0;
 
+    const bounds = this.getBounds();
+    this.renderBadges(ctx, bounds);
+
     const contentBounds = this.getContentBounds();
     this._content.render(ctx, contentBounds);
 

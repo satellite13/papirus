@@ -9,6 +9,11 @@
 
 ## [Unreleased]
 
+## [0.7.2] - 2026-07-24
+
+### Исправлено
+- У composite-нод отрисовываются интерактивные `badges` (те же иконки в левом верхнем углу, что у обычных нод).
+
 ## [0.7.1] - 2026-07-21
 
 ### Исправлено
@@ -358,7 +363,8 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.7.1...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.7.2...HEAD
+[0.7.2]: https://gitverse.ru/ngroznykh/papirus/compare/v0.7.1...v0.7.2
 [0.7.1]: https://gitverse.ru/ngroznykh/papirus/compare/v0.7.0...v0.7.1
 [0.7.0]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.5...v0.7.0
 [0.6.5]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.4...v0.6.5

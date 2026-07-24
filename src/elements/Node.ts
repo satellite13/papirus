@@ -580,7 +580,7 @@ export abstract class Node extends Element {
     }
   }
 
-  private renderBadges(ctx: CanvasRenderingContext2D, bounds: Bounds): void {
+  protected renderBadges(ctx: CanvasRenderingContext2D, bounds: Bounds): void {
     if (this._badges.length === 0) {
       return;
     }

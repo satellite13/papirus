@@ -12,6 +12,8 @@ class FakeImage {
   src = '';
   onload: (() => void) | null = null;
   onerror: (() => void) | null = null;
+  naturalWidth = 0;
+  naturalHeight = 0;
 }
 
 describe('CompositeNode', () => {
@@ -317,6 +319,46 @@ describe('CompositeNode', () => {
       // Change name should mark dirty
       nameComp.text = 'NewName';
       expect(node.dirty).toBe(true);
+    });
+
+    it('renders interactive badges like regular nodes', () => {
+      const created: FakeImage[] = [];
+      vi.stubGlobal('Image', function FakeBadgeImage(this: FakeImage) {
+        this.src = '';
+        this.onload = null;
+        this.onerror = null;
+        this.naturalWidth = 0;
+        this.naturalHeight = 0;
+        created.push(this);
+      });
+
+      const node = new CompositeNode({
+        x: 0,
+        y: 0,
+        width: 200,
+        height: 100,
+        badges: [{ id: 'doc-prop', iconUrl: '/icons/description.svg' }],
+        content: container({
+          children: [text({ text: 'Composite' })],
+        }),
+      });
+
+      expect(node.badges).toHaveLength(1);
+      expect(
+        node.getBadgeAtPoint({
+          x: node.getBounds().x + 4,
+          y: node.getBounds().y + 4,
+        })
+      ).toEqual({ id: 'doc-prop', index: 0 });
+
+      const loadedImg = created[0];
+      expect(loadedImg).toBeDefined();
+      loadedImg!.naturalWidth = 24;
+      loadedImg!.naturalHeight = 24;
+      loadedImg!.onload?.();
+
+      node.render(ctx);
+      expect(ctx.drawImage).toHaveBeenCalled();
     });
   });
 });
