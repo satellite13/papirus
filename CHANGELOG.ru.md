@@ -9,6 +9,11 @@
 
 ## [Unreleased]
 
+## [0.7.3] - 2026-07-26
+
+### Добавлено
+- Опциональные пропорциональные стороны `contentInset` через `contentInsetScale` и `contentInsetBaseSize` (эталонные px масштабируются с размером узла).
+
 ## [0.7.2] - 2026-07-24
 
 ### Исправлено
@@ -363,7 +368,8 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.7.2...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.7.3...HEAD
+[0.7.3]: https://gitverse.ru/ngroznykh/papirus/compare/v0.7.2...v0.7.3
 [0.7.2]: https://gitverse.ru/ngroznykh/papirus/compare/v0.7.1...v0.7.2
 [0.7.1]: https://gitverse.ru/ngroznykh/papirus/compare/v0.7.0...v0.7.1
 [0.7.0]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.5...v0.7.0

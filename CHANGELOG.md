@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.3] - 2026-07-26
+
+### Added
+- Optional per-side proportional `contentInset` via `contentInsetScale` and `contentInsetBaseSize` (reference px scale with node size).
+
 ## [0.7.2] - 2026-07-24
 
 ### Fixed
@@ -356,7 +361,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Edge animations (flow effect)
 - Context menu and search/filter
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.7.2...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.7.3...HEAD
+[0.7.3]: https://gitverse.ru/ngroznykh/papirus/compare/v0.7.2...v0.7.3
 [0.7.2]: https://gitverse.ru/ngroznykh/papirus/compare/v0.7.1...v0.7.2
 [0.7.1]: https://gitverse.ru/ngroznykh/papirus/compare/v0.7.0...v0.7.1
 [0.7.0]: https://gitverse.ru/ngroznykh/papirus/compare/v0.6.5...v0.7.0
