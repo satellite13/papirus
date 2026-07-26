@@ -317,14 +317,7 @@ export class CompositeNode extends Node {
       };
     }
 
-    // Apply contentInset
-    const ci = this.contentInset;
-    return {
-      x: bounds.x + ci.left,
-      y: bounds.y + ci.top,
-      width: Math.max(0, bounds.width - ci.left - ci.right),
-      height: Math.max(0, bounds.height - ci.top - ci.bottom),
-    };
+    return super.getLabelContainerBounds(bounds);
   }
 
   /**

@@ -228,6 +228,8 @@ export type { SegmentRectIntersection } from './utils/geometry';
 export { applyNodeStyle, renderFillAndStroke, applyEdgeStyle } from './utils/canvas';
 
 // Types
+export type { ContentInsetScaleSides } from './utils/resolveContentInset';
+export { resolveContentInset } from './utils/resolveContentInset';
 export type {
   Point,
   Size,

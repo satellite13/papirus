@@ -13,6 +13,10 @@ import type {
 import { shallowEqual } from '@/utils/style';
 import { getIconBoxSize, getIconBounds } from '@/utils/iconLayout';
 import {
+  resolveContentInset,
+  type ContentInsetScaleSides,
+} from '@/utils/resolveContentInset';
+import {
   DEFAULT_SELECTION_COLOR,
   NODE_HITBOX_PADDING,
   RESIZE_HANDLE_OFFSET,
@@ -41,6 +45,16 @@ export interface NodeOptions {
   icon?: NodeImageOptions;
   /** Content area insets per side (default 0 = full bounds). Number = same on all sides. */
   contentInset?: number | ContentInsetSides;
+  /**
+   * Per-side: when true, that contentInset side scales with node size vs contentInsetBaseSize.
+   * Omitted / false sides stay fixed px.
+   */
+  contentInsetScale?: ContentInsetScaleSides;
+  /**
+   * Reference size for proportional contentInset (typically style default width/height).
+   * When missing or non-positive on an axis, that axis uses factor 1.
+   */
+  contentInsetBaseSize?: Size;
   ports?: PortOptions[];
   showPortsAlways?: boolean;
   anchorPoints?: AnchorPointsConfig;
@@ -87,6 +101,8 @@ export abstract class Node extends Element {
   protected _defaultSize: Size;
   protected _resizeHandlesEnabled: boolean;
   protected _contentInset: Required<ContentInsetSides>;
+  protected _contentInsetScale: ContentInsetScaleSides;
+  protected _contentInsetBaseSize: Size | undefined;
   private _attachToOutlineGetter?: () => boolean;
   private _anchorCache: { id: AnchorId; point: Point }[] | null = null;
   private _badgeImageCache = new Map<string, { img: HTMLImageElement; loaded: boolean }>();
@@ -109,6 +125,10 @@ export abstract class Node extends Element {
     this._anchorPoints = this.normalizeAnchorPoints(options.anchorPoints);
     this._resizeHandlesEnabled = options.resizeHandlesEnabled ?? true;
     this._contentInset = this.normalizeContentInset(options.contentInset);
+    this._contentInsetScale = this.normalizeContentInsetScale(options.contentInsetScale);
+    this._contentInsetBaseSize = this.normalizeContentInsetBaseSize(
+      options.contentInsetBaseSize
+    );
 
     if (options.label !== undefined) {
       if (typeof options.label === 'string') {
@@ -406,6 +426,32 @@ export abstract class Node extends Element {
 
   set contentInset(value: number | ContentInsetSides) {
     this._contentInset = this.normalizeContentInset(value);
+    this.markDirty();
+  }
+
+  /**
+   * Per-side proportional flags for contentInset (reference px vs contentInsetBaseSize).
+   */
+  get contentInsetScale(): ContentInsetScaleSides {
+    return { ...this._contentInsetScale };
+  }
+
+  set contentInsetScale(value: ContentInsetScaleSides | undefined) {
+    this._contentInsetScale = this.normalizeContentInsetScale(value);
+    this.markDirty();
+  }
+
+  /**
+   * Base size used when resolving proportional contentInset sides.
+   */
+  get contentInsetBaseSize(): Size | undefined {
+    return this._contentInsetBaseSize
+      ? { ...this._contentInsetBaseSize }
+      : undefined;
+  }
+
+  set contentInsetBaseSize(value: Size | undefined) {
+    this._contentInsetBaseSize = this.normalizeContentInsetBaseSize(value);
     this.markDirty();
   }
 
@@ -990,7 +1036,12 @@ export abstract class Node extends Element {
   }
 
   protected getLabelContainerBounds(bounds: Bounds): Bounds {
-    const { top, right, bottom, left } = this._contentInset;
+    const { top, right, bottom, left } = resolveContentInset(
+      this._contentInset,
+      this._contentInsetScale,
+      { width: bounds.width, height: bounds.height },
+      this._contentInsetBaseSize
+    );
     const x = bounds.x + left;
     const y = bounds.y + top;
     const width = Math.max(0, bounds.width - left - right);
@@ -1016,6 +1067,26 @@ export abstract class Node extends Element {
       bottom: n(value.bottom),
       left: n(value.left),
     };
+  }
+
+  private normalizeContentInsetScale(
+    value?: ContentInsetScaleSides
+  ): ContentInsetScaleSides {
+    if (!value) return {};
+    const out: ContentInsetScaleSides = {};
+    if (value.top === true) out.top = true;
+    if (value.right === true) out.right = true;
+    if (value.bottom === true) out.bottom = true;
+    if (value.left === true) out.left = true;
+    return out;
+  }
+
+  private normalizeContentInsetBaseSize(value?: Size): Size | undefined {
+    if (!value) return undefined;
+    const width = Number.isFinite(value.width) ? value.width : 0;
+    const height = Number.isFinite(value.height) ? value.height : 0;
+    if (!(width > 0) && !(height > 0)) return undefined;
+    return { width, height };
   }
 
   private getIconBoxSize(): Size | undefined {
