@@ -5,6 +5,8 @@ export interface PathObstacle {
   y: number;
   width: number;
   height: number;
+  /** Node id when obstacle comes from a diagram node; used to exclude endpoints only. */
+  id?: string;
   role?: 'source' | 'target' | 'other';
 }
 

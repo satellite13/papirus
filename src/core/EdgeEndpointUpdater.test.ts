@@ -1,8 +1,10 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Edge } from '@/elements/Edge';
+import type { PathObstacle } from '@/elements/paths';
 import { RectangleNode } from '@/elements/nodes/RectangleNode';
 import { stubAnimationFrame, stubCanvasContext } from '@/test/testUtils';
 import { DiagramRenderer } from './DiagramRenderer';
+import { EdgeEndpointUpdater } from './EdgeEndpointUpdater';
 
 describe('EdgeEndpointUpdater edge attachments', () => {
   beforeEach(() => {
@@ -72,6 +74,117 @@ describe('EdgeEndpointUpdater edge attachments', () => {
 
     expect(edge.path[0]!.y).toBeCloseTo(a.y, 0);
     expect(edge.path[0]!.x).toBeCloseTo(a.getCenter().x, 0);
+  });
+
+  it('passes parent and target obstacles with role target, excludes source', () => {
+    const comp = new RectangleNode({ id: 'comp', x: 180, y: 240, width: 140, height: 80 });
+    const bp = new RectangleNode({ id: 'bp', x: 40, y: 40, width: 400, height: 50 });
+    const parent = new RectangleNode({ id: 'parent', x: 160, y: 200, width: 220, height: 160 });
+
+    const nodes = new Map([
+      ['comp', comp],
+      ['bp', bp],
+      ['parent', parent],
+    ]);
+
+    const edge = new Edge({
+      id: 'e1',
+      from: { nodeId: 'comp' },
+      to: { nodeId: 'bp' },
+      type: 'polyline',
+    });
+    const edges = new Map([['e1', edge]]);
+
+    const obstacles: PathObstacle[] = [
+      {
+        id: 'comp',
+        x: comp.x - 8,
+        y: comp.y - 8,
+        width: comp.width + 16,
+        height: comp.height + 16,
+        role: 'other',
+      },
+      {
+        id: 'bp',
+        x: bp.x - 8,
+        y: bp.y - 8,
+        width: bp.width + 16,
+        height: bp.height + 16,
+        role: 'other',
+      },
+      {
+        id: 'parent',
+        x: parent.x - 8,
+        y: parent.y - 8,
+        width: parent.width + 16,
+        height: parent.height + 16,
+        role: 'other',
+      },
+    ];
+
+    const updater = new EdgeEndpointUpdater({
+      getNodes: () => nodes,
+      getEdges: () => edges,
+      getNodeObstacles: () => obstacles,
+    });
+
+    const spy = vi.spyOn(edge, 'updateEndpoints');
+    updater.updateAll();
+
+    expect(spy).toHaveBeenCalled();
+    const passed = spy.mock.calls[0]![4]?.obstacles;
+    expect(passed).toBeDefined();
+    expect(passed!.find((o) => o.id === 'comp')).toBeUndefined();
+    expect(passed!.find((o) => o.id === 'parent')).toBeDefined();
+    const target = passed!.find((o) => o.id === 'bp');
+    expect(target).toBeDefined();
+    expect(target!.role).toBe('target');
+  });
+
+  it('keeps parent container as obstacle so nested edge routes around it', () => {
+    const canvas = document.createElement('canvas');
+    const renderer = new DiagramRenderer(canvas, { width: 600, height: 500, retina: false });
+    const bp = new RectangleNode({ id: 'bp', x: 40, y: 40, width: 400, height: 50 });
+    const parent = new RectangleNode({ id: 'parent', x: 160, y: 200, width: 220, height: 160 });
+    const comp = new RectangleNode({ id: 'comp', x: 180, y: 240, width: 140, height: 80 });
+    renderer.addNode(bp);
+    renderer.addNode(parent);
+    renderer.addNode(comp);
+
+    const edge = new Edge({
+      id: 'e-nested',
+      from: { nodeId: 'comp', portId: 'anchor:left:0' },
+      to: { nodeId: 'bp', portId: 'anchor:bottom:0' },
+      type: 'polyline',
+      lockAnchors: true,
+    });
+    renderer.addEdge(edge);
+    renderer.render();
+
+    const path = edge.path;
+    const start = path[0]!;
+    const end = path[path.length - 1]!;
+    expect(start.x).toBeCloseTo(comp.x, 0);
+    expect(end.y).toBeCloseTo(bp.y + bp.height, 0);
+
+    // Path midpoints after the exit stub should not pierce parent interior.
+    const inset = {
+      x: parent.x + 6,
+      y: parent.y + 6,
+      w: parent.width - 12,
+      h: parent.height - 12,
+    };
+    for (let i = 2; i < path.length; i++) {
+      const a = path[i - 1]!;
+      const b = path[i]!;
+      const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      const inside =
+        mid.x > inset.x &&
+        mid.x < inset.x + inset.w &&
+        mid.y > inset.y &&
+        mid.y < inset.y + inset.h;
+      expect(inside).toBe(false);
+    }
   });
 
   it('places a junction endpoint on the host edge path', () => {

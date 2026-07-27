@@ -1017,6 +1017,7 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> implements Diag
     }
 
     this._nodeObstaclesCache = Array.from(this._nodes.values()).map((node) => ({
+      id: node.id,
       x: node.x - 8,
       y: node.y - 8,
       width: node.width + 16,
