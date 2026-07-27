@@ -1,7 +1,43 @@
 import type { Point } from '@/types';
 import type { PathStrategy, PathStrategyOptions, PathObstacle } from './PathStrategy';
+import { routeOrthogonalAround, type Side } from './routeOrthogonalAround';
 import { distance, distanceToSegment } from '@/utils/geometry';
 import { isHorizontal, isVertical, isOppositeDirections } from '@/utils/direction';
+
+function isSide(v: string | undefined): v is Side {
+  return v === 'top' || v === 'right' || v === 'bottom' || v === 'left';
+}
+
+function resolveParentAndTarget(
+  from: Point,
+  to: Point,
+  obstacles: PathObstacle[]
+): { parent?: PathObstacle; target?: PathObstacle } {
+  const target =
+    obstacles.find((o) => o.role === 'target') ??
+    obstacles.find((o) => {
+      const onVertical =
+        (Math.abs(to.x - o.x) < 1 || Math.abs(to.x - (o.x + o.width)) < 1) &&
+        to.y >= o.y - 1 &&
+        to.y <= o.y + o.height + 1;
+      const onHorizontal =
+        (Math.abs(to.y - o.y) < 1 || Math.abs(to.y - (o.y + o.height)) < 1) &&
+        to.x >= o.x - 1 &&
+        to.x <= o.x + o.width + 1;
+      return onVertical || onHorizontal;
+    });
+
+  const parent = obstacles.find(
+    (o) =>
+      o !== target &&
+      from.x >= o.x &&
+      from.x <= o.x + o.width &&
+      from.y >= o.y &&
+      from.y <= o.y + o.height
+  );
+
+  return { parent, target };
+}
 
 const MIN_SEGMENT_LENGTH = 20;
 const SELF_LOOP_MIN_DISTANCE = 1;
@@ -90,29 +126,371 @@ function moveByDir(point: Point, dir: string | undefined, distance: number): Poi
   }
 }
 
-function inferDir(from: Point, to: Point): string {
+/** Push `point` along `dir` until it clears every obstacle (plus margin). */
+function moveOutsideObstacles(
+  point: Point,
+  dir: string | undefined,
+  obstacles: PathObstacle[],
+  minDistance: number
+): Point {
+  if (!dir || obstacles.length === 0) {
+    return moveByDir(point, dir, minDistance);
+  }
+  const expanded = expandObstacles(obstacles, OBSTACLE_MARGIN);
+  let dist = minDistance;
+  let candidate = moveByDir(point, dir, dist);
+  const step = 16;
+  const maxDist = 4000;
+  while (dist < maxDist && expanded.some((obstacle) => pointInsideObstacle(candidate, obstacle))) {
+    dist += step;
+    candidate = moveByDir(point, dir, dist);
+  }
+  return candidate;
+}
+
+function inferExitDir(from: Point, to: Point): string {
   const dx = to.x - from.x;
   const dy = to.y - from.y;
-  // Prefer horizontal decisions when comparable.
+  // Prefer horizontal exit when comparable (source side).
   if (Math.abs(dx) >= Math.abs(dy)) {
     return dx >= 0 ? 'right' : 'left';
   }
   return dy >= 0 ? 'bottom' : 'top';
 }
 
-function oppositeDir(dir: string): string {
-  switch (dir) {
-    case 'left':
-      return 'right';
-    case 'right':
-      return 'left';
-    case 'top':
-      return 'bottom';
-    case 'bottom':
-      return 'top';
-    default:
-      return dir;
+/** Outward side at `to` we should approach from (not opposite of fromDir). */
+function inferApproachDir(from: Point, to: Point): string {
+  const dx = from.x - to.x;
+  const dy = from.y - to.y;
+  // Any real above/below relationship → vertical arrival. Even a small gap under a
+  // wide Business Process must not flip to left/right (that crawls the bottom edge).
+  if (Math.abs(dy) > 1) {
+    return dy >= 0 ? 'bottom' : 'top';
   }
+  if (Math.abs(dx) > 1) {
+    return dx >= 0 ? 'right' : 'left';
+  }
+  return dy >= 0 ? 'bottom' : 'top';
+}
+
+/**
+ * Resolve approach side at `to`.
+ * - Explicit top/bottom ports are trusted (never replaced by left/right).
+ * - Explicit left/right ports are overridden when geometry is clearly above/below,
+ *   so we do not crawl along wide node edges.
+ */
+function resolveApproachDir(from: Point, to: Point, toDir: string | undefined): string {
+  const geometric = inferApproachDir(from, to);
+  if (toDir && isVertical(toDir)) {
+    return toDir;
+  }
+  if (toDir && isHorizontal(toDir) && isVertical(geometric)) {
+    return geometric;
+  }
+  return toDir ?? geometric;
+}
+
+/**
+ * Polyline terminal rules (endpoints stay fixed):
+ * 1. First segment ⊥ start side (along fromDir / exitDir)
+ * 2. Last segment ⊥ end side (along approachDir)
+ * 3. No crawl along the target edge — jogs stay in the gap
+ * 4. Exit/entry clear containing obstacles (e.g. parent containers)
+ */
+function ensureOrthogonalTerminals(
+  path: Point[],
+  from: Point,
+  to: Point,
+  fromDir: string | undefined,
+  toDir: string | undefined,
+  obstacles: PathObstacle[] = []
+): Point[] {
+  if (path.length < 2) {
+    return path;
+  }
+
+  const exitDir = fromDir ?? inferExitDir(from, to);
+  const approachDir = resolveApproachDir(from, to, toDir);
+
+  const crawlsAlongTargetEdge = (p: Point): boolean => {
+    if (isVertical(approachDir)) {
+      return Math.abs(p.y - to.y) < 0.5 && Math.abs(p.x - to.x) > 0.5;
+    }
+    if (isHorizontal(approachDir)) {
+      return Math.abs(p.x - to.x) < 0.5 && Math.abs(p.y - to.y) > 0.5;
+    }
+    return false;
+  };
+
+  const firstOk = (() => {
+    const next = path[1]!;
+    if (isVertical(exitDir)) {
+      return Math.abs(next.x - from.x) < 0.5 && Math.abs(next.y - from.y) > 0.5;
+    }
+    if (isHorizontal(exitDir)) {
+      return Math.abs(next.y - from.y) < 0.5 && Math.abs(next.x - from.x) > 0.5;
+    }
+    return true;
+  })();
+  const lastOk = (() => {
+    const pre = path[path.length - 2]!;
+    if (isVertical(approachDir)) {
+      return Math.abs(pre.x - to.x) < 0.5 && Math.abs(pre.y - to.y) > 0.5;
+    }
+    if (isHorizontal(approachDir)) {
+      return Math.abs(pre.y - to.y) < 0.5 && Math.abs(pre.x - to.x) > 0.5;
+    }
+    return true;
+  })();
+  const hasEdgeCrawl = path.slice(1, -1).some(crawlsAlongTargetEdge);
+
+  // Keep already-correct orthogonal paths (classic undirected / directed routes).
+  // Still force a rewrite when we must clear obstacles or strip edge crawls.
+  if (firstOk && lastOk && !hasEdgeCrawl && obstacles.length === 0) {
+    return simplifyPath(path);
+  }
+
+  const startExit = moveOutsideObstacles(from, exitDir, obstacles, ROUTE_EXIT_DISTANCE);
+  const endEntry = moveOutsideObstacles(to, approachDir, obstacles, ROUTE_EXIT_DISTANCE);
+
+  const expanded = expandObstacles(obstacles, OBSTACLE_MARGIN);
+  const insideObstacle = (p: Point): boolean =>
+    expanded.some((obstacle) => pointInsideObstacle(p, obstacle));
+
+  // Keep intermediate points; drop old terminal stubs, edge-crawls, and points still inside obstacles.
+  let middle = path.slice(1, -1).filter(
+    (p) =>
+      (Math.abs(p.x - from.x) > 0.001 || Math.abs(p.y - from.y) > 0.001) &&
+      (Math.abs(p.x - to.x) > 0.001 || Math.abs(p.y - to.y) > 0.001) &&
+      (Math.abs(p.x - startExit.x) > 0.001 || Math.abs(p.y - startExit.y) > 0.001) &&
+      (Math.abs(p.x - endEntry.x) > 0.001 || Math.abs(p.y - endEntry.y) > 0.001) &&
+      !crawlsAlongTargetEdge(p) &&
+      !insideObstacle(p)
+  );
+
+  // Prefer jogs away from the target edge when approach is vertical/horizontal.
+  if (isVertical(approachDir)) {
+    middle = middle.filter((p) => Math.abs(p.y - to.y) >= ROUTE_EXIT_DISTANCE * 0.75);
+  } else if (isHorizontal(approachDir)) {
+    middle = middle.filter((p) => Math.abs(p.x - to.x) >= ROUTE_EXIT_DISTANCE * 0.75);
+  }
+
+  const body: Point[] = [from, startExit];
+
+  // Never step back toward the node after exiting — that creates a visible "tail"
+  // past the turn (out to startExit, then back inward before going up/down).
+  const projectOutward = (p: Point): Point => {
+    if (isHorizontal(exitDir)) {
+      return { x: startExit.x, y: p.y };
+    }
+    if (isVertical(exitDir)) {
+      return { x: p.x, y: startExit.y };
+    }
+    return p;
+  };
+  const isInwardOfExit = (p: Point): boolean => {
+    switch (exitDir) {
+      case 'right':
+        return p.x < startExit.x - 0.5;
+      case 'left':
+        return p.x > startExit.x + 0.5;
+      case 'bottom':
+        return p.y < startExit.y - 0.5;
+      case 'top':
+        return p.y > startExit.y + 0.5;
+      default:
+        return false;
+    }
+  };
+
+  middle = middle.map((p) => (isInwardOfExit(p) ? projectOutward(p) : p));
+  middle = simplifyPath(middle).filter(
+    (p) =>
+      (Math.abs(p.x - startExit.x) > 0.001 || Math.abs(p.y - startExit.y) > 0.001) &&
+      !insideObstacle(p)
+  );
+
+  if (middle.length > 0) {
+    const firstMid = middle[0]!;
+    if (
+      Math.abs(startExit.x - firstMid.x) > 0.5 &&
+      Math.abs(startExit.y - firstMid.y) > 0.5
+    ) {
+      const elbow = isHorizontal(exitDir)
+        ? { x: startExit.x, y: firstMid.y }
+        : { x: firstMid.x, y: startExit.y };
+      if (!insideObstacle(elbow)) {
+        body.push(elbow);
+      }
+    }
+    body.push(...middle);
+  } else {
+    // No middle: turn at startExit toward endEntry in the gap.
+    if (
+      Math.abs(startExit.x - endEntry.x) > 0.5 &&
+      Math.abs(startExit.y - endEntry.y) > 0.5
+    ) {
+      const elbow = isHorizontal(exitDir)
+        ? { x: startExit.x, y: endEntry.y }
+        : { x: endEntry.x, y: startExit.y };
+      if (!insideObstacle(elbow)) {
+        body.push(elbow);
+      }
+    }
+  }
+
+  const tip = body[body.length - 1]!;
+  if (Math.abs(tip.x - endEntry.x) > 0.5 || Math.abs(tip.y - endEntry.y) > 0.5) {
+    if (isVertical(approachDir)) {
+      if (Math.abs(tip.x - endEntry.x) > 0.5) {
+        const jogY =
+          Math.abs(tip.y - to.y) < ROUTE_EXIT_DISTANCE
+            ? endEntry.y
+            : Math.abs(tip.y - startExit.y) < 0.5
+              ? (startExit.y + endEntry.y) / 2
+              : tip.y;
+        if (Math.abs(tip.y - jogY) > 0.5) {
+          const p = { x: tip.x, y: jogY };
+          if (!insideObstacle(p)) body.push(p);
+        }
+        const corner = { x: endEntry.x, y: body[body.length - 1]!.y };
+        if (!insideObstacle(corner)) body.push(corner);
+      }
+      const last = body[body.length - 1]!;
+      if (Math.abs(last.y - endEntry.y) > 0.5 || Math.abs(last.x - endEntry.x) > 0.5) {
+        body.push(endEntry);
+      }
+    } else if (isHorizontal(approachDir)) {
+      if (Math.abs(tip.y - endEntry.y) > 0.5) {
+        const jogX =
+          Math.abs(tip.x - to.x) < ROUTE_EXIT_DISTANCE
+            ? endEntry.x
+            : Math.abs(tip.x - startExit.x) < 0.5
+              ? (startExit.x + endEntry.x) / 2
+              : tip.x;
+        if (Math.abs(tip.x - jogX) > 0.5) {
+          const p = { x: jogX, y: tip.y };
+          if (!insideObstacle(p)) body.push(p);
+        }
+        const corner = { x: body[body.length - 1]!.x, y: endEntry.y };
+        if (!insideObstacle(corner)) body.push(corner);
+      }
+      const last = body[body.length - 1]!;
+      if (Math.abs(last.x - endEntry.x) > 0.5 || Math.abs(last.y - endEntry.y) > 0.5) {
+        body.push(endEntry);
+      }
+    } else {
+      body.push(endEntry);
+    }
+  }
+
+  const tail = body[body.length - 1]!;
+  if (Math.abs(tail.x - endEntry.x) > 0.5 || Math.abs(tail.y - endEntry.y) > 0.5) {
+    body.push(endEntry);
+  }
+
+  return forcePerpendicularTerminals(simplifyPath([...body, to]), from, to, exitDir, approachDir);
+}
+
+/**
+ * Surgical fix: only rewrite terminals when they violate ⊥ rules.
+ * Does not rebuild an already-correct orthogonal path.
+ */
+function forcePerpendicularTerminals(
+  path: Point[],
+  from: Point,
+  to: Point,
+  exitDir: string,
+  approachDir: string
+): Point[] {
+  if (path.length < 2) {
+    return path;
+  }
+
+  const stub = Math.max(MIN_SEGMENT_LENGTH, ROUTE_EXIT_DISTANCE / 2);
+  let out = path.slice();
+
+  const onTargetEdge = (p: Point): boolean => {
+    if (isVertical(approachDir)) {
+      return Math.abs(p.y - to.y) < 0.5 && Math.abs(p.x - to.x) > 0.5;
+    }
+    if (isHorizontal(approachDir)) {
+      return Math.abs(p.x - to.x) < 0.5 && Math.abs(p.y - to.y) > 0.5;
+    }
+    return false;
+  };
+
+  const lastIsPerp = (): boolean => {
+    const pre = out[out.length - 2]!;
+    if (isVertical(approachDir)) {
+      return Math.abs(pre.x - to.x) < 0.5 && Math.abs(pre.y - to.y) > 0.5;
+    }
+    if (isHorizontal(approachDir)) {
+      return Math.abs(pre.y - to.y) < 0.5 && Math.abs(pre.x - to.x) > 0.5;
+    }
+    return true;
+  };
+
+  const firstIsPerp = (): boolean => {
+    const next = out[1]!;
+    if (isVertical(exitDir)) {
+      return Math.abs(next.x - from.x) < 0.5 && Math.abs(next.y - from.y) > 0.5;
+    }
+    if (isHorizontal(exitDir)) {
+      return Math.abs(next.y - from.y) < 0.5 && Math.abs(next.x - from.x) > 0.5;
+    }
+    return true;
+  };
+
+  if (!lastIsPerp()) {
+    // Strip crawl along the target edge, then force endEntry → to.
+    while (out.length > 2 && onTargetEdge(out[out.length - 2]!)) {
+      out.splice(out.length - 2, 1);
+    }
+    const endEntry = moveByDir(to, approachDir, stub);
+    // Drop a previous endEntry-like stub if present
+    if (out.length > 2) {
+      const pre = out[out.length - 2]!;
+      if (Math.abs(pre.x - to.x) < 0.5 && Math.abs(pre.y - to.y) < stub + 1) {
+        out.splice(out.length - 2, 1);
+      } else if (Math.abs(pre.y - to.y) < 0.5 && Math.abs(pre.x - to.x) < stub + 1) {
+        out.splice(out.length - 2, 1);
+      }
+    }
+    const tip = out[out.length - 2]!;
+    const insert: Point[] = [];
+    if (isVertical(approachDir) && Math.abs(tip.x - endEntry.x) > 0.5) {
+      insert.push({ x: endEntry.x, y: tip.y });
+    } else if (isHorizontal(approachDir) && Math.abs(tip.y - endEntry.y) > 0.5) {
+      insert.push({ x: tip.x, y: endEntry.y });
+    }
+    insert.push(endEntry);
+    out.splice(out.length - 1, 0, ...insert);
+  }
+
+  if (!firstIsPerp()) {
+    const startExit = moveByDir(from, exitDir, stub);
+    const next = out[1]!;
+    // Drop an inward/wrong first stub
+    if (out.length > 2) {
+      const sameRail =
+        (isHorizontal(exitDir) && Math.abs(next.y - from.y) < 0.5) ||
+        (isVertical(exitDir) && Math.abs(next.x - from.x) < 0.5);
+      if (sameRail) {
+        out.splice(1, 1);
+      }
+    }
+    const tip = out[1]!;
+    const insert: Point[] = [startExit];
+    if (isHorizontal(exitDir) && Math.abs(tip.y - startExit.y) > 0.5) {
+      insert.push({ x: startExit.x, y: tip.y });
+    } else if (isVertical(exitDir) && Math.abs(tip.x - startExit.x) > 0.5) {
+      insert.push({ x: tip.x, y: startExit.y });
+    }
+    out.splice(1, 0, ...insert);
+  }
+
+  return simplifyPath(out);
 }
 
 function buildRoutedPolyline(
@@ -126,11 +504,11 @@ function buildRoutedPolyline(
     return null;
   }
 
-  const effectiveFromDir = fromDir ?? inferDir(from, to);
-  const effectiveToDir = toDir ?? oppositeDir(effectiveFromDir);
+  const effectiveFromDir = fromDir ?? inferExitDir(from, to);
+  const effectiveToDir = resolveApproachDir(from, to, toDir);
 
-  const startExit = moveByDir(from, effectiveFromDir, ROUTE_EXIT_DISTANCE);
-  const endEntry = moveByDir(to, effectiveToDir, ROUTE_EXIT_DISTANCE);
+  const startExit = moveOutsideObstacles(from, effectiveFromDir, obstacles, ROUTE_EXIT_DISTANCE);
+  const endEntry = moveOutsideObstacles(to, effectiveToDir, obstacles, ROUTE_EXIT_DISTANCE);
   const expanded = expandObstacles(obstacles, OBSTACLE_MARGIN);
 
   const xs = new Set<number>([startExit.x, endEntry.x]);
@@ -307,10 +685,27 @@ export class PolylinePathStrategy implements PathStrategy {
     const selfLoop = _options?.selfLoop ?? false;
     const obstacles = _options?.obstacles ?? [];
 
+    if (isSide(fromDir) && isSide(toDir) && obstacles.length > 0) {
+      const { parent, target } = resolveParentAndTarget(from, to, obstacles);
+      const approachDir = resolveApproachDir(from, to, toDir);
+      if ((parent || target) && isSide(approachDir)) {
+        return routeOrthogonalAround({
+          from,
+          to,
+          fromDir,
+          toDir: approachDir,
+          parent,
+          target,
+          margin: 4,
+          exitDistance: 20,
+        });
+      }
+    }
+
     if (!selfLoop && dist < OBSTACLE_ROUTING_DISTANCE) {
       const routed = buildRoutedPolyline(from, to, fromDir, toDir, obstacles);
       if (routed) {
-        return routed;
+        return ensureOrthogonalTerminals(routed, from, to, fromDir, toDir, obstacles);
       }
     }
 
@@ -435,20 +830,33 @@ export class PolylinePathStrategy implements PathStrategy {
 
     // If directions are specified, route accordingly
     if (fromDir || toDir) {
-      return this.calculateDirectedPath(from, to, fromDir, toDir);
+      return ensureOrthogonalTerminals(
+        this.calculateDirectedPath(from, to, fromDir, toDir),
+        from,
+        to,
+        fromDir,
+        toDir,
+        obstacles
+      );
     }
 
-    // Default behavior: auto-detect direction
+    // Default behavior: auto-detect direction (classic manhattan; no forced stubs)
     const midX = (from.x + to.x) / 2;
 
     // Horizontal-first routing
     if (Math.abs(to.x - from.x) > Math.abs(to.y - from.y)) {
-      return [from, { x: midX, y: from.y }, { x: midX, y: to.y }, to];
+      const path = [from, { x: midX, y: from.y }, { x: midX, y: to.y }, to];
+      return obstacles.length > 0
+        ? ensureOrthogonalTerminals(path, from, to, fromDir, toDir, obstacles)
+        : path;
     }
 
     // Vertical-first routing
     const midY = (from.y + to.y) / 2;
-    return [from, { x: from.x, y: midY }, { x: to.x, y: midY }, to];
+    const path = [from, { x: from.x, y: midY }, { x: to.x, y: midY }, to];
+    return obstacles.length > 0
+      ? ensureOrthogonalTerminals(path, from, to, fromDir, toDir, obstacles)
+      : path;
   }
 
   private calculateDirectedPath(from: Point, to: Point, fromDir?: string, toDir?: string): Point[] {
@@ -499,11 +907,27 @@ export class PolylinePathStrategy implements PathStrategy {
         points.push({ x: exitX, y: to.y });
       }
     } else if (fromVertical && toHorizontal) {
-      // From vertical to horizontal
-      points.push({ x: from.x, y: to.y });
+      // Exit along fromDir first; horizontal approach jog stays in the mid-gap.
+      const exitY =
+        fromDir === 'top' ? from.y - MIN_SEGMENT_LENGTH : from.y + MIN_SEGMENT_LENGTH;
+      const entryX =
+        toDir === 'left' ? to.x - MIN_SEGMENT_LENGTH : to.x + MIN_SEGMENT_LENGTH;
+      const jogX = (from.x + to.x) / 2;
+      const approachX =
+        Math.abs(jogX - to.x) >= MIN_SEGMENT_LENGTH
+          ? jogX
+          : entryX;
+      points.push({ x: from.x, y: exitY });
+      points.push({ x: approachX, y: exitY });
+      points.push({ x: approachX, y: to.y });
     } else if (fromHorizontal && toVertical) {
-      // From horizontal to vertical
-      points.push({ x: to.x, y: from.y });
+      // Exit along fromDir first; horizontal jog in mid-gap, then vertical into target.
+      const exitX =
+        fromDir === 'left' ? from.x - MIN_SEGMENT_LENGTH : from.x + MIN_SEGMENT_LENGTH;
+      const jogY = (from.y + to.y) / 2;
+      points.push({ x: exitX, y: from.y });
+      points.push({ x: exitX, y: jogY });
+      points.push({ x: to.x, y: jogY });
     } else {
       // Fallback: one corner
       const midX = (from.x + to.x) / 2;
