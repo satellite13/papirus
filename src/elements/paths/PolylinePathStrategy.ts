@@ -222,7 +222,7 @@ function ensureOrthogonalTerminals(
     return false;
   };
 
-  const firstOk = (() => {
+  const firstOk = ((): boolean => {
     const next = path[1]!;
     if (isVertical(exitDir)) {
       return Math.abs(next.x - from.x) < 0.5 && Math.abs(next.y - from.y) > 0.5;
@@ -232,7 +232,7 @@ function ensureOrthogonalTerminals(
     }
     return true;
   })();
-  const lastOk = (() => {
+  const lastOk = ((): boolean => {
     const pre = path[path.length - 2]!;
     if (isVertical(approachDir)) {
       return Math.abs(pre.x - to.x) < 0.5 && Math.abs(pre.y - to.y) > 0.5;
@@ -408,7 +408,7 @@ function forcePerpendicularTerminals(
   }
 
   const stub = Math.max(MIN_SEGMENT_LENGTH, ROUTE_EXIT_DISTANCE / 2);
-  let out = path.slice();
+  const out = path.slice();
 
   const onTargetEdge = (p: Point): boolean => {
     if (isVertical(approachDir)) {
