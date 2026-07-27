@@ -3,6 +3,7 @@ import type { PathStrategy, PathStrategyOptions, PathObstacle } from './PathStra
 import { routeOrthogonalAround, type Side } from './routeOrthogonalAround';
 import { distance, distanceToSegment } from '@/utils/geometry';
 import { isHorizontal, isVertical, isOppositeDirections } from '@/utils/direction';
+import { routeDebug } from '@/utils/routeDebug';
 
 function isSide(v: string | undefined): v is Side {
   return v === 'top' || v === 'right' || v === 'bottom' || v === 'left';
@@ -397,15 +398,34 @@ export class PolylinePathStrategy implements PathStrategy {
   ): Point[] {
     const controlPoints = _options?.controlPoints;
     if (_options?.editablePolyline) {
-      if (controlPoints && controlPoints.length > 0) {
-        return [from, ...controlPoints, to];
-      }
-      return [from, { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 }, to];
+      const path =
+        controlPoints && controlPoints.length > 0
+          ? [from, ...controlPoints, to]
+          : [from, { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 }, to];
+      routeDebug('polyline.via', { via: 'editable', path });
+      return path;
     }
 
     const dist = distance(from, to);
     const selfLoop = _options?.selfLoop ?? false;
     const obstacles = _options?.obstacles ?? [];
+    const finish = (via: string, path: Point[]): Point[] => {
+      const roles = resolveRoutingRoles(from, to, obstacles);
+      routeDebug('polyline.via', {
+        via,
+        fromDir,
+        toDir,
+        approachDir: roles.target ? resolveApproachDir(from, to, toDir, roles.target) : toDir,
+        roles: {
+          parent: roles.parent?.id,
+          source: roles.source?.id,
+          target: roles.target?.id,
+        },
+        obstacleRoles: obstacles.map((o) => `${o.id}:${o.role ?? '?'}`),
+        path: path.map((p) => `${Math.round(p.x)},${Math.round(p.y)}`).join(' → '),
+      });
+      return path;
+    };
 
     if (selfLoop && dist < SELF_LOOP_MIN_DISTANCE && (fromDir || toDir)) {
       const dir = fromDir ?? toDir;
@@ -532,40 +552,51 @@ export class PolylinePathStrategy implements PathStrategy {
       const { parent, source, target } = resolveRoutingRoles(from, to, obstacles);
       const approachDir = resolveApproachDir(from, to, toDir, target);
       if ((parent || source || target) && isSide(approachDir)) {
-        return routeOrthogonalAround({
-          from,
-          to,
-          fromDir,
-          toDir: approachDir,
-          parent,
-          source,
-          target,
-          margin: 4,
-          exitDistance: 20,
-        });
+        return finish(
+          'routeOrthogonalAround',
+          routeOrthogonalAround({
+            from,
+            to,
+            fromDir,
+            toDir: approachDir,
+            parent,
+            source,
+            target,
+            margin: 4,
+            exitDistance: 20,
+          })
+        );
       }
+      routeDebug('polyline.via', {
+        via: 'roles-missed-around',
+        fromDir,
+        toDir,
+        approachDir,
+        roles: { parent: parent?.id, source: source?.id, target: target?.id },
+        obstacleRoles: obstacles.map((o) => `${o.id}:${o.role ?? '?'}`),
+      });
     }
 
     // Generic multi-obstacle A* (no parent/target specialization)
     if (!selfLoop && dist < OBSTACLE_ROUTING_DISTANCE) {
       const routed = buildRoutedPolyline(from, to, fromDir, toDir, obstacles);
       if (routed) {
-        return routed;
+        return finish('buildRoutedPolyline', routed);
       }
     }
 
     // One-sided or partial dirs / directed without specialized obstacles
     if (fromDir || toDir) {
-      return this.calculateDirectedPath(from, to, fromDir, toDir);
+      return finish('calculateDirectedPath', this.calculateDirectedPath(from, to, fromDir, toDir));
     }
 
     // Classic manhattan when dirs are absent
     const midX = (from.x + to.x) / 2;
     if (Math.abs(to.x - from.x) > Math.abs(to.y - from.y)) {
-      return [from, { x: midX, y: from.y }, { x: midX, y: to.y }, to];
+      return finish('manhattan-h', [from, { x: midX, y: from.y }, { x: midX, y: to.y }, to]);
     }
     const midY = (from.y + to.y) / 2;
-    return [from, { x: from.x, y: midY }, { x: to.x, y: midY }, to];
+    return finish('manhattan-v', [from, { x: from.x, y: midY }, { x: to.x, y: midY }, to]);
   }
 
   private calculateDirectedPath(from: Point, to: Point, fromDir?: string, toDir?: string): Point[] {

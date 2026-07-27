@@ -1016,12 +1016,15 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> implements Diag
       return this._nodeObstaclesCache;
     }
 
+    // Keep pad modest: ArchiMate stacks nodes ~12px apart; 8px/side sealed mid-gap
+    // corridors and forced contour crawl along Business Process bottoms.
+    const pad = 4;
     this._nodeObstaclesCache = Array.from(this._nodes.values()).map((node) => ({
       id: node.id,
-      x: node.x - 8,
-      y: node.y - 8,
-      width: node.width + 16,
-      height: node.height + 16,
+      x: node.x - pad,
+      y: node.y - pad,
+      width: node.width + pad * 2,
+      height: node.height + pad * 2,
       role: 'other' as const,
     }));
 

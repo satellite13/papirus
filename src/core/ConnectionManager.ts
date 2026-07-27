@@ -327,7 +327,7 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
         snappedPoint = bestResult.point;
         this.reconnectingOutlineParam = bestResult.param;
         this.reconnectingTargetNodeId = bestResult.node.id;
-        snappedDir = getDirectionFromOutlineParam(bestResult.param);
+        snappedDir = getDirectionFromOutlineParam(bestResult.param, bestResult.node.getBounds());
 
         const otherNode = this.reconnectingEndpoint === 'start' ? toNode : fromNode;
         if (otherNode) {
@@ -340,7 +340,7 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
           const reprojected = targetNode.getClosestPointOnOutline(snappedPoint);
           snappedPoint = reprojected.point;
           this.reconnectingOutlineParam = reprojected.param;
-          snappedDir = getDirectionFromOutlineParam(reprojected.param);
+          snappedDir = getDirectionFromOutlineParam(reprojected.param, targetNode.getBounds());
         }
       } else {
         this.reconnectingOutlineParam = null;
@@ -405,12 +405,13 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
       let role: PathObstacle['role'] = 'other';
       if (node.id === sourceNodeId) role = 'source';
       else if (node.id === targetNodeId) role = 'target';
+      const pad = 4;
       obstacles.push({
         id: node.id,
-        x: node.x - 8,
-        y: node.y - 8,
-        width: node.width + 16,
-        height: node.height + 16,
+        x: node.x - pad,
+        y: node.y - pad,
+        width: node.width + pad * 2,
+        height: node.height + pad * 2,
         role,
       });
     }
@@ -437,7 +438,8 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
   private getTargetDirForReconnect(edge: Edge, endpoint: 'from' | 'to'): string | undefined {
     const ep = endpoint === 'from' ? edge.from : edge.to;
     if (this.attachToOutline && ep.outlineParam !== undefined) {
-      return getDirectionFromOutlineParam(ep.outlineParam);
+      const node = ep.nodeId ? this.renderer.getNode(ep.nodeId) : undefined;
+      return getDirectionFromOutlineParam(ep.outlineParam, node?.getBounds());
     }
     const anchorId = ep.portId?.replace(ANCHOR_PORT_PREFIX, '');
     return anchorId?.split(':')[0];
@@ -845,13 +847,23 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
       ctx.lineTo(end.x, end.y);
       ctx.stroke();
     } else {
+      const previewTarget =
+        this.previewTargetNodeId != null
+          ? this.renderer.getNode(this.previewTargetNodeId)
+          : undefined;
       const fromDir =
         this.sourceOutlineParam !== null
-          ? getDirectionFromOutlineParam(this.sourceOutlineParam)
+          ? getDirectionFromOutlineParam(
+              this.sourceOutlineParam,
+              this.sourceNode?.getBounds()
+            )
           : this.sourceAnchorId?.split(':')[0];
       const toDir =
         this.previewTargetOutlineParam !== null
-          ? getDirectionFromOutlineParam(this.previewTargetOutlineParam)
+          ? getDirectionFromOutlineParam(
+              this.previewTargetOutlineParam,
+              previewTarget?.getBounds()
+            )
           : this.previewTargetAnchorId?.split(':')[0];
       this.drawBezierPreview(ctx, start, end, fromDir, toDir);
     }

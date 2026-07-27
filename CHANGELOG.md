@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-07-28
+
+### Fixed
+- Orthogonal polylines no longer crawl along wide target edges when the attachment slides left on the bottom side (`attachToOutline` used equal perimeter quarters for direction).
+- Obstacle-aware routing stays active while dragging nodes (avoids temporary contour-glued paths).
+- Fallback outer routes stay orthogonal (no diagonal segments between exit/entry stubs).
+- Vertically stacked nodes prefer facing top/bottom ports so side locks do not force a contour jog.
+
 ## [0.8.0] - 2026-07-28
 
 ### Added
@@ -377,7 +385,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Edge animations (flow effect)
 - Context menu and search/filter
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.8.0...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.8.1...HEAD
+[0.8.1]: https://gitverse.ru/ngroznykh/papirus/compare/v0.8.0...v0.8.1
 [0.8.0]: https://gitverse.ru/ngroznykh/papirus/compare/v0.7.3...v0.8.0
 [0.7.3]: https://gitverse.ru/ngroznykh/papirus/compare/v0.7.2...v0.7.3
 [0.7.2]: https://gitverse.ru/ngroznykh/papirus/compare/v0.7.1...v0.7.2

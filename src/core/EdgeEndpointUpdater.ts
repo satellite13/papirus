@@ -6,6 +6,7 @@ import type { EdgeEndpoint, Point } from '@/types';
 import { isEdgeEdgeEndpoint, isNodeEdgeEndpoint } from '@/types';
 import { directionFromAngle } from '@/utils/edgePath';
 import { getDirectionFromOutlineParam } from '@/utils/direction';
+import { routeDebug } from '@/utils/routeDebug';
 
 export interface EdgeEndpointUpdaterHost {
   getNodes(): ReadonlyMap<string, Node>;
@@ -14,6 +15,7 @@ export interface EdgeEndpointUpdaterHost {
 }
 
 type ResolvedEnd = { point: Point; direction?: string };
+type Side = 'top' | 'right' | 'bottom' | 'left';
 
 const EDGE_ATTACH_MAX_PASSES = 3;
 
@@ -21,7 +23,9 @@ export class EdgeEndpointUpdater {
   constructor(private readonly host: EdgeEndpointUpdaterHost) {}
 
   updateForDrag(): void {
-    this.update(false);
+    // Keep obstacle-aware routing while dragging — otherwise polylines fall back to
+    // calculateDirectedPath and glue to target contours until drag ends.
+    this.update(true);
   }
 
   updateAll(): void {
@@ -71,6 +75,10 @@ export class EdgeEndpointUpdater {
     if (!fromNode || !toNode) return;
 
     if (includeRoutingObstacles) {
+      // Fix left/right locks on a vertical stack (and vice versa) before freezing
+      // unset ports — otherwise approachDir follows the side port and the jog
+      // crawls along the wide target edge.
+      this.preferFacingSidePorts(edge, fromNode, toNode);
       this.lockAnchors(edge, fromNode, toNode);
     }
     const from = this.resolveNodeEndpoint(fromNode, edge.from, toNode.getCenter(), edge.lockAnchors);
@@ -83,6 +91,27 @@ export class EdgeEndpointUpdater {
       if (obstacle.id === fromId) return { ...obstacle, role: 'source' as const };
       if (obstacle.id === toId) return { ...obstacle, role: 'target' as const };
       return obstacle;
+    });
+    routeDebug('updater.nodeNode', {
+      edgeId: edge.id,
+      type: edge.type,
+      includeRoutingObstacles,
+      lockAnchors: edge.lockAnchors,
+      from: {
+        nodeId: fromId,
+        portId: edge.from.portId,
+        outlineParam: edge.from.outlineParam,
+        point: `${Math.round(from.point.x)},${Math.round(from.point.y)}`,
+        dir: from.direction,
+      },
+      to: {
+        nodeId: toId,
+        portId: edge.to.portId,
+        outlineParam: edge.to.outlineParam,
+        point: `${Math.round(to.point.x)},${Math.round(to.point.y)}`,
+        dir: to.direction,
+      },
+      obstacleCount: routingObstacles?.length ?? 0,
     });
     edge.updateEndpoints(
       from.point,
@@ -190,6 +219,115 @@ export class EdgeEndpointUpdater {
   }
 
   /**
+   * When nodes are clearly stacked, retarget side ports that would force the
+   * polyline to approach along the long edge (contour crawl).
+   *
+   * Uses bounding-box gaps (not center dx/dy): a large horizontal offset must not
+   * flip bottom→left while the source is still below the target — that reintroduces
+   * the left-edge contour jog when the user drags the node leftward.
+   *
+   * - Always set facing ports when unset (so lockAnchors does not pick left/right).
+   * - Rewrite target left/right → top/bottom when there is a clear vertical gap.
+   * - Do not rewrite an intentional source side exit (e.g. left exit from a nested
+   *   component around its parent).
+   */
+  private preferFacingSidePorts(edge: Edge, fromNode: Node, toNode: Node): void {
+    if (!edge.lockAnchors) return;
+    if (!isNodeEdgeEndpoint(edge.from) || !isNodeEdgeEndpoint(edge.to)) return;
+    if (edge.from.outlineParam !== undefined || edge.to.outlineParam !== undefined) return;
+
+    const fromB = fromNode.getBounds();
+    const toB = toNode.getBounds();
+    // Positive = clear gap with `from` on that side of `to`.
+    const fromBelow = fromB.y - (toB.y + toB.height);
+    const fromAbove = toB.y - (fromB.y + fromB.height);
+    const fromRight = fromB.x - (toB.x + toB.width);
+    const fromLeft = toB.x - (fromB.x + fromB.width);
+
+    const fc = fromNode.getCenter();
+    const tc = toNode.getCenter();
+
+    if (fromBelow > 0 || fromAbove > 0) {
+      const fromSide: Side = fromBelow > 0 ? 'top' : 'bottom';
+      const toSide: Side = fromBelow > 0 ? 'bottom' : 'top';
+      const curFrom = this.portSide(edge.from.portId);
+      const curTo = this.portSide(edge.to.portId);
+      if (!curFrom) {
+        this.setEndpointSidePort(edge, 'from', fromNode, fromSide, tc);
+      }
+      // Fix lateral locks and keep/slide along the facing side toward the source.
+      if (!curTo || curTo === 'left' || curTo === 'right' || curTo === toSide) {
+        this.setEndpointSidePort(edge, 'to', toNode, toSide, fc);
+      }
+      return;
+    }
+
+    if (fromLeft > 0 || fromRight > 0) {
+      const fromSide: Side = fromRight > 0 ? 'left' : 'right';
+      const toSide: Side = fromRight > 0 ? 'right' : 'left';
+      const curFrom = this.portSide(edge.from.portId);
+      const curTo = this.portSide(edge.to.portId);
+      if (!curFrom) {
+        this.setEndpointSidePort(edge, 'from', fromNode, fromSide, tc);
+      }
+      // Only lateralize when there is no vertical gap (handled above). Never flip
+      // a facing bottom/top while boxes are still stacked — that was the left-drag bug.
+      if (!curTo || curTo === 'top' || curTo === 'bottom') {
+        this.setEndpointSidePort(edge, 'to', toNode, toSide, fc);
+      }
+    }
+  }
+
+  private portSide(portId: string | undefined): Side | undefined {
+    if (!portId?.startsWith(ANCHOR_PORT_PREFIX)) return undefined;
+    const side = portId.slice(ANCHOR_PORT_PREFIX.length).split(':')[0];
+    if (side === 'top' || side === 'right' || side === 'bottom' || side === 'left') {
+      return side;
+    }
+    return undefined;
+  }
+
+  private nearestAnchorOnSide(
+    node: Node,
+    side: Side,
+    toward: Point
+  ): { id: string; point: Point } | null {
+    const anchors = node.getAnchors().filter((a) => a.id.startsWith(`${side}:`));
+    if (anchors.length === 0) return null;
+    let best = anchors[0]!;
+    let minDist = Infinity;
+    for (const anchor of anchors) {
+      const dist = (anchor.point.x - toward.x) ** 2 + (anchor.point.y - toward.y) ** 2;
+      if (dist < minDist) {
+        minDist = dist;
+        best = anchor;
+      }
+    }
+    return best;
+  }
+
+  private setEndpointSidePort(
+    edge: Edge,
+    end: 'from' | 'to',
+    node: Node,
+    side: Side,
+    toward: Point
+  ): void {
+    const anchor = this.nearestAnchorOnSide(node, side, toward);
+    if (!anchor) return;
+    const next = {
+      ...(end === 'from' ? edge.from : edge.to),
+      portId: `${ANCHOR_PORT_PREFIX}${anchor.id}`,
+      outlineParam: undefined,
+    };
+    if (end === 'from') {
+      edge.from = next;
+    } else {
+      edge.to = next;
+    }
+  }
+
+  /**
    * Resolve a node endpoint:
    * - lockAnchors + portId → fixed side port (wins over leftover outlineParam)
    * - outlineParam → fixed point on outline (attach-to-outline)
@@ -210,9 +348,10 @@ export class EdgeEndpointUpdater {
     }
 
     if (isNodeEdgeEndpoint(endpoint) && endpoint.outlineParam !== undefined) {
+      const bounds = node.getBounds();
       return {
         point: node.getConnectionPointAtOutlineParam(endpoint.outlineParam),
-        direction: getDirectionFromOutlineParam(endpoint.outlineParam),
+        direction: getDirectionFromOutlineParam(endpoint.outlineParam, bounds),
       };
     }
 

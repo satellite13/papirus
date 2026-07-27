@@ -9,6 +9,14 @@
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-07-28
+
+### Исправлено
+- Ортогональные polyline больше не «лижут» край широкой цели при сдвиге точки влево по нижней стороне (`attachToOutline` брал направление четвертями периметра).
+- Во время перетаскивания нод сохраняется obstacle-aware маршрутизация (без временного прилипания к контуру).
+- Fallback outer-маршруты остаются ортогональными (без диагоналей между exit/entry stubs).
+- У вертикально расположенных нод предпочитаются facing-порты top/bottom, чтобы боковые lock не давали jog вдоль контура.
+
 ## [0.8.0] - 2026-07-28
 
 ### Добавлено
@@ -384,7 +392,8 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.8.0...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.8.1...HEAD
+[0.8.1]: https://gitverse.ru/ngroznykh/papirus/compare/v0.8.0...v0.8.1
 [0.8.0]: https://gitverse.ru/ngroznykh/papirus/compare/v0.7.3...v0.8.0
 [0.7.3]: https://gitverse.ru/ngroznykh/papirus/compare/v0.7.2...v0.7.3
 [0.7.2]: https://gitverse.ru/ngroznykh/papirus/compare/v0.7.1...v0.7.2

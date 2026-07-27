@@ -16,8 +16,19 @@ describe('direction utilities', () => {
     [0.75, 'left'],
     [-0.25, 'left'],
     [1.25, 'right'],
-  ] as const)('maps outline parameter %s to %s', (param, expected) => {
+  ] as const)('maps outline parameter %s to %s (equal-quarter fallback)', (param, expected) => {
     expect(getDirectionFromOutlineParam(param)).toBe(expected);
+  });
+
+  it('uses real perimeter fractions for wide/short bounds', () => {
+    // 400×50 → peri 900; bottom is param [0.5 .. ~0.944]
+    const wide = { width: 400, height: 50 };
+    expect(getDirectionFromOutlineParam(0.5, wide)).toBe('bottom');
+    expect(getDirectionFromOutlineParam(0.8, wide)).toBe('bottom');
+    expect(getDirectionFromOutlineParam(0.94, wide)).toBe('bottom');
+    expect(getDirectionFromOutlineParam(0.95, wide)).toBe('left');
+    // Equal-quarter fallback wrongly called this "left"
+    expect(getDirectionFromOutlineParam(0.8)).toBe('left');
   });
 
   it('classifies horizontal and vertical directions', () => {

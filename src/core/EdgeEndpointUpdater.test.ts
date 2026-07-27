@@ -3,6 +3,7 @@ import { Edge } from '@/elements/Edge';
 import type { PathObstacle } from '@/elements/paths';
 import { RectangleNode } from '@/elements/nodes/RectangleNode';
 import { stubAnimationFrame, stubCanvasContext } from '@/test/testUtils';
+import { isNodeEdgeEndpoint } from '@/types';
 import { DiagramRenderer } from './DiagramRenderer';
 import { EdgeEndpointUpdater } from './EdgeEndpointUpdater';
 
@@ -141,6 +142,104 @@ describe('EdgeEndpointUpdater edge attachments', () => {
     const target = passed!.find((o) => o.id === 'bp');
     expect(target).toBeDefined();
     expect(target!.role).toBe('target');
+  });
+
+  it('rewrites target left/right to facing bottom/top on a vertical stack', () => {
+    const product = new RectangleNode({ id: 'product', x: 200, y: 240, width: 140, height: 80 });
+    const bp = new RectangleNode({ id: 'bp', x: 40, y: 40, width: 400, height: 50 });
+    const nodes = new Map([
+      ['product', product],
+      ['bp', bp],
+    ]);
+
+    const edge = new Edge({
+      id: 'e-stack',
+      // OEF / nearest-anchor often locks BP to left while source sits below → contour jog.
+      from: { nodeId: 'product', portId: 'anchor:top:0' },
+      to: { nodeId: 'bp', portId: 'anchor:left:0' },
+      type: 'polyline',
+      lockAnchors: true,
+    });
+    const edges = new Map([['e-stack', edge]]);
+
+    const pad = 4;
+    const obstacles: PathObstacle[] = [
+      {
+        id: 'product',
+        x: product.x - pad,
+        y: product.y - pad,
+        width: product.width + pad * 2,
+        height: product.height + pad * 2,
+        role: 'other',
+      },
+      {
+        id: 'bp',
+        x: bp.x - pad,
+        y: bp.y - pad,
+        width: bp.width + pad * 2,
+        height: bp.height + pad * 2,
+        role: 'other',
+      },
+    ];
+
+    const updater = new EdgeEndpointUpdater({
+      getNodes: () => nodes,
+      getEdges: () => edges,
+      getNodeObstacles: () => obstacles,
+    });
+    updater.updateAll();
+
+    expect(isNodeEdgeEndpoint(edge.to)).toBe(true);
+    if (isNodeEdgeEndpoint(edge.to)) {
+      expect(edge.to.portId?.startsWith('anchor:bottom:')).toBe(true);
+    }
+    expect(isNodeEdgeEndpoint(edge.from)).toBe(true);
+    if (isNodeEdgeEndpoint(edge.from)) {
+      expect(edge.from.portId).toBe('anchor:top:0');
+    }
+
+    const end = edge.path[edge.path.length - 1]!;
+    expect(end.y).toBeCloseTo(bp.y + bp.height, 0);
+    // Horizontal mid segments should sit below BP, not at left-port Y on the contour.
+    for (let i = 1; i < edge.path.length; i++) {
+      const a = edge.path[i - 1]!;
+      const b = edge.path[i]!;
+      if (Math.abs(a.y - b.y) < 0.5 && Math.abs(a.x - b.x) > 1) {
+        expect(a.y).toBeGreaterThan(bp.y + bp.height - 1);
+      }
+    }
+  });
+
+  it('keeps bottom target when source is offset far left but still below', () => {
+    const product = new RectangleNode({ id: 'product', x: -80, y: 240, width: 140, height: 80 });
+    const bp = new RectangleNode({ id: 'bp', x: 40, y: 40, width: 400, height: 50 });
+    const nodes = new Map([
+      ['product', product],
+      ['bp', bp],
+    ]);
+
+    const edge = new Edge({
+      id: 'e-left-offset',
+      from: { nodeId: 'product', portId: 'anchor:top:0' },
+      // Already facing — must not flip to left just because |dx| > |dy|.
+      to: { nodeId: 'bp', portId: 'anchor:bottom:0' },
+      type: 'polyline',
+      lockAnchors: true,
+    });
+    const edges = new Map([['e-left-offset', edge]]);
+
+    const updater = new EdgeEndpointUpdater({
+      getNodes: () => nodes,
+      getEdges: () => edges,
+      getNodeObstacles: () => [],
+    });
+    updater.updateAll();
+
+    expect(isNodeEdgeEndpoint(edge.to)).toBe(true);
+    if (isNodeEdgeEndpoint(edge.to)) {
+      expect(edge.to.portId?.startsWith('anchor:bottom:')).toBe(true);
+    }
+    expect(edge.path[edge.path.length - 1]!.y).toBeCloseTo(bp.y + bp.height, 0);
   });
 
   it('keeps parent container as obstacle so nested edge routes around it', () => {

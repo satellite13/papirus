@@ -27,9 +27,137 @@ export type RouteOrthogonalAroundInput = {
 const DEFAULT_MARGIN = 12;
 const DEFAULT_EXIT = 20;
 const BEND_PENALTY = 0.001;
+/** Prefer mid-gap over hugging obstacle borders (same Manhattan, fewer bends). */
+const CONTOUR_BAND = 18;
+const CONTOUR_PENALTY = 140;
 
 function expandRect(r: RouteRect, m: number): RouteRect {
   return { ...r, x: r.x - m, y: r.y - m, width: r.width + 2 * m, height: r.height + 2 * m };
+}
+
+/**
+ * Diagram padding + router margin can seal a real visual gap between stacked nodes
+ * (e.g. ArchiMate BP header above a Product ~12px apart, 8px pad each side).
+ * Shrink facing sides of the expanded rects so a mid-gap corridor stays open.
+ */
+export function preserveFacingGap(
+  expandedA: RouteRect,
+  expandedB: RouteRect,
+  rawA: RouteRect,
+  rawB: RouteRect,
+  minCorridor = 2
+): [RouteRect, RouteRect] {
+  let a = { ...expandedA };
+  let b = { ...expandedB };
+
+  const gapAAboveB = rawB.y - (rawA.y + rawA.height);
+  if (gapAAboveB >= minCorridor) {
+    const mid = (rawA.y + rawA.height + rawB.y) / 2;
+    const half = minCorridor / 2;
+    const aBottom = mid - half;
+    const bTop = mid + half;
+    if (a.y + a.height > aBottom) a = { ...a, height: Math.max(0, aBottom - a.y) };
+    if (b.y < bTop) b = { ...b, height: Math.max(0, b.y + b.height - bTop), y: bTop };
+    return [a, b];
+  }
+
+  const gapBAboveA = rawA.y - (rawB.y + rawB.height);
+  if (gapBAboveA >= minCorridor) {
+    const mid = (rawB.y + rawB.height + rawA.y) / 2;
+    const half = minCorridor / 2;
+    const bBottom = mid - half;
+    const aTop = mid + half;
+    if (b.y + b.height > bBottom) b = { ...b, height: Math.max(0, bBottom - b.y) };
+    if (a.y < aTop) a = { ...a, height: Math.max(0, a.y + a.height - aTop), y: aTop };
+    return [a, b];
+  }
+
+  const gapALeftOfB = rawB.x - (rawA.x + rawA.width);
+  if (gapALeftOfB >= minCorridor) {
+    const mid = (rawA.x + rawA.width + rawB.x) / 2;
+    const half = minCorridor / 2;
+    const aRight = mid - half;
+    const bLeft = mid + half;
+    if (a.x + a.width > aRight) a = { ...a, width: Math.max(0, aRight - a.x) };
+    if (b.x < bLeft) b = { ...b, width: Math.max(0, b.x + b.width - bLeft), x: bLeft };
+    return [a, b];
+  }
+
+  const gapBLeftOfA = rawA.x - (rawB.x + rawB.width);
+  if (gapBLeftOfA >= minCorridor) {
+    const mid = (rawB.x + rawB.width + rawA.x) / 2;
+    const half = minCorridor / 2;
+    const bRight = mid - half;
+    const aLeft = mid + half;
+    if (b.x + b.width > bRight) b = { ...b, width: Math.max(0, bRight - b.x) };
+    if (a.x < aLeft) a = { ...a, width: Math.max(0, a.x + a.width - aLeft), x: aLeft };
+    return [a, b];
+  }
+
+  return [a, b];
+}
+
+function insetRect(r: RouteRect, m: number): RouteRect | null {
+  if (m <= 0) return r;
+  const width = r.width - 2 * m;
+  const height = r.height - 2 * m;
+  if (width <= 1 || height <= 1) return null;
+  return { ...r, x: r.x + m, y: r.y + m, width, height };
+}
+
+/** Midline of a positive gap between two raw rects, if any. */
+export function facingGapMid(rawA: RouteRect, rawB: RouteRect): Point | null {
+  if (rawA.y + rawA.height < rawB.y) {
+    return {
+      x: (rawA.x + rawA.width / 2 + rawB.x + rawB.width / 2) / 2,
+      y: (rawA.y + rawA.height + rawB.y) / 2,
+    };
+  }
+  if (rawB.y + rawB.height < rawA.y) {
+    return {
+      x: (rawA.x + rawA.width / 2 + rawB.x + rawB.width / 2) / 2,
+      y: (rawB.y + rawB.height + rawA.y) / 2,
+    };
+  }
+  if (rawA.x + rawA.width < rawB.x) {
+    return {
+      x: (rawA.x + rawA.width + rawB.x) / 2,
+      y: (rawA.y + rawA.height / 2 + rawB.y + rawB.height / 2) / 2,
+    };
+  }
+  if (rawB.x + rawB.width < rawA.x) {
+    return {
+      x: (rawB.x + rawB.width + rawA.x) / 2,
+      y: (rawA.y + rawA.height / 2 + rawB.y + rawB.height / 2) / 2,
+    };
+  }
+  return null;
+}
+
+/**
+ * Obstacles arrive pre-padded (diagram pad 4–8). Peel common pad amounts so a
+ * real visual gap between stacked nodes is visible to corridor / endEntry logic.
+ */
+export function peelForFacingGap(
+  a: RouteRect,
+  b: RouteRect
+): { a: RouteRect; b: RouteRect } | null {
+  for (const peel of [0, 4, 8]) {
+    const aa = insetRect(a, peel);
+    const bb = insetRect(b, peel);
+    if (!aa || !bb) continue;
+    if (facingGapMid(aa, bb)) return { a: aa, b: bb };
+  }
+  return null;
+}
+
+/** Clearance between two peeled rects on their facing axis (0 if overlapping/touching). */
+export function facingGapSize(a: RouteRect, b: RouteRect): number {
+  if (a.y + a.height < b.y) return b.y - (a.y + a.height);
+  if (b.y + b.height < a.y) return a.y - (b.y + b.height);
+  if (a.x + a.width < b.x) return b.x - (a.x + a.width);
+  if (b.x + b.width < a.x) return a.x - (b.x + b.width);
+  return 0;
 }
 
 function moveByDir(p: Point, dir: Side, d: number): Point {
@@ -74,6 +202,41 @@ function manhattan(a: Point, b: Point): number {
   return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
 }
 
+/**
+ * Extra cost when a segment runs parallel to an obstacle edge inside CONTOUR_BAND.
+ * Scaled by segment length so a long “lick” along a wide BP costs far more than a short stub.
+ */
+export function contourProximityPenalty(a: Point, b: Point, obstacles: RouteRect[]): number {
+  if (obstacles.length === 0) return 0;
+  const segLen = manhattan(a, b);
+  if (segLen < 1) return 0;
+  let minDist = Infinity;
+  if (Math.abs(a.y - b.y) < 0.001) {
+    const y = a.y;
+    const x1 = Math.min(a.x, b.x);
+    const x2 = Math.max(a.x, b.x);
+    for (const o of obstacles) {
+      // Only count edges the segment actually runs alongside (x-overlap).
+      if (x2 < o.x - 1 || x1 > o.x + o.width + 1) continue;
+      minDist = Math.min(minDist, Math.abs(y - o.y), Math.abs(y - (o.y + o.height)));
+    }
+  } else if (Math.abs(a.x - b.x) < 0.001) {
+    const x = a.x;
+    const y1 = Math.min(a.y, b.y);
+    const y2 = Math.max(a.y, b.y);
+    for (const o of obstacles) {
+      if (y2 < o.y - 1 || y1 > o.y + o.height + 1) continue;
+      minDist = Math.min(minDist, Math.abs(x - o.x), Math.abs(x - (o.x + o.width)));
+    }
+  } else {
+    return 0;
+  }
+  if (!Number.isFinite(minDist) || minDist >= CONTOUR_BAND) return 0;
+  const proximity = 1 - minDist / CONTOUR_BAND;
+  // Per-pixel crawl cost: a long glued jog must lose to an outer route.
+  return segLen * (CONTOUR_PENALTY / 10) * proximity;
+}
+
 /** Push along dir until outside expanded parent (and at least exitDistance). */
 function computeStartExit(
   from: Point,
@@ -109,8 +272,44 @@ function computeStartExit(
   return p;
 }
 
-function computeEndEntry(to: Point, toDir: Side, exitDistance: number): Point {
-  return moveByDir(to, toDir, exitDistance);
+function computeEndEntry(
+  to: Point,
+  toDir: Side,
+  exitDistance: number,
+  rawTarget?: RouteRect,
+  rawNeighbor?: RouteRect
+): Point {
+  const stub = moveByDir(to, toDir, exitDistance);
+  if (!rawTarget || !rawNeighbor) return stub;
+
+  // Prefer the visual mid-gap over a fixed stub when the approach faces a neighbor.
+  // Keeps the long jog off the target contour (ArchiMate BP bottom above Product).
+  const mid = facingGapMid(rawTarget, rawNeighbor);
+  if (!mid) return stub;
+
+  switch (toDir) {
+    case 'bottom':
+      if (mid.y > to.y && rawNeighbor.y >= rawTarget.y + rawTarget.height) {
+        return { x: to.x, y: mid.y };
+      }
+      break;
+    case 'top':
+      if (mid.y < to.y && rawNeighbor.y + rawNeighbor.height <= rawTarget.y) {
+        return { x: to.x, y: mid.y };
+      }
+      break;
+    case 'right':
+      if (mid.x > to.x && rawNeighbor.x >= rawTarget.x + rawTarget.width) {
+        return { x: mid.x, y: to.y };
+      }
+      break;
+    case 'left':
+      if (mid.x < to.x && rawNeighbor.x + rawNeighbor.width <= rawTarget.x) {
+        return { x: mid.x, y: to.y };
+      }
+      break;
+  }
+  return stub;
 }
 
 /**
@@ -168,18 +367,19 @@ function simplifyPath(path: Point[]): Point[] {
     const a = out[i]!;
     const b = out[i + 1]!;
     const c = out[i + 2]!;
-    const colinear =
-      (Math.abs(a.x - b.x) < 0.001 && Math.abs(b.x - c.x) < 0.001) ||
-      (Math.abs(a.y - b.y) < 0.001 && Math.abs(b.y - c.y) < 0.001);
+    const colinearV = Math.abs(a.x - b.x) < 0.001 && Math.abs(b.x - c.x) < 0.001;
+    const colinearH = Math.abs(a.y - b.y) < 0.001 && Math.abs(b.y - c.y) < 0.001;
+    const colinear = colinearV || colinearH;
     // Drop overshoot vertex: A→B→C where C lies between A and B on the same axis.
     const uturn =
-      (Math.abs(a.x - b.x) < 0.001 &&
-        Math.abs(b.x - c.x) < 0.001 &&
-        ((a.y < c.y && c.y < b.y) || (b.y < c.y && c.y < a.y))) ||
-      (Math.abs(a.y - b.y) < 0.001 &&
-        Math.abs(b.y - c.y) < 0.001 &&
-        ((a.x < c.x && c.x < b.x) || (b.x < c.x && c.x < a.x)));
-    if (uturn || (colinear && i > 0 && i + 2 < out.length - 1)) out.splice(i + 1, 1);
+      (colinearV && ((a.y < c.y && c.y < b.y) || (b.y < c.y && c.y < a.y))) ||
+      (colinearH && ((a.x < c.x && c.x < b.x) || (b.x < c.x && c.x < a.x)));
+    // Drop entry/exit spur: A→B→C where A lies between B and C (B overshoots then returns).
+    // e.g. (170,68)→(170,60)→(170,80) above a top port — the visible "хвостик".
+    const spur =
+      (colinearV && ((b.y < a.y && a.y < c.y) || (c.y < a.y && a.y < b.y))) ||
+      (colinearH && ((b.x < a.x && a.x < c.x) || (c.x < a.x && a.x < b.x)));
+    if (uturn || spur || (colinear && i > 0 && i + 2 < out.length - 1)) out.splice(i + 1, 1);
     else i++;
   }
   return out;
@@ -221,14 +421,17 @@ function collectLatticeCoords(
     ySet.add(o.y + o.height + 1);
   }
 
-  if (parent && target && margin != null) {
-    const ep = expandRect(parent, margin);
-    const et = expandRect(target, margin);
-
+  // Gap midlines from raw parent/target (not re-expanded): padding must not hide the corridor.
+  if (parent && target) {
     const addGapY = (gapY: number): void => {
       ySet.add(gapY);
-      const left = Math.min(ep.x, et.x, startExit.x, endEntry.x);
-      const right = Math.max(ep.x + ep.width, et.x + et.width, startExit.x, endEntry.x);
+      const left = Math.min(parent.x, target.x, startExit.x, endEntry.x);
+      const right = Math.max(
+        parent.x + parent.width,
+        target.x + target.width,
+        startExit.x,
+        endEntry.x
+      );
       xSet.add(left);
       xSet.add(right);
       xSet.add(startExit.x);
@@ -237,25 +440,34 @@ function collectLatticeCoords(
 
     const addGapX = (gapX: number): void => {
       xSet.add(gapX);
-      const top = Math.min(ep.y, et.y, startExit.y, endEntry.y);
-      const bottom = Math.max(ep.y + ep.height, et.y + et.height, startExit.y, endEntry.y);
+      const top = Math.min(parent.y, target.y, startExit.y, endEntry.y);
+      const bottom = Math.max(
+        parent.y + parent.height,
+        target.y + target.height,
+        startExit.y,
+        endEntry.y
+      );
       ySet.add(top);
       ySet.add(bottom);
       ySet.add(startExit.y);
       ySet.add(endEntry.y);
     };
 
-    if (et.y + et.height < ep.y) {
-      addGapY((et.y + et.height + ep.y) / 2);
-    }
-    if (ep.y + ep.height < et.y) {
-      addGapY((ep.y + ep.height + et.y) / 2);
-    }
-    if (et.x + et.width < ep.x) {
-      addGapX((et.x + et.width + ep.x) / 2);
-    }
-    if (ep.x + ep.width < et.x) {
-      addGapX((ep.x + ep.width + et.x) / 2);
+    const mid = facingGapMid(parent, target);
+    if (mid) {
+      if (parent.y + parent.height < target.y || target.y + target.height < parent.y) {
+        addGapY(mid.y);
+      } else {
+        addGapX(mid.x);
+      }
+    } else if (margin != null) {
+      // Fallback: expanded faces when raw rects already touch/overlap.
+      const ep = expandRect(parent, margin);
+      const et = expandRect(target, margin);
+      if (et.y + et.height < ep.y) addGapY((et.y + et.height + ep.y) / 2);
+      if (ep.y + ep.height < et.y) addGapY((ep.y + ep.height + et.y) / 2);
+      if (et.x + et.width < ep.x) addGapX((et.x + et.width + ep.x) / 2);
+      if (ep.x + ep.width < et.x) addGapX((ep.x + ep.width + et.x) / 2);
     }
   }
 
@@ -326,7 +538,7 @@ function buildCornerGraph(
       const a = nodes[list[i - 1]!]!;
       const b = nodes[list[i]!]!;
       if (!segmentHitsObstacles(a, b, obstacles)) {
-        const length = manhattan(a, b);
+        const length = manhattan(a, b) + contourProximityPenalty(a, b, obstacles);
         pushEdge(list[i - 1]!, list[i]!, 'v', length);
         pushEdge(list[i]!, list[i - 1]!, 'v', length);
       }
@@ -339,7 +551,7 @@ function buildCornerGraph(
       const a = nodes[list[i - 1]!]!;
       const b = nodes[list[i]!]!;
       if (!segmentHitsObstacles(a, b, obstacles)) {
-        const length = manhattan(a, b);
+        const length = manhattan(a, b) + contourProximityPenalty(a, b, obstacles);
         pushEdge(list[i - 1]!, list[i]!, 'h', length);
         pushEdge(list[i]!, list[i - 1]!, 'h', length);
       }
@@ -424,12 +636,17 @@ function pathIsValid(path: Point[], obstacles: RouteRect[]): boolean {
   return true;
 }
 
+/** Always orthogonal: never emit a diagonal between startExit and endEntry. */
+function orthogonalElbow(startExit: Point, endEntry: Point): Point[] {
+  if (Math.abs(startExit.x - endEntry.x) < 0.001 || Math.abs(startExit.y - endEntry.y) < 0.001) {
+    return [startExit, endEntry];
+  }
+  return [startExit, { x: startExit.x, y: endEntry.y }, endEntry];
+}
+
 function fallbackOuterRoute(startExit: Point, endEntry: Point, obstacles: RouteRect[]): Point[] {
   if (obstacles.length === 0) {
-    if (Math.abs(startExit.x - endEntry.x) < 0.001 || Math.abs(startExit.y - endEntry.y) < 0.001) {
-      return [startExit, endEntry];
-    }
-    return [startExit, { x: startExit.x, y: endEntry.y }, endEntry];
+    return orthogonalElbow(startExit, endEntry);
   }
 
   const u = unionBBox(obstacles);
@@ -444,6 +661,9 @@ function fallbackOuterRoute(startExit: Point, endEntry: Point, obstacles: RouteR
     [startExit, { x: startExit.x, y: bottom }, { x: endEntry.x, y: bottom }, endEntry],
     [startExit, { x: left, y: startExit.y }, { x: left, y: endEntry.y }, endEntry],
     [startExit, { x: right, y: startExit.y }, { x: right, y: endEntry.y }, endEntry],
+    // Simple elbows (prefer when outer rails are blocked)
+    [startExit, { x: startExit.x, y: endEntry.y }, endEntry],
+    [startExit, { x: endEntry.x, y: startExit.y }, endEntry],
   ];
 
   let best: Point[] | null = null;
@@ -461,7 +681,8 @@ function fallbackOuterRoute(startExit: Point, endEntry: Point, obstacles: RouteR
     }
   }
 
-  return best ?? [startExit, { x: startExit.x, y: endEntry.y }, endEntry];
+  // Last resort: orthogonal elbow even if it clips — never a diagonal.
+  return best ?? orthogonalElbow(startExit, endEntry);
 }
 
 function routeMidPath(
@@ -498,7 +719,18 @@ export function routeOrthogonalAround(input: RouteOrthogonalAroundInput): Point[
     margin,
     exitDistance
   );
-  const rawEndEntry = computeEndEntry(input.to, input.toDir, exitDistance);
+  const gapNeighbor = input.parent ?? input.source;
+  const peeledTargetNeighbor =
+    input.target && gapNeighbor ? peelForFacingGap(input.target, gapNeighbor) : null;
+
+  // Park the approach on the visual mid-gap so the long jog is not glued to the target.
+  const rawEndEntry = computeEndEntry(
+    input.to,
+    input.toDir,
+    exitDistance,
+    peeledTargetNeighbor?.a,
+    peeledTargetNeighbor?.b
+  );
   const { startExit, endEntry } = clampFacingExitEntry(
     input.from,
     input.to,
@@ -508,19 +740,93 @@ export function routeOrthogonalAround(input: RouteOrthogonalAroundInput): Point[
     rawEndEntry
   );
 
+  let sourceObs = input.source ? expandRect(input.source, margin) : undefined;
+  let parentObs = input.parent ? expandRect(input.parent, margin) : undefined;
+  let targetObs = input.target ? expandRect(input.target, margin) : undefined;
+
+  const openCorridor = (
+    expA: RouteRect,
+    expB: RouteRect,
+    inputA: RouteRect,
+    inputB: RouteRect
+  ): [RouteRect, RouteRect] => {
+    const peeled = peelForFacingGap(inputA, inputB);
+    if (peeled) return preserveFacingGap(expA, expB, peeled.a, peeled.b);
+    return preserveFacingGap(expA, expB, inputA, inputB);
+  };
+
+  if (parentObs && targetObs && input.parent && input.target) {
+    [parentObs, targetObs] = openCorridor(parentObs, targetObs, input.parent, input.target);
+  } else if (sourceObs && targetObs && input.source && input.target) {
+    [sourceObs, targetObs] = openCorridor(sourceObs, targetObs, input.source, input.target);
+  }
+  if (sourceObs && parentObs && input.source && input.parent) {
+    [sourceObs, parentObs] = openCorridor(sourceObs, parentObs, input.source, input.parent);
+  }
+
   const obstacles: RouteRect[] = [];
-  if (input.source) obstacles.push(expandRect(input.source, margin));
-  if (input.parent) obstacles.push(expandRect(input.parent, margin));
-  if (input.target) obstacles.push(expandRect(input.target, margin));
+  if (sourceObs) obstacles.push(sourceObs);
+  if (parentObs) obstacles.push(parentObs);
+  if (targetObs) obstacles.push(targetObs);
+
+  const peeledLattice =
+    input.parent && input.target
+      ? peelForFacingGap(input.parent, input.target)
+      : input.source && input.target
+        ? peelForFacingGap(input.source, input.target)
+        : null;
 
   const mid = routeMidPath(
     startExit,
     endEntry,
     obstacles,
-    input.parent ?? input.source,
-    input.target,
+    peeledLattice?.a ?? input.parent ?? input.source,
+    peeledLattice?.b ?? input.target,
     margin
   ).slice(1, -1);
 
-  return simplifyPath([input.from, startExit, ...mid, endEntry, input.to]);
+  // If mid already ends on the approach ray outside `to`, skip endEntry — otherwise
+  // a fixed exitDistance stub overshoots and simplify has to cut a visible spur.
+  const lastMid = mid[mid.length - 1];
+  const alreadyApproaching =
+    !!lastMid && isOnApproachOutside(lastMid, input.to, input.toDir, 1);
+
+  const raw = [
+    input.from,
+    startExit,
+    ...mid,
+    ...(alreadyApproaching ? [] : [endEntry]),
+    input.to,
+  ];
+  return simplifyPath(ensureOrthogonalPath(raw));
+}
+
+/** Insert elbows so no consecutive points form a diagonal (safety net). */
+export function ensureOrthogonalPath(path: Point[]): Point[] {
+  if (path.length < 2) return path;
+  const out: Point[] = [path[0]!];
+  for (let i = 1; i < path.length; i++) {
+    const prev = out[out.length - 1]!;
+    const next = path[i]!;
+    const axisAligned =
+      Math.abs(prev.x - next.x) < 0.001 || Math.abs(prev.y - next.y) < 0.001;
+    if (!axisAligned) {
+      out.push({ x: prev.x, y: next.y });
+    }
+    out.push(next);
+  }
+  return out;
+}
+
+function isOnApproachOutside(p: Point, to: Point, toDir: Side, minClearance: number): boolean {
+  switch (toDir) {
+    case 'top':
+      return Math.abs(p.x - to.x) < 0.001 && p.y <= to.y - minClearance;
+    case 'bottom':
+      return Math.abs(p.x - to.x) < 0.001 && p.y >= to.y + minClearance;
+    case 'left':
+      return Math.abs(p.y - to.y) < 0.001 && p.x <= to.x - minClearance;
+    case 'right':
+      return Math.abs(p.y - to.y) < 0.001 && p.x >= to.x + minClearance;
+  }
 }

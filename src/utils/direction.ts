@@ -1,10 +1,32 @@
 export type Direction = 'top' | 'right' | 'bottom' | 'left' | undefined;
 
+export type OutlineBounds = { width: number; height: number };
+
 /**
- * Map outline param [0,1) to cardinal direction (top → right → bottom → left).
+ * Map outline param [0,1) to cardinal direction.
+ *
+ * When `bounds` are provided, uses the same perimeter walk as
+ * `Node.getConnectionPointAtOutlineParam` (top → right → bottom → left).
+ * Equal-quarter mapping is only a fallback for square-ish shapes / legacy callers —
+ * on wide/short nodes it wrongly labels the left half of the bottom edge as `left`.
  */
-export function getDirectionFromOutlineParam(param: number): Exclude<Direction, undefined> {
+export function getDirectionFromOutlineParam(
+  param: number,
+  bounds?: OutlineBounds
+): Exclude<Direction, undefined> {
   const p = ((param % 1) + 1) % 1;
+  const w = bounds?.width ?? 0;
+  const h = bounds?.height ?? 0;
+  if (w > 0 && h > 0) {
+    const peri = 2 * (w + h);
+    let s = p * peri;
+    if (s < w) return 'top';
+    s -= w;
+    if (s < h) return 'right';
+    s -= h;
+    if (s < w) return 'bottom';
+    return 'left';
+  }
   if (p < 0.25) return 'top';
   if (p < 0.5) return 'right';
   if (p < 0.75) return 'bottom';

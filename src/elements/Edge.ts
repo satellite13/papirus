@@ -29,6 +29,8 @@ import {
   renderEdgeLabel,
   type EdgeLabelLayoutOptions,
 } from './edge/EdgeLabelRenderer';
+import { routeDebug } from '@/utils/routeDebug';
+import { isNodeEdgeEndpoint } from '@/types';
 
 export interface EdgeOptions {
   id?: string;
@@ -524,6 +526,11 @@ export class Edge extends Element {
     const routingOptionsChanged = !routingOptionsEqual(this._pathOptions, options);
     if (geometryUnchanged && !routingOptionsChanged) {
       this._pathOptions = options;
+      routeDebug('edge.updateEndpoints:skip', {
+        id: this.id,
+        type: this._type,
+        reason: 'geometry+routing unchanged',
+      });
       return;
     }
     this._fromPoint = fromPoint;
@@ -550,6 +557,56 @@ export class Edge extends Element {
         selfLoop: this._from.nodeId === this._to.nodeId,
       }
     );
+    if (
+      this._type === 'polyline' ||
+      this._type === 'editable-polyline' ||
+      this._type === 'bezier'
+    ) {
+      const obstacles = this._pathOptions?.obstacles ?? [];
+      const segs: Array<{ axis: string; len: number; a: string; b: string }> = [];
+      for (let i = 1; i < this._path.length; i++) {
+        const a = this._path[i - 1]!;
+        const b = this._path[i]!;
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const axis =
+          Math.abs(dy) < 0.01 ? 'H' : Math.abs(dx) < 0.01 ? 'V' : `DIAG(${dx.toFixed(0)},${dy.toFixed(0)})`;
+        segs.push({
+          axis,
+          len: Math.round(Math.abs(dx) + Math.abs(dy)),
+          a: `${Math.round(a.x)},${Math.round(a.y)}`,
+          b: `${Math.round(b.x)},${Math.round(b.y)}`,
+        });
+      }
+      routeDebug('edge.recalculatePath', {
+        id: this.id,
+        type: this._type,
+        from: {
+          nodeId: this._from.nodeId,
+          portId: isNodeEdgeEndpoint(this._from) ? this._from.portId : undefined,
+          outlineParam: isNodeEdgeEndpoint(this._from) ? this._from.outlineParam : undefined,
+          point: `${Math.round(this._fromPoint.x)},${Math.round(this._fromPoint.y)}`,
+          dir: this._fromDir,
+        },
+        to: {
+          nodeId: this._to.nodeId,
+          portId: isNodeEdgeEndpoint(this._to) ? this._to.portId : undefined,
+          outlineParam: isNodeEdgeEndpoint(this._to) ? this._to.outlineParam : undefined,
+          point: `${Math.round(this._toPoint.x)},${Math.round(this._toPoint.y)}`,
+          dir: this._toDir,
+        },
+        lockAnchors: this.lockAnchors,
+        obstacleCount: obstacles.length,
+        obstacles: obstacles.map((o) => ({
+          id: o.id,
+          role: o.role,
+          box: `${Math.round(o.x)},${Math.round(o.y)} ${Math.round(o.width)}x${Math.round(o.height)}`,
+        })),
+        path: this._path.map((p) => `${Math.round(p.x)},${Math.round(p.y)}`).join(' → '),
+        segments: segs,
+        controlPoints: this._controlPoints?.length ?? 0,
+      });
+    }
     this.updateBounds();
     this.markDirty();
   }
