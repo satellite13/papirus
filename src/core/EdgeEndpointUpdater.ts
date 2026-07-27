@@ -219,18 +219,14 @@ export class EdgeEndpointUpdater {
   }
 
   /**
-   * When nodes are clearly stacked, retarget unset / OEF-lateral ports toward
-   * facing sides. Intentional same-side wraps (bottom→bottom, top→top, left→left)
-   * are kept — orthogonal routing clears them around the stack.
+   * When nodes are clearly stacked/side-by-side, assign facing sides only to
+   * unset endpoints. Intentional ports (including lateral reconnect with
+   * attachToOutline off) and outlineParams are kept — orthogonal routing clears
+   * same-side wraps around the stack.
    *
    * Uses bounding-box gaps (not center dx/dy): a large horizontal offset must not
    * flip bottom→left while the source is still below the target — that reintroduces
    * the left-edge contour jog when the user drags the node leftward.
-   *
-   * - Works for portId and outlineParam (OEF / attach-to-outline).
-   * - Does NOT move an endpoint that is already on a chosen side — otherwise
-   *   dragging a locked/outline anchor snaps back on every updateAll.
-   * - Keeps intentional source left/right exits for nest wrap around a parent.
    */
   private preferFacingSidePorts(edge: Edge, fromNode: Node, toNode: Node): void {
     if (!edge.lockAnchors) return;
@@ -252,18 +248,11 @@ export class EdgeEndpointUpdater {
     if (fromBelow > 0 || fromAbove > 0) {
       const fromSide: Side = fromBelow > 0 ? 'top' : 'bottom';
       const toSide: Side = fromBelow > 0 ? 'bottom' : 'top';
-      // Port-locked lateral (OEF) → facing. Outline lateral is a user reconnect — keep it.
-      const toOutlineLateral =
-        (curTo === 'left' || curTo === 'right') &&
-        isNodeEdgeEndpoint(edge.to) &&
-        edge.to.outlineParam !== undefined;
-      const toPortLateral =
-        (curTo === 'left' || curTo === 'right') && !toOutlineLateral;
 
       if (!curFrom) {
         this.setEndpointSidePort(edge, 'from', fromNode, fromSide, tc);
       }
-      if (!curTo || toPortLateral) {
+      if (!curTo) {
         this.setEndpointSidePort(edge, 'to', toNode, toSide, fc);
       }
       return;
@@ -272,21 +261,11 @@ export class EdgeEndpointUpdater {
     if (fromLeft > 0 || fromRight > 0) {
       const fromSide: Side = fromRight > 0 ? 'left' : 'right';
       const toSide: Side = fromRight > 0 ? 'right' : 'left';
-      // Port-locked vertical (OEF) → facing. Outline top/bottom is user reconnect.
-      const toOutlineVertical =
-        (curTo === 'top' || curTo === 'bottom') &&
-        isNodeEdgeEndpoint(edge.to) &&
-        edge.to.outlineParam !== undefined;
-      const toPortVertical =
-        (curTo === 'top' || curTo === 'bottom') && !toOutlineVertical;
 
       if (!curFrom) {
         this.setEndpointSidePort(edge, 'from', fromNode, fromSide, tc);
       }
-      // Only lateralize when there is no vertical gap (handled above). Never flip
-      // a facing bottom/top while boxes are still stacked — that was the left-drag bug.
-      // Keep user outline on the far side (wrap-around); rewrite port-locked vertical only.
-      if (!curTo || toPortVertical) {
+      if (!curTo) {
         this.setEndpointSidePort(edge, 'to', toNode, toSide, fc);
       }
     }

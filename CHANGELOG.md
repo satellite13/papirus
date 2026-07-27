@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.3] - 2026-07-28
+
+### Fixed
+- With `attachToOutline` off, reconnecting an edge end to a side port no longer snaps back to the facing top/bottom after `updateAll` (user-chosen `portId` sides are kept; only unset ends are nudged to facing).
+
 ## [0.8.2] - 2026-07-28
 
 ### Fixed
@@ -392,7 +397,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Edge animations (flow effect)
 - Context menu and search/filter
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.8.2...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.8.3...HEAD
+[0.8.3]: https://gitverse.ru/ngroznykh/papirus/compare/v0.8.2...v0.8.3
 [0.8.2]: https://gitverse.ru/ngroznykh/papirus/compare/v0.8.1...v0.8.2
 [0.8.1]: https://gitverse.ru/ngroznykh/papirus/compare/v0.8.0...v0.8.1
 [0.8.0]: https://gitverse.ru/ngroznykh/papirus/compare/v0.7.3...v0.8.0

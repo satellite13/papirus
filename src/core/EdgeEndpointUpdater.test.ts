@@ -144,7 +144,7 @@ describe('EdgeEndpointUpdater edge attachments', () => {
     expect(target!.role).toBe('target');
   });
 
-  it('rewrites target left/right to facing bottom/top on a vertical stack', () => {
+  it('assigns facing bottom/top when target port is unset on a vertical stack', () => {
     const product = new RectangleNode({ id: 'product', x: 200, y: 240, width: 140, height: 80 });
     const bp = new RectangleNode({ id: 'bp', x: 40, y: 40, width: 400, height: 50 });
     const nodes = new Map([
@@ -154,9 +154,9 @@ describe('EdgeEndpointUpdater edge attachments', () => {
 
     const edge = new Edge({
       id: 'e-stack',
-      // OEF / nearest-anchor often locks BP to left while source sits below → contour jog.
       from: { nodeId: 'product', portId: 'anchor:top:0' },
-      to: { nodeId: 'bp', portId: 'anchor:left:0' },
+      // Unset target — prefer facing side instead of nearest-anchor left on a wide BP.
+      to: { nodeId: 'bp' },
       type: 'polyline',
       lockAnchors: true,
     });
@@ -207,6 +207,38 @@ describe('EdgeEndpointUpdater edge attachments', () => {
       if (Math.abs(a.y - b.y) < 0.5 && Math.abs(a.x - b.x) > 1) {
         expect(a.y).toBeGreaterThan(bp.y + bp.height - 1);
       }
+    }
+  });
+
+  it('keeps user port on a lateral side after reconnect (no snap to facing)', () => {
+    const os = new RectangleNode({ id: 'os', x: 80, y: 150, width: 200, height: 60 });
+    const device = new RectangleNode({ id: 'device', x: 80, y: 240, width: 200, height: 60 });
+    const nodes = new Map([
+      ['os', os],
+      ['device', device],
+    ]);
+
+    // Port-mode reconnect (attachToOutline off) locks a side port — must not snap to top/bottom.
+    const edge = new Edge({
+      id: 'e-port-lateral',
+      from: { nodeId: 'device', portId: 'anchor:top:0' },
+      to: { nodeId: 'os', portId: 'anchor:right:0' },
+      type: 'polyline',
+      lockAnchors: true,
+    });
+    const edges = new Map([['e-port-lateral', edge]]);
+
+    const updater = new EdgeEndpointUpdater({
+      getNodes: () => nodes,
+      getEdges: () => edges,
+      getNodeObstacles: () => [],
+    });
+    updater.updateAll();
+    updater.updateAll();
+
+    expect(isNodeEdgeEndpoint(edge.to)).toBe(true);
+    if (isNodeEdgeEndpoint(edge.to)) {
+      expect(edge.to.portId?.startsWith('anchor:right:')).toBe(true);
     }
   });
 
