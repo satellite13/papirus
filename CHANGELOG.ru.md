@@ -9,6 +9,22 @@
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-07-28
+
+### Добавлено
+- Ортогональная маршрутизация polyline: выход от источника, обход parent/target-препятствий и подход к цели с нужной стороны (`routeOrthogonalAround`).
+- В basic example переключатель **Lock** для `edge.lockAnchors` (при выключении — плавающая привязка к ближайшей стороне).
+
+### Исправлено
+- Путь ребра пересчитывается при смене routing-obstacles (например preview reconnect → финальный путь).
+- Preview reconnect использует ту же obstacle-aware маршрутизацию, что и settled edges.
+- Source-нода остаётся препятствием, чтобы путь не резал её насквозь.
+- У близких «лицом к лицу» нод больше нет U-turn «хвостика», когда exit-stubs пересекаются.
+- В basic example кнопка Grid подсвечивается (`btn-primary`) во включённом состоянии.
+
+### Изменено
+- `PolylinePathStrategy` использует новый around-obstacles роутер, когда доступны роли source/parent/target.
+
 ## [0.7.3] - 2026-07-26
 
 ### Добавлено
@@ -368,7 +384,8 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.7.3...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.8.0...HEAD
+[0.8.0]: https://gitverse.ru/ngroznykh/papirus/compare/v0.7.3...v0.8.0
 [0.7.3]: https://gitverse.ru/ngroznykh/papirus/compare/v0.7.2...v0.7.3
 [0.7.2]: https://gitverse.ru/ngroznykh/papirus/compare/v0.7.1...v0.7.2
 [0.7.1]: https://gitverse.ru/ngroznykh/papirus/compare/v0.7.0...v0.7.1

@@ -58,6 +58,33 @@ const DEFAULT_EDGE_STYLE: EdgeStyle = {
   opacity: 1,
 };
 
+/** Compare path options that affect polyline routing (not control-point identity). */
+function routingOptionsEqual(
+  a: PathStrategyOptions | undefined,
+  b: PathStrategyOptions | undefined
+): boolean {
+  const aObs = a?.obstacles;
+  const bObs = b?.obstacles;
+  if (aObs === bObs) return true;
+  if (!aObs || !bObs) return !aObs && !bObs;
+  if (aObs.length !== bObs.length) return false;
+  for (let i = 0; i < aObs.length; i++) {
+    const left = aObs[i]!;
+    const right = bObs[i]!;
+    if (
+      left.id !== right.id ||
+      left.role !== right.role ||
+      left.x !== right.x ||
+      left.y !== right.y ||
+      left.width !== right.width ||
+      left.height !== right.height
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
 export type { PathStrategy };
 
 /**
@@ -484,17 +511,18 @@ export class Edge extends Element {
     toDir?: string,
     options?: PathStrategyOptions
   ): void {
-    // Skip path rebuild when nothing moved — critical for pan/zoom frames where
-    // DiagramRenderer still syncs endpoints for every edge.
-    if (
+    // Skip path rebuild when geometry is unchanged — but still rebuild when routing
+    // options change (e.g. reconnect preview had no obstacles, then updateAll passes them).
+    const geometryUnchanged =
       this._path.length > 0 &&
       this._fromPoint.x === fromPoint.x &&
       this._fromPoint.y === fromPoint.y &&
       this._toPoint.x === toPoint.x &&
       this._toPoint.y === toPoint.y &&
       this._fromDir === fromDir &&
-      this._toDir === toDir
-    ) {
+      this._toDir === toDir;
+    const routingOptionsChanged = !routingOptionsEqual(this._pathOptions, options);
+    if (geometryUnchanged && !routingOptionsChanged) {
       this._pathOptions = options;
       return;
     }

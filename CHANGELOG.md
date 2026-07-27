@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-07-28
+
+### Added
+- Orthogonal polyline routing that exits the source, goes around parent/target obstacles, and approaches the target from the correct side (`routeOrthogonalAround`).
+- Basic example toolbar toggle **Lock** for `edge.lockAnchors` (floating nearest-side attachment when off).
+
+### Fixed
+- Edge path rebuilds when routing obstacles change (e.g. reconnect preview → settled path).
+- Reconnect preview uses the same obstacle-aware routing as settled edges.
+- Source node is kept as a routing obstacle so paths do not cut back through it.
+- Close facing nodes no longer draw a U-turn “tail” when exit stubs would cross.
+- Basic example: Grid toggle uses the primary button style when enabled.
+
+### Changed
+- `PolylinePathStrategy` uses the new around-obstacles router when source/parent/target roles are available.
+
 ## [0.7.3] - 2026-07-26
 
 ### Added
@@ -361,7 +377,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Edge animations (flow effect)
 - Context menu and search/filter
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.7.3...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.8.0...HEAD
+[0.8.0]: https://gitverse.ru/ngroznykh/papirus/compare/v0.7.3...v0.8.0
 [0.7.3]: https://gitverse.ru/ngroznykh/papirus/compare/v0.7.2...v0.7.3
 [0.7.2]: https://gitverse.ru/ngroznykh/papirus/compare/v0.7.1...v0.7.2
 [0.7.1]: https://gitverse.ru/ngroznykh/papirus/compare/v0.7.0...v0.7.1

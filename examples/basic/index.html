@@ -43,11 +43,12 @@
           <button class="btn" id="resetView"><span class="material-symbols-outlined">restart_alt</span>Reset View</button>
         </div>
         <div class="toolbar-group">
-          <button class="btn" id="toggleGrid"><span class="material-symbols-outlined">grid_view</span><span id="toggleGridLabel">Grid</span></button>
-          <button class="btn" id="toggleMiniMap"><span class="material-symbols-outlined">map</span><span id="toggleMiniMapLabel">Minimap</span></button>
+          <button class="btn btn-primary" id="toggleGrid"><span class="material-symbols-outlined">grid_view</span><span id="toggleGridLabel">Grid ON</span></button>
+          <button class="btn btn-primary" id="toggleMiniMap"><span class="material-symbols-outlined">map</span><span id="toggleMiniMapLabel">Minimap ON</span></button>
           <button class="btn" id="toggleSnap"><span class="material-symbols-outlined">my_location</span><span id="toggleSnapLabel">Snap OFF</span></button>
-          <button class="btn" id="toggleAlign"><span class="material-symbols-outlined">align_horizontal_left</span><span id="toggleAlignLabel">Align ON</span></button>
-          <button class="btn" id="toggleRulers"><span class="material-symbols-outlined">straighten</span><span id="toggleRulersLabel">Rulers ON</span></button>
+          <button class="btn" id="toggleAlign"><span class="material-symbols-outlined">align_horizontal_left</span><span id="toggleAlignLabel">Align OFF</span></button>
+          <button class="btn btn-primary" id="toggleRulers"><span class="material-symbols-outlined">straighten</span><span id="toggleRulersLabel">Rulers ON</span></button>
+          <button class="btn btn-primary" id="toggleLockAnchors"><span class="material-symbols-outlined">commit</span><span id="toggleLockAnchorsLabel">Lock ON</span></button>
           <button class="btn" id="toggleAttachOutline"><span class="material-symbols-outlined">link</span><span id="toggleAttachOutlineLabel">Outline OFF</span></button>
         </div>
         <div class="toolbar-group">
@@ -299,6 +300,8 @@
                 <li><kbd>Ctrl</kbd> + Click for multi-select</li>
                 <li>Drag nodes to move</li>
                 <li><kbd>Shift</kbd> + drag to connect</li>
+                <li><strong>Lock OFF</strong>: edge ends float to the nearest side/port toward the other node (same as unlocking link anchors in wArchi)</li>
+                <li><strong>Lock ON</strong>: keep fixed attachment ports after connect / reconnect</li>
                 <li><strong>Outline ON</strong>: attach edges anywhere on shape contour; <kbd>Shift</kbd>+click on node to start connection from outline</li>
                 <li>Mouse wheel to zoom</li>
                 <li>Drag empty area to pan</li>

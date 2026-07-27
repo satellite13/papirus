@@ -18,6 +18,7 @@ import {
 } from '@/constants';
 import { clonePoints, distance } from '@/utils/geometry';
 import { getDirectionFromOutlineParam } from '@/utils/direction';
+import type { PathObstacle } from '@/elements/paths';
 
 /**
  * Connection events
@@ -364,17 +365,56 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
       if (toNode) {
         const target = this.getTargetPointForReconnect(edge, toNode, 'to', snappedPoint);
         const toDir = this.getTargetDirForReconnect(edge, 'to');
-        edge.updateEndpoints(snappedPoint, target, snappedDir, toDir);
+        // Exclude the node under the dragged start; keep fixed `to` as target obstacle.
+        const sourceId = targetNode?.id ?? edge.from.nodeId;
+        edge.updateEndpoints(
+          snappedPoint,
+          target,
+          snappedDir,
+          toDir,
+          this.buildReconnectRoutingOptions(sourceId, toNode.id)
+        );
       }
     } else {
       if (fromNode) {
         const start = this.getTargetPointForReconnect(edge, fromNode, 'from', snappedPoint);
         const fromDir = this.getTargetDirForReconnect(edge, 'from');
-        edge.updateEndpoints(start, snappedPoint, fromDir, snappedDir);
+        edge.updateEndpoints(
+          start,
+          snappedPoint,
+          fromDir,
+          snappedDir,
+          this.buildReconnectRoutingOptions(fromNode.id, targetNode?.id)
+        );
       }
     }
 
     this.renderer.markDirty();
+  }
+
+  /**
+   * Match DiagramRenderer.getNodeObstacles padding and EdgeEndpointUpdater roles
+   * so reconnect preview uses the same polyline routing as updateAll.
+   */
+  private buildReconnectRoutingOptions(
+    sourceNodeId: string | undefined,
+    targetNodeId: string | undefined
+  ): { obstacles: PathObstacle[] } {
+    const obstacles: PathObstacle[] = [];
+    for (const node of this.renderer.nodes.values()) {
+      let role: PathObstacle['role'] = 'other';
+      if (node.id === sourceNodeId) role = 'source';
+      else if (node.id === targetNodeId) role = 'target';
+      obstacles.push({
+        id: node.id,
+        x: node.x - 8,
+        y: node.y - 8,
+        width: node.width + 16,
+        height: node.height + 16,
+        role,
+      });
+    }
+    return { obstacles };
   }
 
   private getTargetPointForReconnect(
@@ -674,6 +714,8 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
       }
 
       this.resetReconnection();
+      // Force obstacle-aware endpoint sync (binding change already marks content dirty;
+      // keep markDirty for immediate repaint if binding did not change).
       this.renderer.markDirty();
       return true;
     }

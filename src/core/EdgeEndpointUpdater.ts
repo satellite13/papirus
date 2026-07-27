@@ -75,15 +75,15 @@ export class EdgeEndpointUpdater {
     }
     const from = this.resolveNodeEndpoint(fromNode, edge.from, toNode.getCenter(), edge.lockAnchors);
     const to = this.resolveNodeEndpoint(toNode, edge.to, fromNode.getCenter(), edge.lockAnchors);
-    // Exclude only the source node by id so exit is not blocked. Keep target as
-    // obstacle with role target. Parent containers remain for routing around them.
+    // Keep source as role:source (avoid re-entering after exit), target as role:target.
+    // Parent containers stay as other/containing obstacles for around-routing.
     const fromId = edge.from.nodeId;
     const toId = edge.to.nodeId;
-    const routingObstacles = obstacles
-      ?.filter((obstacle) => obstacle.id == null || obstacle.id !== fromId)
-      .map((obstacle) =>
-        obstacle.id === toId ? { ...obstacle, role: 'target' as const } : obstacle
-      );
+    const routingObstacles = obstacles?.map((obstacle) => {
+      if (obstacle.id === fromId) return { ...obstacle, role: 'source' as const };
+      if (obstacle.id === toId) return { ...obstacle, role: 'target' as const };
+      return obstacle;
+    });
     edge.updateEndpoints(
       from.point,
       to.point,

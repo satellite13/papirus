@@ -15,7 +15,10 @@ export type RouteOrthogonalAroundInput = {
   to: Point;
   fromDir: Side;
   toDir: Side;
+  /** Containing container around the source (route around it). */
   parent?: RouteRect;
+  /** Source node owning `from` — avoid re-entering after exit. */
+  source?: RouteRect;
   target?: RouteRect;
   margin?: number;
   exitDistance?: number;
@@ -110,6 +113,50 @@ function computeEndEntry(to: Point, toDir: Side, exitDistance: number): Point {
   return moveByDir(to, toDir, exitDistance);
 }
 
+/**
+ * When nodes face each other closer than 2×exitDistance, fixed stubs cross
+ * (startExit past endEntry). That draws a U-turn "tail" at the first bend.
+ * Meet both stubs on the mid-gap instead.
+ */
+export function clampFacingExitEntry(
+  from: Point,
+  to: Point,
+  fromDir: Side,
+  toDir: Side,
+  startExit: Point,
+  endEntry: Point
+): { startExit: Point; endEntry: Point } {
+  if (fromDir === 'bottom' && toDir === 'top' && to.y > from.y && startExit.y > endEntry.y) {
+    const midY = (from.y + to.y) / 2;
+    return {
+      startExit: { x: startExit.x, y: midY },
+      endEntry: { x: endEntry.x, y: midY },
+    };
+  }
+  if (fromDir === 'top' && toDir === 'bottom' && to.y < from.y && startExit.y < endEntry.y) {
+    const midY = (from.y + to.y) / 2;
+    return {
+      startExit: { x: startExit.x, y: midY },
+      endEntry: { x: endEntry.x, y: midY },
+    };
+  }
+  if (fromDir === 'right' && toDir === 'left' && to.x > from.x && startExit.x > endEntry.x) {
+    const midX = (from.x + to.x) / 2;
+    return {
+      startExit: { x: midX, y: startExit.y },
+      endEntry: { x: midX, y: endEntry.y },
+    };
+  }
+  if (fromDir === 'left' && toDir === 'right' && to.x < from.x && startExit.x < endEntry.x) {
+    const midX = (from.x + to.x) / 2;
+    return {
+      startExit: { x: midX, y: startExit.y },
+      endEntry: { x: midX, y: endEntry.y },
+    };
+  }
+  return { startExit, endEntry };
+}
+
 function simplifyPath(path: Point[]): Point[] {
   const out: Point[] = [];
   for (const p of path) {
@@ -124,7 +171,15 @@ function simplifyPath(path: Point[]): Point[] {
     const colinear =
       (Math.abs(a.x - b.x) < 0.001 && Math.abs(b.x - c.x) < 0.001) ||
       (Math.abs(a.y - b.y) < 0.001 && Math.abs(b.y - c.y) < 0.001);
-    if (colinear && i > 0 && i + 2 < out.length - 1) out.splice(i + 1, 1);
+    // Drop overshoot vertex: A→B→C where C lies between A and B on the same axis.
+    const uturn =
+      (Math.abs(a.x - b.x) < 0.001 &&
+        Math.abs(b.x - c.x) < 0.001 &&
+        ((a.y < c.y && c.y < b.y) || (b.y < c.y && c.y < a.y))) ||
+      (Math.abs(a.y - b.y) < 0.001 &&
+        Math.abs(b.y - c.y) < 0.001 &&
+        ((a.x < c.x && c.x < b.x) || (b.x < c.x && c.x < a.x)));
+    if (uturn || (colinear && i > 0 && i + 2 < out.length - 1)) out.splice(i + 1, 1);
     else i++;
   }
   return out;
@@ -434,16 +489,27 @@ function routeMidPath(
 export function routeOrthogonalAround(input: RouteOrthogonalAroundInput): Point[] {
   const margin = input.margin ?? DEFAULT_MARGIN;
   const exitDistance = input.exitDistance ?? DEFAULT_EXIT;
-  const startExit = computeStartExit(
+  // Clear the outer blocker first (container), else the source node itself.
+  const exitBlocker = input.parent ?? input.source;
+  const rawStartExit = computeStartExit(
     input.from,
     input.fromDir,
-    input.parent,
+    exitBlocker,
     margin,
     exitDistance
   );
-  const endEntry = computeEndEntry(input.to, input.toDir, exitDistance);
+  const rawEndEntry = computeEndEntry(input.to, input.toDir, exitDistance);
+  const { startExit, endEntry } = clampFacingExitEntry(
+    input.from,
+    input.to,
+    input.fromDir,
+    input.toDir,
+    rawStartExit,
+    rawEndEntry
+  );
 
   const obstacles: RouteRect[] = [];
+  if (input.source) obstacles.push(expandRect(input.source, margin));
   if (input.parent) obstacles.push(expandRect(input.parent, margin));
   if (input.target) obstacles.push(expandRect(input.target, margin));
 
@@ -451,7 +517,7 @@ export function routeOrthogonalAround(input: RouteOrthogonalAroundInput): Point[
     startExit,
     endEntry,
     obstacles,
-    input.parent,
+    input.parent ?? input.source,
     input.target,
     margin
   ).slice(1, -1);

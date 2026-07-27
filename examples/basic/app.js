@@ -14,6 +14,7 @@ import {
   RulersOverlay,
   Group,
   SearchManager,
+  isNodeEdgeEndpoint,
 } from '../../dist/papirus.js';
 
 // Initialize renderer
@@ -144,16 +145,48 @@ renderer.use(miniMap);
 renderer.use(rulersOverlay);
 
 // Interactions
+let lockAnchorsEnabled = true;
+
 const interactions = renderer.enableInteractions({
   nodeFactory,
   edgeFactory,
+  snapToGrid: false,
+  alignToNodes: false,
   createEdge: (from, to) => new Edge({
     from,
     to,
     type: 'bezier',
     endMarker: { type: 'open', size: 12 },
+    lockAnchors: lockAnchorsEnabled,
   }),
 });
+
+function clearLockedPortsFromEdges() {
+  for (const edge of renderer.edges.values()) {
+    if (isNodeEdgeEndpoint(edge.from) && edge.from.portId) {
+      edge.from = {
+        nodeId: edge.from.nodeId,
+        ...(edge.from.outlineParam !== undefined ? { outlineParam: edge.from.outlineParam } : {}),
+      };
+    }
+    if (isNodeEdgeEndpoint(edge.to) && edge.to.portId) {
+      edge.to = {
+        nodeId: edge.to.nodeId,
+        ...(edge.to.outlineParam !== undefined ? { outlineParam: edge.to.outlineParam } : {}),
+      };
+    }
+  }
+}
+
+function applyLockAnchorsToEdges(enabled) {
+  for (const edge of renderer.edges.values()) {
+    edge.lockAnchors = enabled;
+  }
+  if (!enabled) {
+    clearLockedPortsFromEdges();
+  }
+  renderer.markContentDirty();
+}
 
 function changeNode(nodeId, apply) {
   interactions.changeNodeProperties(nodeId, apply);
@@ -1062,22 +1095,25 @@ const miniMapButton = document.getElementById('toggleMiniMap');
 const snapButton = document.getElementById('toggleSnap');
 const alignButton = document.getElementById('toggleAlign');
 const rulersButton = document.getElementById('toggleRulers');
+const lockAnchorsButton = document.getElementById('toggleLockAnchors');
 const attachOutlineButton = document.getElementById('toggleAttachOutline');
 const gridButtonLabel = document.getElementById('toggleGridLabel');
 const miniMapButtonLabel = document.getElementById('toggleMiniMapLabel');
 const snapButtonLabel = document.getElementById('toggleSnapLabel');
 const alignButtonLabel = document.getElementById('toggleAlignLabel');
 const rulersButtonLabel = document.getElementById('toggleRulersLabel');
+const lockAnchorsButtonLabel = document.getElementById('toggleLockAnchorsLabel');
 const attachOutlineButtonLabel = document.getElementById('toggleAttachOutlineLabel');
 let gridVisible = true;
 let miniMapVisible = true;
 let snapEnabled = false;
-let alignEnabled = true;
+let alignEnabled = false;
 let rulersEnabled = true;
 let attachToOutlineEnabled = false;
 
 function updateToggleLabels() {
   gridButtonLabel.textContent = gridVisible ? 'Grid ON' : 'Grid OFF';
+  gridButton.classList.toggle('btn-primary', gridVisible);
   miniMapButtonLabel.textContent = miniMapVisible ? 'Minimap ON' : 'Minimap OFF';
   miniMapButton.classList.toggle('btn-primary', miniMapVisible);
   snapButtonLabel.textContent = snapEnabled ? 'Snap ON' : 'Snap OFF';
@@ -1086,6 +1122,8 @@ function updateToggleLabels() {
   alignButton.classList.toggle('btn-primary', alignEnabled);
   rulersButtonLabel.textContent = rulersEnabled ? 'Rulers ON' : 'Rulers OFF';
   rulersButton.classList.toggle('btn-primary', rulersEnabled);
+  lockAnchorsButtonLabel.textContent = lockAnchorsEnabled ? 'Lock ON' : 'Lock OFF';
+  lockAnchorsButton.classList.toggle('btn-primary', lockAnchorsEnabled);
   attachOutlineButtonLabel.textContent = attachToOutlineEnabled ? 'Outline ON' : 'Outline OFF';
   attachOutlineButton.classList.toggle('btn-primary', attachToOutlineEnabled);
 }
@@ -1122,6 +1160,12 @@ rulersButton.addEventListener('click', () => {
   rulersEnabled = !rulersEnabled;
   rulersOverlay.setEnabled(rulersEnabled);
   renderer.markDirty();
+  updateToggleLabels();
+});
+
+lockAnchorsButton.addEventListener('click', () => {
+  lockAnchorsEnabled = !lockAnchorsEnabled;
+  applyLockAnchorsToEdges(lockAnchorsEnabled);
   updateToggleLabels();
 });
 

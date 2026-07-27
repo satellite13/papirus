@@ -8,11 +8,11 @@ function isSide(v: string | undefined): v is Side {
   return v === 'top' || v === 'right' || v === 'bottom' || v === 'left';
 }
 
-function resolveParentAndTarget(
+function resolveRoutingRoles(
   from: Point,
   to: Point,
   obstacles: PathObstacle[]
-): { parent?: PathObstacle; target?: PathObstacle } {
+): { parent?: PathObstacle; source?: PathObstacle; target?: PathObstacle } {
   const target =
     obstacles.find((o) => o.role === 'target') ??
     obstacles.find((o) => {
@@ -27,16 +27,21 @@ function resolveParentAndTarget(
       return onVertical || onHorizontal;
     });
 
+  const source = obstacles.find((o) => o.role === 'source' && o !== target);
+
+  // Container around the source (not the source node itself).
   const parent = obstacles.find(
     (o) =>
       o !== target &&
+      o !== source &&
+      o.role !== 'source' &&
       from.x >= o.x &&
       from.x <= o.x + o.width &&
       from.y >= o.y &&
       from.y <= o.y + o.height
   );
 
-  return { parent, target };
+  return { parent, source, target };
 }
 
 const MIN_SEGMENT_LENGTH = 20;
@@ -173,21 +178,40 @@ function inferApproachDir(from: Point, to: Point): string {
   return dy >= 0 ? 'bottom' : 'top';
 }
 
+/** Which side of `target` the attachment point `to` lies on (border hit). */
+function sideOfPointOnRect(to: Point, target: PathObstacle): Side | undefined {
+  const onLeft = Math.abs(to.x - target.x) <= 1;
+  const onRight = Math.abs(to.x - (target.x + target.width)) <= 1;
+  const onTop = Math.abs(to.y - target.y) <= 1;
+  const onBottom = Math.abs(to.y - (target.y + target.height)) <= 1;
+  // Prefer non-corner unambiguous sides; corners fall back to toDir/geometry.
+  if (onTop && !onLeft && !onRight) return 'top';
+  if (onBottom && !onLeft && !onRight) return 'bottom';
+  if (onLeft && !onTop && !onBottom) return 'left';
+  if (onRight && !onTop && !onBottom) return 'right';
+  return undefined;
+}
+
 /**
  * Resolve approach side at `to`.
- * - Explicit top/bottom ports are trusted (never replaced by left/right).
- * - Explicit left/right ports are overridden when geometry is clearly above/below,
- *   so we do not crawl along wide node edges.
+ * Prefer the side of the target rect where `to` actually sits — never override a
+ * left/right attachment with top/bottom from source geometry (that puts endEntry
+ * inside the target and draws the last bend through the node).
  */
-function resolveApproachDir(from: Point, to: Point, toDir: string | undefined): string {
-  const geometric = inferApproachDir(from, to);
-  if (toDir && isVertical(toDir)) {
+function resolveApproachDir(
+  from: Point,
+  to: Point,
+  toDir: string | undefined,
+  target?: PathObstacle
+): string {
+  if (target) {
+    const side = sideOfPointOnRect(to, target);
+    if (side) return side;
+  }
+  if (toDir && isSide(toDir)) {
     return toDir;
   }
-  if (toDir && isHorizontal(toDir) && isVertical(geometric)) {
-    return geometric;
-  }
-  return toDir ?? geometric;
+  return inferApproachDir(from, to);
 }
 
 function buildRoutedPolyline(
@@ -202,7 +226,8 @@ function buildRoutedPolyline(
   }
 
   const effectiveFromDir = fromDir ?? inferExitDir(from, to);
-  const effectiveToDir = resolveApproachDir(from, to, toDir);
+  const { target: routedTarget } = resolveRoutingRoles(from, to, obstacles);
+  const effectiveToDir = resolveApproachDir(from, to, toDir, routedTarget);
 
   const startExit = moveOutsideObstacles(from, effectiveFromDir, obstacles, ROUTE_EXIT_DISTANCE);
   const endEntry = moveOutsideObstacles(to, effectiveToDir, obstacles, ROUTE_EXIT_DISTANCE);
@@ -504,15 +529,16 @@ export class PolylinePathStrategy implements PathStrategy {
     // Nested / target-aware case: dedicated router (parent and/or target present).
     // Diagram obstacles already pad ~8px; margin 4 ≈ 12px total clearance.
     if (!selfLoop && isSide(fromDir) && isSide(toDir)) {
-      const { parent, target } = resolveParentAndTarget(from, to, obstacles);
-      const approachDir = resolveApproachDir(from, to, toDir);
-      if ((parent || target) && isSide(approachDir)) {
+      const { parent, source, target } = resolveRoutingRoles(from, to, obstacles);
+      const approachDir = resolveApproachDir(from, to, toDir, target);
+      if ((parent || source || target) && isSide(approachDir)) {
         return routeOrthogonalAround({
           from,
           to,
           fromDir,
           toDir: approachDir,
           parent,
+          source,
           target,
           margin: 4,
           exitDistance: 20,

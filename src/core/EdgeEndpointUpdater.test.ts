@@ -134,7 +134,9 @@ describe('EdgeEndpointUpdater edge attachments', () => {
     expect(spy).toHaveBeenCalled();
     const passed = spy.mock.calls[0]![4]?.obstacles;
     expect(passed).toBeDefined();
-    expect(passed!.find((o) => o.id === 'comp')).toBeUndefined();
+    const source = passed!.find((o) => o.id === 'comp');
+    expect(source).toBeDefined();
+    expect(source!.role).toBe('source');
     expect(passed!.find((o) => o.id === 'parent')).toBeDefined();
     const target = passed!.find((o) => o.id === 'bp');
     expect(target).toBeDefined();
