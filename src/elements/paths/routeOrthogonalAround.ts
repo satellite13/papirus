@@ -296,7 +296,7 @@ function buildCornerGraph(
 
 type DirState = 'h' | 'v' | 's';
 
-function dijkstraMidPath(
+function searchMidPath(
   nodes: Point[],
   edges: Map<number, GraphEdge[]>,
   startIdx: number,
@@ -424,7 +424,7 @@ function routeMidPath(
 
   const graph = buildCornerGraph(startExit, endEntry, obstacles, parent, target, margin);
   if (graph) {
-    const mid = dijkstraMidPath(graph.nodes, graph.edges, graph.startIdx, graph.goalIdx);
+    const mid = searchMidPath(graph.nodes, graph.edges, graph.startIdx, graph.goalIdx);
     if (mid && pathIsValid(mid, obstacles)) return mid;
   }
 

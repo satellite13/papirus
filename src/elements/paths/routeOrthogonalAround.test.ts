@@ -121,3 +121,71 @@ describe('routeOrthogonalAround obstacles', () => {
     expect(minY).toBeGreaterThan(0);
   });
 });
+
+const sides = ['left', 'right', 'top', 'bottom'] as const;
+
+function fromPointForDir(fromDir: (typeof sides)[number]): { x: number; y: number } {
+  switch (fromDir) {
+    case 'left':
+      return { x: 250, y: 250 };
+    case 'right':
+      return { x: 250, y: 250 };
+    case 'top':
+      return { x: 250, y: 210 };
+    case 'bottom':
+      return { x: 250, y: 330 };
+  }
+}
+
+describe('routeOrthogonalAround side matrix', () => {
+  for (const fromDir of sides) {
+    for (const toDir of sides) {
+      it(`${fromDir} → ${toDir}: terminals ⊥ and no cross`, () => {
+        const from = fromPointForDir(fromDir);
+        const to =
+          toDir === 'bottom'
+            ? { x: 260, y: 90 }
+            : toDir === 'top'
+              ? { x: 260, y: 40 }
+              : toDir === 'left'
+                ? { x: 40, y: 65 }
+                : { x: 440, y: 65 };
+
+        const path = routeOrthogonalAround({
+          from,
+          to,
+          fromDir,
+          toDir,
+          parent,
+          target,
+          margin: 12,
+          exitDistance: 20,
+        });
+
+        expect(path[0]).toEqual(from);
+        expect(path[path.length - 1]).toEqual(to);
+
+        const p1 = path[1]!;
+        if (fromDir === 'left') expect(p1.x).toBeLessThan(from.x);
+        if (fromDir === 'right') expect(p1.x).toBeGreaterThan(from.x);
+        if (fromDir === 'top') expect(p1.y).toBeLessThan(from.y);
+        if (fromDir === 'bottom') expect(p1.y).toBeGreaterThan(from.y);
+
+        const pre = path[path.length - 2]!;
+        if (toDir === 'left' || toDir === 'right') {
+          expect(Math.abs(pre.y - to.y)).toBeLessThan(0.5);
+          expect(Math.abs(pre.x - to.x)).toBeGreaterThan(1);
+        } else {
+          expect(Math.abs(pre.x - to.x)).toBeLessThan(0.5);
+          expect(Math.abs(pre.y - to.y)).toBeGreaterThan(1);
+        }
+
+        for (let i = 2; i < path.length - 1; i++) {
+          expect(segmentHitsExpanded(path[i - 1]!, path[i]!, parent, 12)).toBe(false);
+          expect(segmentHitsExpanded(path[i - 1]!, path[i]!, target, 12)).toBe(false);
+        }
+        expect(segmentHitsExpanded(pre, to, target, 0)).toBe(false);
+      });
+    }
+  }
+});
