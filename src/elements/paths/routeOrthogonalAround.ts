@@ -20,6 +20,11 @@ export type RouteOrthogonalAroundInput = {
   /** Source node owning `from` — avoid re-entering after exit. */
   source?: RouteRect;
   target?: RouteRect;
+  /**
+   * Sibling / other nodes to avoid (e.g. stack mates inside a container).
+   * Not used as exit blockers — only as mid-path obstacles.
+   */
+  others?: RouteRect[];
   margin?: number;
   exitDistance?: number;
 };
@@ -237,17 +242,17 @@ export function contourProximityPenalty(a: Point, b: Point, obstacles: RouteRect
   return segLen * (CONTOUR_PENALTY / 10) * proximity;
 }
 
-/** Push along dir until outside expanded parent (and at least exitDistance). */
+/** Push along dir until outside expanded blocker (and at least exitDistance). */
 function computeStartExit(
   from: Point,
   fromDir: Side,
-  parent: RouteRect | undefined,
+  blocker: RouteRect | undefined,
   margin: number,
   exitDistance: number
 ): Point {
   let p = moveByDir(from, fromDir, exitDistance);
-  if (!parent) return p;
-  const expanded = expandRect(parent, margin);
+  if (!blocker) return p;
+  const expanded = expandRect(blocker, margin);
   let guard = 0;
   while (pointInOpenInterior(p, expanded) && guard++ < 64) {
     p = moveByDir(p, fromDir, exitDistance);
@@ -270,6 +275,148 @@ function computeStartExit(
     }
   }
   return p;
+}
+
+function pointInRectClosed(p: Point, r: RouteRect): boolean {
+  return p.x >= r.x && p.x <= r.x + r.width && p.y >= r.y && p.y <= r.y + r.height;
+}
+
+/**
+ * Push a same-side exit/entry far enough that the orthogonal span between
+ * `spanA` and `spanB` clears every `others` obstacle (siblings in a stack).
+ */
+function clearCorridorOfOthers(
+  exit: Point,
+  dir: Side,
+  others: RouteRect[],
+  spanA: Point,
+  spanB: Point,
+  margin: number
+): Point {
+  if (others.length === 0) return exit;
+  let p = { ...exit };
+  const y1 = Math.min(spanA.y, spanB.y);
+  const y2 = Math.max(spanA.y, spanB.y);
+  const x1 = Math.min(spanA.x, spanB.x);
+  const x2 = Math.max(spanA.x, spanB.x);
+
+  for (let guard = 0; guard < 64; guard++) {
+    let blocked: RouteRect | undefined;
+    for (const raw of others) {
+      const o = expandRect(raw, margin);
+      if (dir === 'left' || dir === 'right') {
+        // Vertical corridor at p.x across [y1,y2]
+        if (p.x > o.x && p.x < o.x + o.width && y2 > o.y && y1 < o.y + o.height) {
+          blocked = o;
+          break;
+        }
+      } else {
+        // Horizontal corridor at p.y across [x1,x2]
+        if (p.y > o.y && p.y < o.y + o.height && x2 > o.x && x1 < o.x + o.width) {
+          blocked = o;
+          break;
+        }
+      }
+    }
+    if (!blocked) return p;
+    switch (dir) {
+      case 'left':
+        p = { x: blocked.x - 1, y: p.y };
+        break;
+      case 'right':
+        p = { x: blocked.x + blocked.width + 1, y: p.y };
+        break;
+      case 'top':
+        p = { x: p.x, y: blocked.y - 1 };
+        break;
+      case 'bottom':
+        p = { x: p.x, y: blocked.y + blocked.height + 1 };
+        break;
+    }
+  }
+  return p;
+}
+
+/**
+ * When same-side exits still share an axis that crosses a blocker (top→top over
+ * a stacked target), slide the *start* exit to the nearer free side. Keep
+ * endEntry on the approach ray at `to` so the final stub stays ⊥ to the side.
+ */
+function offsetSameSideAroundBlockers(
+  startExit: Point,
+  endEntry: Point,
+  dir: Side,
+  blockers: RouteRect[],
+  margin: number,
+  from: Point,
+  to: Point
+): { startExit: Point; endEntry: Point } {
+  if (blockers.length === 0) return { startExit, endEntry };
+  let s = { ...startExit };
+  const e = { ...endEntry };
+  const y1 = Math.min(from.y, to.y, s.y, e.y);
+  const y2 = Math.max(from.y, to.y, s.y, e.y);
+  const x1 = Math.min(from.x, to.x, s.x, e.x);
+  const x2 = Math.max(from.x, to.x, s.x, e.x);
+
+  for (const raw of blockers) {
+    const o = expandRect(raw, margin);
+    if (dir === 'top' || dir === 'bottom') {
+      const crosses =
+        s.x > o.x && s.x < o.x + o.width && y2 > o.y && y1 < o.y + o.height;
+      if (!crosses) continue;
+      const leftX = o.x - 1;
+      const rightX = o.x + o.width + 1;
+      s = { ...s, x: s.x <= o.x + o.width / 2 ? leftX : rightX };
+    } else {
+      const crosses =
+        s.y > o.y && s.y < o.y + o.height && x2 > o.x && x1 < o.x + o.width;
+      if (!crosses) continue;
+      const topY = o.y - 1;
+      const bottomY = o.y + o.height + 1;
+      s = { ...s, y: s.y <= o.y + o.height / 2 ? topY : bottomY };
+    }
+  }
+  return { startExit: s, endEntry: e };
+}
+
+/** True when collapsing same-side exits onto one rail would not pierce blockers. */
+function canAlignSameSideExits(
+  dir: Side,
+  startExit: Point,
+  endEntry: Point,
+  from: Point,
+  to: Point,
+  blockers: RouteRect[],
+  margin: number
+): boolean {
+  let alignedStart = { ...startExit };
+  let alignedEnd = { ...endEntry };
+  if (dir === 'left') {
+    const x = Math.min(startExit.x, endEntry.x);
+    alignedStart = { ...alignedStart, x };
+    alignedEnd = { ...alignedEnd, x };
+  } else if (dir === 'right') {
+    const x = Math.max(startExit.x, endEntry.x);
+    alignedStart = { ...alignedStart, x };
+    alignedEnd = { ...alignedEnd, x };
+  } else if (dir === 'top') {
+    const y = Math.min(startExit.y, endEntry.y);
+    alignedStart = { ...alignedStart, y };
+    alignedEnd = { ...alignedEnd, y };
+  } else {
+    const y = Math.max(startExit.y, endEntry.y);
+    alignedStart = { ...alignedStart, y };
+    alignedEnd = { ...alignedEnd, y };
+  }
+
+  for (const raw of blockers) {
+    const o = expandRect(raw, margin);
+    if (segmentIntersectsOpenInterior(from, alignedStart, o)) return false;
+    if (segmentIntersectsOpenInterior(alignedEnd, to, o)) return false;
+    if (segmentIntersectsOpenInterior(alignedStart, alignedEnd, o)) return false;
+  }
+  return true;
 }
 
 function computeEndEntry(
@@ -710,27 +857,112 @@ function routeMidPath(
 export function routeOrthogonalAround(input: RouteOrthogonalAroundInput): Point[] {
   const margin = input.margin ?? DEFAULT_MARGIN;
   const exitDistance = input.exitDistance ?? DEFAULT_EXIT;
+  const others = input.others ?? [];
+
+  // Both endpoints inside parent → internal edge: stay in the container and dodge
+  // siblings. Otherwise parent is a solid outer blocker (nested → outside target).
+  const internalParent =
+    !!input.parent &&
+    pointInRectClosed(input.from, input.parent) &&
+    pointInRectClosed(input.to, input.parent);
+
   // Clear the outer blocker first (container), else the source node itself.
-  const exitBlocker = input.parent ?? input.source;
-  const rawStartExit = computeStartExit(
+  const exitBlocker = internalParent ? input.source : (input.parent ?? input.source);
+  let rawStartExit = computeStartExit(
     input.from,
     input.fromDir,
     exitBlocker,
     margin,
     exitDistance
   );
-  const gapNeighbor = input.parent ?? input.source;
+  const gapNeighbor = internalParent
+    ? input.source
+    : (input.parent ?? input.source);
   const peeledTargetNeighbor =
     input.target && gapNeighbor ? peelForFacingGap(input.target, gapNeighbor) : null;
 
   // Park the approach on the visual mid-gap so the long jog is not glued to the target.
-  const rawEndEntry = computeEndEntry(
+  let rawEndEntry = computeEndEntry(
     input.to,
     input.toDir,
     exitDistance,
     peeledTargetNeighbor?.a,
     peeledTargetNeighbor?.b
   );
+
+  // Same-side elbows (left→left / top→top): clear siblings AND the target/source
+  // so a wrap does not drop a straight segment through an endpoint node.
+  if (input.fromDir === input.toDir) {
+    const sameSideBlockers: RouteRect[] = [...others];
+    if (input.target) sameSideBlockers.push(input.target);
+    if (input.source) sameSideBlockers.push(input.source);
+
+    if (sameSideBlockers.length > 0) {
+      rawStartExit = clearCorridorOfOthers(
+        rawStartExit,
+        input.fromDir,
+        sameSideBlockers,
+        input.from,
+        input.to,
+        margin
+      );
+      rawEndEntry = clearCorridorOfOthers(
+        rawEndEntry,
+        input.toDir,
+        sameSideBlockers,
+        input.from,
+        input.to,
+        margin
+      );
+      // Lateral offset when the exit axis still lines up through the target
+      // (top→top over a node below: clearCorridor only pushes further "out", not aside).
+      ({ startExit: rawStartExit, endEntry: rawEndEntry } = offsetSameSideAroundBlockers(
+        rawStartExit,
+        rawEndEntry,
+        input.fromDir,
+        sameSideBlockers,
+        margin,
+        input.from,
+        input.to
+      ));
+    }
+
+    // Align exits only when from→exit / exit→to would not pierce blockers.
+    // Unsafe align (pull startExit above target at the same x) collapses to a
+    // vertical through the node after simplify drops the spur.
+    if (
+      canAlignSameSideExits(
+        input.fromDir,
+        rawStartExit,
+        rawEndEntry,
+        input.from,
+        input.to,
+        sameSideBlockers.length > 0
+          ? sameSideBlockers
+          : [input.target, input.source].filter((r): r is RouteRect => !!r),
+        margin
+      )
+    ) {
+      if (input.fromDir === 'left') {
+        const x = Math.min(rawStartExit.x, rawEndEntry.x);
+        rawStartExit = { ...rawStartExit, x };
+        rawEndEntry = { ...rawEndEntry, x };
+      } else if (input.fromDir === 'right') {
+        const x = Math.max(rawStartExit.x, rawEndEntry.x);
+        rawStartExit = { ...rawStartExit, x };
+        rawEndEntry = { ...rawEndEntry, x };
+      } else if (input.fromDir === 'top') {
+        const y = Math.min(rawStartExit.y, rawEndEntry.y);
+        rawStartExit = { ...rawStartExit, y };
+        rawEndEntry = { ...rawEndEntry, y };
+      } else if (input.fromDir === 'bottom') {
+        const y = Math.max(rawStartExit.y, rawEndEntry.y);
+        rawStartExit = { ...rawStartExit, y };
+        rawEndEntry = { ...rawEndEntry, y };
+      }
+    }
+  }
+
   const { startExit, endEntry } = clampFacingExitEntry(
     input.from,
     input.to,
@@ -741,7 +973,8 @@ export function routeOrthogonalAround(input: RouteOrthogonalAroundInput): Point[
   );
 
   let sourceObs = input.source ? expandRect(input.source, margin) : undefined;
-  let parentObs = input.parent ? expandRect(input.parent, margin) : undefined;
+  let parentObs =
+    input.parent && !internalParent ? expandRect(input.parent, margin) : undefined;
   let targetObs = input.target ? expandRect(input.target, margin) : undefined;
 
   const openCorridor = (
@@ -768,20 +1001,29 @@ export function routeOrthogonalAround(input: RouteOrthogonalAroundInput): Point[
   if (sourceObs) obstacles.push(sourceObs);
   if (parentObs) obstacles.push(parentObs);
   if (targetObs) obstacles.push(targetObs);
+  for (const other of others) {
+    obstacles.push(expandRect(other, margin));
+  }
 
+  // Internal edges: lattice from source/target only — parent rails would pull
+  // the graph outside the container (and nested grandparents onto the canvas).
   const peeledLattice =
-    input.parent && input.target
+    !internalParent && input.parent && input.target
       ? peelForFacingGap(input.parent, input.target)
       : input.source && input.target
         ? peelForFacingGap(input.source, input.target)
         : null;
 
+  const latticeA =
+    peeledLattice?.a ?? (internalParent ? input.source : (input.parent ?? input.source));
+  const latticeB = peeledLattice?.b ?? input.target;
+
   const mid = routeMidPath(
     startExit,
     endEntry,
     obstacles,
-    peeledLattice?.a ?? input.parent ?? input.source,
-    peeledLattice?.b ?? input.target,
+    latticeA,
+    latticeB,
     margin
   ).slice(1, -1);
 
@@ -798,11 +1040,47 @@ export function routeOrthogonalAround(input: RouteOrthogonalAroundInput): Point[
     ...(alreadyApproaching ? [] : [endEntry]),
     input.to,
   ];
-  return simplifyPath(ensureOrthogonalPath(raw));
+  return simplifyPath(
+    ensureOrthogonalPath(raw, { exitDir: input.fromDir, enterDir: input.toDir })
+  );
+}
+
+/** Elbow that leaves `prev` along `dir` first (source exit). */
+function elbowExitFirst(prev: Point, next: Point, dir: Side): Point {
+  switch (dir) {
+    case 'left':
+    case 'right':
+      return { x: next.x, y: prev.y };
+    case 'top':
+    case 'bottom':
+      return { x: prev.x, y: next.y };
+  }
+}
+
+/** Elbow that arrives at `next` along `dir` last (target entry). */
+function elbowEnterLast(prev: Point, next: Point, dir: Side): Point {
+  switch (dir) {
+    case 'left':
+    case 'right':
+      return { x: prev.x, y: next.y };
+    case 'top':
+    case 'bottom':
+      return { x: next.x, y: prev.y };
+  }
+}
+
+export interface EnsureOrthogonalOptions {
+  /** Prefer leaving the first point along this side (avoids licking source face). */
+  exitDir?: Side;
+  /** Prefer arriving at the last point along this side. */
+  enterDir?: Side;
 }
 
 /** Insert elbows so no consecutive points form a diagonal (safety net). */
-export function ensureOrthogonalPath(path: Point[]): Point[] {
+export function ensureOrthogonalPath(
+  path: Point[],
+  options?: EnsureOrthogonalOptions
+): Point[] {
   if (path.length < 2) return path;
   const out: Point[] = [path[0]!];
   for (let i = 1; i < path.length; i++) {
@@ -811,7 +1089,17 @@ export function ensureOrthogonalPath(path: Point[]): Point[] {
     const axisAligned =
       Math.abs(prev.x - next.x) < 0.001 || Math.abs(prev.y - next.y) < 0.001;
     if (!axisAligned) {
-      out.push({ x: prev.x, y: next.y });
+      const isFirst = out.length === 1;
+      const isLast = i === path.length - 1;
+      let elbow: Point;
+      if (isFirst && options?.exitDir) {
+        elbow = elbowExitFirst(prev, next, options.exitDir);
+      } else if (isLast && options?.enterDir) {
+        elbow = elbowEnterLast(prev, next, options.enterDir);
+      } else {
+        elbow = { x: prev.x, y: next.y };
+      }
+      out.push(elbow);
     }
     out.push(next);
   }

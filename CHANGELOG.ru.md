@@ -9,6 +9,13 @@
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-07-28
+
+### Исправлено
+- Same-side локти (`left→left`, `right→right`, `top→top`, `bottom→bottom`) обходят siblings и endpoint-ноды, а не режут стек и не «лижут» боковую грань у начала связи.
+- Внутренние связи в контейнере предпочитают короткий коридор мимо siblings, а не полный wrap на канвас.
+- Locked-якоря сохраняют намеренные same-side и wrap-конфигурации (`bottom→bottom`, `bottom→top`, `top→top`); на facing сдвигаются только незаданные или OEF-lateral порты.
+
 ## [0.8.1] - 2026-07-28
 
 ### Исправлено
@@ -392,7 +399,8 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.8.1...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.8.2...HEAD
+[0.8.2]: https://gitverse.ru/ngroznykh/papirus/compare/v0.8.1...v0.8.2
 [0.8.1]: https://gitverse.ru/ngroznykh/papirus/compare/v0.8.0...v0.8.1
 [0.8.0]: https://gitverse.ru/ngroznykh/papirus/compare/v0.7.3...v0.8.0
 [0.7.3]: https://gitverse.ru/ngroznykh/papirus/compare/v0.7.2...v0.7.3

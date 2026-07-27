@@ -9,40 +9,99 @@ function isSide(v: string | undefined): v is Side {
   return v === 'top' || v === 'right' || v === 'bottom' || v === 'left';
 }
 
+function pointInObstacle(p: Point, o: PathObstacle): boolean {
+  return p.x >= o.x && p.x <= o.x + o.width && p.y >= o.y && p.y <= o.y + o.height;
+}
+
+function pointOnObstacleOutline(p: Point, o: PathObstacle, tol = 1): boolean {
+  const onVertical =
+    (Math.abs(p.x - o.x) < tol || Math.abs(p.x - (o.x + o.width)) < tol) &&
+    p.y >= o.y - tol &&
+    p.y <= o.y + o.height + tol;
+  const onHorizontal =
+    (Math.abs(p.y - o.y) < tol || Math.abs(p.y - (o.y + o.height)) < tol) &&
+    p.x >= o.x - tol &&
+    p.x <= o.x + o.width + tol;
+  return onVertical || onHorizontal;
+}
+
+/** Prefer the tightest rect that contains `p` (source/composite vs ancestor). */
+function smallestContaining(
+  p: Point,
+  obstacles: PathObstacle[],
+  exclude: ReadonlySet<PathObstacle>
+): PathObstacle | undefined {
+  let best: PathObstacle | undefined;
+  let bestArea = Infinity;
+  for (const o of obstacles) {
+    if (exclude.has(o) || !pointInObstacle(p, o)) continue;
+    const area = o.width * o.height;
+    if (area < bestArea) {
+      best = o;
+      bestArea = area;
+    }
+  }
+  return best;
+}
+
 function resolveRoutingRoles(
   from: Point,
   to: Point,
   obstacles: PathObstacle[]
-): { parent?: PathObstacle; source?: PathObstacle; target?: PathObstacle } {
+): {
+  parent?: PathObstacle;
+  source?: PathObstacle;
+  target?: PathObstacle;
+  others: PathObstacle[];
+} {
   const target =
     obstacles.find((o) => o.role === 'target') ??
-    obstacles.find((o) => {
-      const onVertical =
-        (Math.abs(to.x - o.x) < 1 || Math.abs(to.x - (o.x + o.width)) < 1) &&
-        to.y >= o.y - 1 &&
-        to.y <= o.y + o.height + 1;
-      const onHorizontal =
-        (Math.abs(to.y - o.y) < 1 || Math.abs(to.y - (o.y + o.height)) < 1) &&
-        to.x >= o.x - 1 &&
-        to.x <= o.x + o.width + 1;
-      return onVertical || onHorizontal;
-    });
+    obstacles.find((o) => pointOnObstacleOutline(to, o));
 
-  const source = obstacles.find((o) => o.role === 'source' && o !== target);
+  const excludeForSource = new Set<PathObstacle>();
+  if (target) excludeForSource.add(target);
 
-  // Container around the source (not the source node itself).
-  const parent = obstacles.find(
-    (o) =>
-      o !== target &&
-      o !== source &&
-      o.role !== 'source' &&
-      from.x >= o.x &&
-      from.x <= o.x + o.width &&
-      from.y >= o.y &&
-      from.y <= o.y + o.height
-  );
+  // Role first; else smallest container of `from` (inset composite anchors).
+  const source =
+    obstacles.find((o) => o.role === 'source' && o !== target) ??
+    smallestContaining(from, obstacles, excludeForSource);
 
-  return { parent, source, target };
+  const excludeForParent = new Set<PathObstacle>();
+  if (target) excludeForParent.add(target);
+  if (source) excludeForParent.add(source);
+
+  // Tightest container of `from` (not outer ancestors listed first in the Map).
+  // If `to` is also inside → internal edge (routeOrthogonalAround skips wrapping).
+  // If `to` is outside → nest exit / contour crawl around this container only.
+  const parent = smallestContaining(from, obstacles, excludeForParent);
+
+  // Mid-path obstacles: siblings inside the parent (or near the span if no parent).
+  // Skip ancestors that contain both ends — they must not seal the internal corridor.
+  const spanPad = 40;
+  const span = {
+    x: Math.min(from.x, to.x) - spanPad,
+    y: Math.min(from.y, to.y) - spanPad,
+    width: Math.abs(to.x - from.x) + spanPad * 2,
+    height: Math.abs(to.y - from.y) + spanPad * 2,
+  };
+  const rectsOverlap = (a: PathObstacle, b: PathObstacle): boolean =>
+    a.x < b.x + b.width &&
+    a.x + a.width > b.x &&
+    a.y < b.y + b.height &&
+    a.y + a.height > b.y;
+
+  const others = obstacles.filter((o) => {
+    if (o === parent || o === source || o === target) return false;
+    if (pointInObstacle(from, o) && pointInObstacle(to, o)) return false;
+    if (parent) {
+      const cx = o.x + o.width / 2;
+      const cy = o.y + o.height / 2;
+      return pointInObstacle({ x: cx, y: cy }, parent);
+    }
+    return rectsOverlap(o, span);
+  });
+
+  return { parent, source, target, others };
 }
 
 const MIN_SEGMENT_LENGTH = 20;
@@ -181,10 +240,13 @@ function inferApproachDir(from: Point, to: Point): string {
 
 /** Which side of `target` the attachment point `to` lies on (border hit). */
 function sideOfPointOnRect(to: Point, target: PathObstacle): Side | undefined {
-  const onLeft = Math.abs(to.x - target.x) <= 1;
-  const onRight = Math.abs(to.x - (target.x + target.width)) <= 1;
-  const onTop = Math.abs(to.y - target.y) <= 1;
-  const onBottom = Math.abs(to.y - (target.y + target.height)) <= 1;
+  // Obstacles are padded (~4px); attachment points sit on the visual edge inside
+  // that pad — use a tolerance that still recognizes the side.
+  const tol = 6;
+  const onLeft = Math.abs(to.x - target.x) <= tol;
+  const onRight = Math.abs(to.x - (target.x + target.width)) <= tol;
+  const onTop = Math.abs(to.y - target.y) <= tol;
+  const onBottom = Math.abs(to.y - (target.y + target.height)) <= tol;
   // Prefer non-corner unambiguous sides; corners fall back to toDir/geometry.
   if (onTop && !onLeft && !onRight) return 'top';
   if (onBottom && !onLeft && !onRight) return 'bottom';
@@ -549,7 +611,7 @@ export class PolylinePathStrategy implements PathStrategy {
     // Nested / target-aware case: dedicated router (parent and/or target present).
     // Diagram obstacles already pad ~8px; margin 4 ≈ 12px total clearance.
     if (!selfLoop && isSide(fromDir) && isSide(toDir)) {
-      const { parent, source, target } = resolveRoutingRoles(from, to, obstacles);
+      const { parent, source, target, others } = resolveRoutingRoles(from, to, obstacles);
       const approachDir = resolveApproachDir(from, to, toDir, target);
       if ((parent || source || target) && isSide(approachDir)) {
         return finish(
@@ -562,6 +624,7 @@ export class PolylinePathStrategy implements PathStrategy {
             parent,
             source,
             target,
+            others,
             margin: 4,
             exitDistance: 20,
           })
@@ -572,7 +635,12 @@ export class PolylinePathStrategy implements PathStrategy {
         fromDir,
         toDir,
         approachDir,
-        roles: { parent: parent?.id, source: source?.id, target: target?.id },
+        roles: {
+          parent: parent?.id,
+          source: source?.id,
+          target: target?.id,
+          others: others.map((o) => o.id).filter(Boolean),
+        },
         obstacleRoles: obstacles.map((o) => `${o.id}:${o.role ?? '?'}`),
       });
     }

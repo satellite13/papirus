@@ -210,6 +210,262 @@ describe('EdgeEndpointUpdater edge attachments', () => {
     }
   });
 
+  it('keeps intentional bottom→bottom wrap on a vertical stack', () => {
+    const os = new RectangleNode({ id: 'os', x: 80, y: 150, width: 200, height: 60 });
+    const device = new RectangleNode({ id: 'device', x: 80, y: 240, width: 200, height: 60 });
+    const nodes = new Map([
+      ['os', os],
+      ['device', device],
+    ]);
+
+    const edge = new Edge({
+      id: 'e-serving',
+      from: { nodeId: 'device', portId: 'anchor:bottom:0' },
+      to: { nodeId: 'os', portId: 'anchor:bottom:0' },
+      type: 'polyline',
+      lockAnchors: true,
+    });
+    const edges = new Map([['e-serving', edge]]);
+
+    const updater = new EdgeEndpointUpdater({
+      getNodes: () => nodes,
+      getEdges: () => edges,
+      getNodeObstacles: () => [
+        { id: 'os', x: os.x, y: os.y, width: os.width, height: os.height, role: 'other' },
+        {
+          id: 'device',
+          x: device.x,
+          y: device.y,
+          width: device.width,
+          height: device.height,
+          role: 'other',
+        },
+      ],
+    });
+    updater.updateAll();
+
+    expect(isNodeEdgeEndpoint(edge.from)).toBe(true);
+    expect(isNodeEdgeEndpoint(edge.to)).toBe(true);
+    if (isNodeEdgeEndpoint(edge.from) && isNodeEdgeEndpoint(edge.to)) {
+      expect(edge.from.portId?.startsWith('anchor:bottom:')).toBe(true);
+      expect(edge.to.portId?.startsWith('anchor:bottom:')).toBe(true);
+    }
+
+    const start = edge.path[0]!;
+    const end = edge.path[edge.path.length - 1]!;
+    expect(start.y).toBeCloseTo(device.y + device.height, 0);
+    expect(end.y).toBeCloseTo(os.y + os.height, 0);
+
+    // Mid segments must not cut open interiors of either endpoint.
+    for (let i = 1; i < edge.path.length; i++) {
+      const a = edge.path[i - 1]!;
+      const b = edge.path[i]!;
+      const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      const inOs =
+        mid.x > os.x && mid.x < os.x + os.width && mid.y > os.y && mid.y < os.y + os.height;
+      const inDevice =
+        mid.x > device.x &&
+        mid.x < device.x + device.width &&
+        mid.y > device.y &&
+        mid.y < device.y + device.height;
+      expect(inOs || inDevice).toBe(false);
+    }
+  });
+
+  it('keeps outlineParam same-side bottoms on a vertical stack', () => {
+    const os = new RectangleNode({ id: 'os', x: 80, y: 150, width: 200, height: 60 });
+    const device = new RectangleNode({ id: 'device', x: 80, y: 240, width: 200, height: 60 });
+    const nodes = new Map([
+      ['os', os],
+      ['device', device],
+    ]);
+
+    // peri = 2*(200+60)=520; bottom starts after top+right = 260 → param ≈ 0.69.
+    const edge = new Edge({
+      id: 'e-outline-serving',
+      from: { nodeId: 'device', outlineParam: 0.7 },
+      to: { nodeId: 'os', outlineParam: 0.7 },
+      type: 'polyline',
+      lockAnchors: true,
+    });
+    const edges = new Map([['e-outline-serving', edge]]);
+
+    const updater = new EdgeEndpointUpdater({
+      getNodes: () => nodes,
+      getEdges: () => edges,
+      getNodeObstacles: () => [],
+    });
+    updater.updateAll();
+
+    expect(isNodeEdgeEndpoint(edge.from)).toBe(true);
+    expect(isNodeEdgeEndpoint(edge.to)).toBe(true);
+    if (isNodeEdgeEndpoint(edge.from) && isNodeEdgeEndpoint(edge.to)) {
+      expect(edge.from.outlineParam).toBeCloseTo(0.7, 5);
+      expect(edge.to.outlineParam).toBeCloseTo(0.7, 5);
+      expect(edge.from.portId).toBeUndefined();
+      expect(edge.to.portId).toBeUndefined();
+    }
+  });
+
+  it('keeps intentional bottom→top on a vertical stack (no snap to facing)', () => {
+    // Device below OS: user places source on bottom and target on top (wrap under).
+    const os = new RectangleNode({ id: 'os', x: 80, y: 150, width: 200, height: 60 });
+    const device = new RectangleNode({ id: 'device', x: 80, y: 240, width: 200, height: 60 });
+    const nodes = new Map([
+      ['os', os],
+      ['device', device],
+    ]);
+
+    const edge = new Edge({
+      id: 'e-bottom-top',
+      from: { nodeId: 'device', portId: 'anchor:bottom:0' },
+      to: { nodeId: 'os', portId: 'anchor:top:0' },
+      type: 'polyline',
+      lockAnchors: true,
+    });
+    const edges = new Map([['e-bottom-top', edge]]);
+
+    const updater = new EdgeEndpointUpdater({
+      getNodes: () => nodes,
+      getEdges: () => edges,
+      getNodeObstacles: () => [
+        { id: 'os', x: os.x, y: os.y, width: os.width, height: os.height, role: 'other' },
+        {
+          id: 'device',
+          x: device.x,
+          y: device.y,
+          width: device.width,
+          height: device.height,
+          role: 'other',
+        },
+      ],
+    });
+    updater.updateAll();
+
+    expect(isNodeEdgeEndpoint(edge.from)).toBe(true);
+    expect(isNodeEdgeEndpoint(edge.to)).toBe(true);
+    if (isNodeEdgeEndpoint(edge.from) && isNodeEdgeEndpoint(edge.to)) {
+      expect(edge.from.portId?.startsWith('anchor:bottom:')).toBe(true);
+      expect(edge.to.portId?.startsWith('anchor:top:')).toBe(true);
+    }
+  });
+
+  it('keeps user outline on target top (wrap-around, no snap to facing bottom)', () => {
+    const os = new RectangleNode({ id: 'os', x: 80, y: 150, width: 200, height: 60 });
+    const device = new RectangleNode({ id: 'device', x: 80, y: 240, width: 200, height: 60 });
+    const nodes = new Map([
+      ['os', os],
+      ['device', device],
+    ]);
+
+    // peri=520; top edge param in [0, 200/520) ≈ 0.2
+    const edge = new Edge({
+      id: 'e-wrap-top',
+      from: { nodeId: 'device', portId: 'anchor:top:0' },
+      to: { nodeId: 'os', outlineParam: 0.2 },
+      type: 'polyline',
+      lockAnchors: true,
+    });
+    const edges = new Map([['e-wrap-top', edge]]);
+
+    const updater = new EdgeEndpointUpdater({
+      getNodes: () => nodes,
+      getEdges: () => edges,
+      getNodeObstacles: () => [
+        { id: 'os', x: os.x, y: os.y, width: os.width, height: os.height, role: 'other' },
+        {
+          id: 'device',
+          x: device.x,
+          y: device.y,
+          width: device.width,
+          height: device.height,
+          role: 'other',
+        },
+      ],
+    });
+    updater.updateAll();
+
+    expect(isNodeEdgeEndpoint(edge.to)).toBe(true);
+    if (isNodeEdgeEndpoint(edge.to)) {
+      expect(edge.to.outlineParam).toBeCloseTo(0.2, 5);
+      expect(edge.to.portId).toBeUndefined();
+    }
+    // Path must go around OS, not through it.
+    for (let i = 1; i < edge.path.length - 1; i++) {
+      const p = edge.path[i]!;
+      const inOs =
+        p.x > os.x && p.x < os.x + os.width && p.y > os.y && p.y < os.y + os.height;
+      expect(inOs).toBe(false);
+    }
+  });
+
+  it('keeps user outline on a lateral side after reconnect', () => {
+    const os = new RectangleNode({ id: 'os', x: 80, y: 150, width: 200, height: 60 });
+    const device = new RectangleNode({ id: 'device', x: 80, y: 240, width: 200, height: 60 });
+    const nodes = new Map([
+      ['os', os],
+      ['device', device],
+    ]);
+
+    // peri=520; right edge after top(200) → param in (200/520, 260/520) ≈ 0.42
+    const edge = new Edge({
+      id: 'e-lateral',
+      from: { nodeId: 'device', portId: 'anchor:top:0' },
+      to: { nodeId: 'os', outlineParam: 0.42 },
+      type: 'polyline',
+      lockAnchors: true,
+    });
+    const edges = new Map([['e-lateral', edge]]);
+
+    const updater = new EdgeEndpointUpdater({
+      getNodes: () => nodes,
+      getEdges: () => edges,
+      getNodeObstacles: () => [],
+    });
+    updater.updateAll();
+
+    expect(isNodeEdgeEndpoint(edge.to)).toBe(true);
+    if (isNodeEdgeEndpoint(edge.to)) {
+      expect(edge.to.outlineParam).toBeCloseTo(0.42, 5);
+    }
+  });
+
+  it('keeps user outline on facing side (no snap-back after reconnect)', () => {
+    const os = new RectangleNode({ id: 'os', x: 80, y: 150, width: 200, height: 60 });
+    const device = new RectangleNode({ id: 'device', x: 80, y: 240, width: 200, height: 60 });
+    const nodes = new Map([
+      ['os', os],
+      ['device', device],
+    ]);
+
+    // Facing top→bottom; user slid the OS end along the bottom edge.
+    const edge = new Edge({
+      id: 'e-slide',
+      from: { nodeId: 'device', portId: 'anchor:top:0' },
+      to: { nodeId: 'os', outlineParam: 0.72 },
+      type: 'polyline',
+      lockAnchors: true,
+    });
+    const edges = new Map([['e-slide', edge]]);
+
+    const updater = new EdgeEndpointUpdater({
+      getNodes: () => nodes,
+      getEdges: () => edges,
+      getNodeObstacles: () => [],
+    });
+    updater.updateAll();
+    updater.updateAll();
+
+    expect(isNodeEdgeEndpoint(edge.to)).toBe(true);
+    if (isNodeEdgeEndpoint(edge.to)) {
+      expect(edge.to.outlineParam).toBeCloseTo(0.72, 5);
+      expect(edge.to.portId).toBeUndefined();
+    }
+    if (isNodeEdgeEndpoint(edge.from)) {
+      expect(edge.from.portId).toBe('anchor:top:0');
+    }
+  });
+
   it('keeps bottom target when source is offset far left but still below', () => {
     const product = new RectangleNode({ id: 'product', x: -80, y: 240, width: 140, height: 80 });
     const bp = new RectangleNode({ id: 'bp', x: 40, y: 40, width: 400, height: 50 });
