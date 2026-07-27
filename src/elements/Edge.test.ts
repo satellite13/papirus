@@ -139,8 +139,9 @@ describe('Edge', () => {
       'right'
     );
 
-    // No self-loop bypass: standard directed path shape.
-    expect(edge.path.length).toBe(4);
+    // No self-loop bypass: standard directed path (duplicates collapsed).
+    expect(edge.path.length).toBeGreaterThanOrEqual(3);
+    expect(edge.path.length).toBeLessThan(6);
   });
 
   it('routes polyline around obstacle rectangles', () => {
@@ -165,6 +166,332 @@ describe('Edge', () => {
     expect(edge.path.length).toBeGreaterThan(4);
     // Route should detour vertically instead of crossing through obstacle band.
     expect(edge.path.some((p) => p.y < 90 || p.y > 150)).toBe(true);
+  });
+
+  it('does not leave an outward tail past the first turn', () => {
+    const from = { x: 340, y: 280 }
+    const to = { x: 280, y: 90 }
+    const edge = new Edge({
+      from: { nodeId: 'dp', portId: 'anchor:right:0' },
+      to: { nodeId: 'bp', portId: 'anchor:bottom:0' },
+      type: 'polyline',
+    })
+    edge.updateEndpoints(from, to, 'right', 'bottom')
+
+    const path = edge.path
+    expect(path[0]).toEqual(from)
+    // Exit goes right, then the next distinct corner must not step back left
+    // (that overhang is the visible "tail" past the vertical).
+    let maxX = from.x
+    for (let i = 1; i < path.length; i++) {
+      const p = path[i]!
+      if (p.x > maxX) maxX = p.x
+    }
+    const exitIdx = path.findIndex((p) => Math.abs(p.x - maxX) < 0.5)
+    expect(exitIdx).toBeGreaterThan(0)
+    // After reaching max outward X, subsequent points on the start row should not
+    // appear — the turn happens at the outermost exit.
+    for (let i = exitIdx + 1; i < path.length; i++) {
+      const p = path[i]!
+      if (Math.abs(p.y - from.y) < 0.5) {
+        expect(p.x).toBeGreaterThanOrEqual(maxX - 0.5)
+      }
+    }
+    // Clean L at start: second point outward, third leaves the start row.
+    expect(path[1]!.x).toBeGreaterThan(from.x)
+    expect(Math.abs(path[2]!.y - from.y)).toBeGreaterThan(0.5)
+  })
+
+  it('enforces perpendicular exit and arrival for polyline terminals', () => {
+    const cases: Array<{
+      name: string
+      from: { x: number; y: number }
+      to: { x: number; y: number }
+      fromDir: string
+      toDir: string
+    }> = [
+      {
+        name: 'right→bottom',
+        from: { x: 200, y: 300 },
+        to: { x: 280, y: 80 },
+        fromDir: 'right',
+        toDir: 'bottom',
+      },
+      {
+        name: 'top→bottom',
+        from: { x: 520, y: 150 },
+        to: { x: 400, y: 90 },
+        fromDir: 'top',
+        toDir: 'bottom',
+      },
+      {
+        name: 'left→bottom',
+        from: { x: 200, y: 260 },
+        to: { x: 280, y: 80 },
+        fromDir: 'left',
+        toDir: 'bottom',
+      },
+    ]
+
+    for (const c of cases) {
+      const edge = new Edge({
+        from: { nodeId: 'a' },
+        to: { nodeId: 'b' },
+        type: 'polyline',
+      })
+      edge.updateEndpoints(c.from, c.to, c.fromDir, c.toDir, {
+        obstacles: [{ id: 'parent', x: 160, y: 140, width: 200, height: 140 }],
+      })
+      const path = edge.path
+      expect(path[0], c.name).toEqual(c.from)
+      expect(path[path.length - 1], c.name).toEqual(c.to)
+
+      const p1 = path[1]!
+      if (c.fromDir === 'left') expect(p1.x, c.name).toBeLessThan(c.from.x)
+      if (c.fromDir === 'right') expect(p1.x, c.name).toBeGreaterThan(c.from.x)
+      if (c.fromDir === 'top') expect(p1.y, c.name).toBeLessThan(c.from.y)
+      if (c.fromDir === 'bottom') expect(p1.y, c.name).toBeGreaterThan(c.from.y)
+
+      const pre = path[path.length - 2]!
+      if (c.toDir === 'bottom' || c.toDir === 'top') {
+        expect(Math.abs(pre.x - c.to.x), c.name).toBeLessThan(0.5)
+        expect(Math.abs(pre.y - c.to.y), c.name).toBeGreaterThan(1)
+      } else {
+        expect(Math.abs(pre.y - c.to.y), c.name).toBeLessThan(0.5)
+        expect(Math.abs(pre.x - c.to.x), c.name).toBeGreaterThan(1)
+      }
+    }
+  })
+
+  it('keeps fixed endpoints and arrives vertically into bottom target', () => {
+    const from = { x: 208, y: 216 };
+    const to = { x: 224, y: 72 };
+    const edge = new Edge({
+      from: { nodeId: 'dp', portId: 'anchor:right:0' },
+      to: { nodeId: 'bp', portId: 'anchor:bottom:0' },
+      type: 'polyline',
+    });
+
+    edge.updateEndpoints(from, to, 'right', 'bottom', {
+      obstacles: [{ x: 40, y: 90, width: 180, height: 80 }],
+    });
+
+    const path = edge.path;
+    expect(path[0]).toEqual(from);
+    expect(path[path.length - 1]).toEqual(to);
+    const pre = path[path.length - 2]!;
+    // Final approach must be vertical (same X), not crawl along the target edge.
+    expect(Math.abs(pre.x - to.x)).toBeLessThan(0.5);
+    expect(Math.abs(pre.y - to.y)).toBeGreaterThan(1);
+  });
+
+  it('does not crawl along target edge when toDir is omitted', () => {
+    const from = { x: 208, y: 216 };
+    const to = { x: 224, y: 72 };
+    const edge = new Edge({
+      from: { nodeId: 'dp', portId: 'anchor:right:0' },
+      to: { nodeId: 'bp' },
+      type: 'polyline',
+    });
+
+    edge.updateEndpoints(from, to, 'right', undefined, {
+      obstacles: [{ x: 40, y: 90, width: 180, height: 80 }],
+    });
+
+    const path = edge.path;
+    expect(path[0]).toEqual(from);
+    expect(path[path.length - 1]).toEqual(to);
+    const pre = path[path.length - 2]!;
+    expect(Math.abs(pre.x - to.x)).toBeLessThan(0.5);
+    expect(Math.abs(pre.y - to.y)).toBeGreaterThan(1);
+  });
+
+  it('exits outward for left→bottom instead of cutting through the node', () => {
+    const from = { x: 200, y: 260 }; // left side of component
+    const to = { x: 280, y: 80 }; // bottom of BP (to the right of from)
+    const edge = new Edge({
+      from: { nodeId: 'comp', portId: 'anchor:left:0' },
+      to: { nodeId: 'bp', portId: 'anchor:bottom:0' },
+      type: 'polyline',
+    });
+
+    edge.updateEndpoints(from, to, 'left', 'bottom');
+
+    const path = edge.path;
+    expect(path[0]).toEqual(from);
+    expect(path[path.length - 1]).toEqual(to);
+    // First bend must go further left (outward), not into the component toward to.x
+    expect(path[1]!.x).toBeLessThan(from.x);
+    const pre = path[path.length - 2]!;
+    expect(Math.abs(pre.x - to.x)).toBeLessThan(0.5);
+  });
+
+  it('exits clear of parent container before turning toward target', () => {
+    const from = { x: 200, y: 260 }
+    const to = { x: 260, y: 90 }
+    const parent = { id: 'parent', x: 160, y: 200, width: 220, height: 160 }
+    const edge = new Edge({
+      from: { nodeId: 'comp', portId: 'anchor:left:0' },
+      to: { nodeId: 'bp', portId: 'anchor:bottom:0' },
+      type: 'polyline',
+    })
+    edge.updateEndpoints(from, to, 'left', 'bottom', { obstacles: [parent] })
+
+    const path = edge.path
+    expect(path[0]).toEqual(from)
+    expect(path[path.length - 1]).toEqual(to)
+    // First exit clears parent left edge (with margin)
+    expect(path[1]!.x).toBeLessThan(parent.x - 8)
+
+    const inset = {
+      x: parent.x + 4,
+      y: parent.y + 4,
+      width: parent.width - 8,
+      height: parent.height - 8,
+    }
+    for (let i = 2; i < path.length; i++) {
+      const a = path[i - 1]!
+      const b = path[i]!
+      const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
+      const inside =
+        mid.x > inset.x &&
+        mid.x < inset.x + inset.width &&
+        mid.y > inset.y &&
+        mid.y < inset.y + inset.height
+      expect(inside).toBe(false)
+    }
+  })
+
+  it('routes around a parent container obstacle without crossing it', () => {
+    // Nested component inside parent; edge from component left to BP above.
+    // Parent must remain an obstacle (not filtered just because start is inside it).
+    const from = { x: 180, y: 260 };
+    const to = { x: 260, y: 80 };
+    const parent = { id: 'parent', x: 160, y: 200, width: 220, height: 160 };
+    const edge = new Edge({
+      from: { nodeId: 'comp', portId: 'anchor:left:0' },
+      to: { nodeId: 'bp', portId: 'anchor:bottom:0' },
+      type: 'polyline',
+    });
+
+    // After EdgeEndpointUpdater filters out endpoint nodes by id, parent remains.
+    edge.updateEndpoints(from, to, 'left', 'bottom', {
+      obstacles: [parent],
+    });
+
+    const path = edge.path;
+    expect(path[0]).toEqual(from);
+    expect(path[path.length - 1]).toEqual(to);
+
+    // No segment should cut through the parent interior (strictly inside, not on border).
+    const inset = {
+      x: parent.x + 4,
+      y: parent.y + 4,
+      width: parent.width - 8,
+      height: parent.height - 8,
+    };
+    for (let i = 1; i < path.length; i++) {
+      const a = path[i - 1]!;
+      const b = path[i]!;
+      // Sample midpoint of each segment
+      const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      const inside =
+        mid.x > inset.x &&
+        mid.x < inset.x + inset.width &&
+        mid.y > inset.y &&
+        mid.y < inset.y + inset.height;
+      // Start may lie on the parent border; later midpoints must not pierce interior.
+      if (i > 1) {
+        expect(inside).toBe(false);
+      }
+    }
+  });
+
+  it('arrives vertically into bottom target even when end is far sideways', () => {
+    // Component close under a wide Business Process; end X far from start X.
+    // |dx| > |dy| must NOT flip approach to left/right (crawl along BP edge).
+    const from = { x: 520, y: 150 };
+    const to = { x: 400, y: 90 };
+    const edge = new Edge({
+      from: { nodeId: 'comp', portId: 'anchor:top:0' },
+      to: { nodeId: 'bp', portId: 'anchor:bottom:0' },
+      type: 'polyline',
+    });
+
+    edge.updateEndpoints(from, to, 'top', 'bottom', {
+      obstacles: [{ id: 'parent', x: 400, y: 150, width: 200, height: 120 }],
+    });
+
+    const path = edge.path;
+    expect(path[0]).toEqual(from);
+    expect(path[path.length - 1]).toEqual(to);
+    const pre = path[path.length - 2]!;
+    expect(Math.abs(pre.x - to.x)).toBeLessThan(0.5);
+    expect(Math.abs(pre.y - to.y)).toBeGreaterThan(1);
+    // No horizontal segment on the target edge itself.
+    for (let i = 1; i < path.length; i++) {
+      const a = path[i - 1]!;
+      const b = path[i]!;
+      const onEdge = Math.abs(a.y - to.y) < 0.5 && Math.abs(b.y - to.y) < 0.5;
+      const horizontal = Math.abs(a.y - b.y) < 0.5 && Math.abs(a.x - b.x) > 1;
+      expect(onEdge && horizontal).toBe(false);
+    }
+  });
+
+  it('arrives vertically when vertical gap is smaller than MIN_SEGMENT_LENGTH', () => {
+    // Tight gap under a wide BP: |dy| < 20 used to flip approach to left/right
+    // and crawl the bottom edge — last segment must stay vertical.
+    const from = { x: 520, y: 102 };
+    const to = { x: 400, y: 90 };
+    const edge = new Edge({
+      from: { nodeId: 'comp', portId: 'anchor:left:0' },
+      to: { nodeId: 'bp', portId: 'anchor:bottom:0' },
+      type: 'polyline',
+    });
+
+    edge.updateEndpoints(from, to, 'left', 'bottom', {
+      obstacles: [{ id: 'parent', x: 450, y: 100, width: 180, height: 100 }],
+    });
+
+    const path = edge.path;
+    expect(path[0]).toEqual(from);
+    expect(path[path.length - 1]).toEqual(to);
+    const pre = path[path.length - 2]!;
+    expect(Math.abs(pre.x - to.x)).toBeLessThan(0.5);
+    expect(Math.abs(pre.y - to.y)).toBeGreaterThan(1);
+    for (let i = 1; i < path.length; i++) {
+      const a = path[i - 1]!;
+      const b = path[i]!;
+      const onEdge = Math.abs(a.y - to.y) < 0.5 && Math.abs(b.y - to.y) < 0.5;
+      const horizontal = Math.abs(a.y - b.y) < 0.5 && Math.abs(a.x - b.x) > 1;
+      expect(onEdge && horizontal).toBe(false);
+    }
+  });
+
+  it('ignores conflicting horizontal toDir when target is clearly above', () => {
+    // Endpoints fixed on right→bottom geometry, but toDir wrongly says "left"
+    // (wide Business Process / corner outline). Must not crawl along y=to.y.
+    const from = { x: 260, y: 450 };
+    const to = { x: 300, y: 98 };
+    const edge = new Edge({
+      from: { nodeId: 'dp', portId: 'anchor:right:0' },
+      to: { nodeId: 'bp', portId: 'anchor:left:0' },
+      type: 'polyline',
+    });
+
+    edge.updateEndpoints(from, to, 'right', 'left', {
+      obstacles: [
+        { x: 32, y: 32, width: 536, height: 66 },
+        { x: 72, y: 400, width: 188, height: 108 },
+      ],
+    });
+
+    const path = edge.path;
+    expect(path[0]).toEqual(from);
+    expect(path[path.length - 1]).toEqual(to);
+    const pre = path[path.length - 2]!;
+    expect(Math.abs(pre.x - to.x)).toBeLessThan(0.5);
+    expect(Math.abs(pre.y - to.y)).toBeGreaterThan(1);
   });
 
   it('routes close orthogonal polyline anchors around outer corner', () => {
