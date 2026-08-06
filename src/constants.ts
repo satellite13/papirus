@@ -13,6 +13,7 @@ export const ARROW_ANGLE = Math.PI / 6; // 30 degrees
 export const MARKER_SIZES: Record<string, number> = {
   arrow: 12,
   open: 12,
+  stealth: 12,
   diamond: 14,
   circle: 6,
   square: 6,
