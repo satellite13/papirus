@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.4] - 2026-08-06
+
+### Added
+- Edge marker type `stealth`: filled barbed arrowhead with a shallow concave heel (canvas and SVG export).
+
 ## [0.8.3] - 2026-07-28
 
 ### Fixed
@@ -397,7 +402,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Edge animations (flow effect)
 - Context menu and search/filter
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.8.3...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.8.4...HEAD
+[0.8.4]: https://gitverse.ru/ngroznykh/papirus/compare/v0.8.3...v0.8.4
 [0.8.3]: https://gitverse.ru/ngroznykh/papirus/compare/v0.8.2...v0.8.3
 [0.8.2]: https://gitverse.ru/ngroznykh/papirus/compare/v0.8.1...v0.8.2
 [0.8.1]: https://gitverse.ru/ngroznykh/papirus/compare/v0.8.0...v0.8.1

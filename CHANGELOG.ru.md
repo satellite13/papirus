@@ -9,6 +9,11 @@
 
 ## [Unreleased]
 
+## [0.8.4] - 2026-08-06
+
+### Добавлено
+- Тип маркера ребра `stealth`: залитый наконечник с небольшой вогнутой пяткой (canvas и SVG-экспорт).
+
 ## [0.8.3] - 2026-07-28
 
 ### Исправлено
@@ -404,7 +409,8 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.8.3...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.8.4...HEAD
+[0.8.4]: https://gitverse.ru/ngroznykh/papirus/compare/v0.8.3...v0.8.4
 [0.8.3]: https://gitverse.ru/ngroznykh/papirus/compare/v0.8.2...v0.8.3
 [0.8.2]: https://gitverse.ru/ngroznykh/papirus/compare/v0.8.1...v0.8.2
 [0.8.1]: https://gitverse.ru/ngroznykh/papirus/compare/v0.8.0...v0.8.1
