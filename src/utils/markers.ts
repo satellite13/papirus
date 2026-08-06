@@ -75,13 +75,11 @@ export function calculateArrowMarkerPoints(
   return { tip: to, left, right };
 }
 
-/** Depth of stealth heel notch along the edge (fraction of arrow shaft length). */
-const STEALTH_NOTCH_DEPTH = 0.55;
-/** Lateral inset of heel vs outer barb half-width. */
-const STEALTH_NOTCH_WIDTH = 0.35;
+/** Heel inset along the edge (fraction of arrow shaft length). Closer to tip = deeper notch. */
+const STEALTH_HEEL_DEPTH = 0.55;
 
 /**
- * Stealth (barbed) marker: tip + outer barbs + concave heel (two inner points).
+ * Stealth (barbed) marker: tip + outer barbs + centerline heel (classic Graphviz stealth).
  */
 export function calculateStealthMarkerPoints(
   to: Point,
@@ -90,26 +88,19 @@ export function calculateStealthMarkerPoints(
 ): {
   tip: Point;
   leftOuter: Point;
-  leftInner: Point;
-  rightInner: Point;
+  heel: Point;
   rightOuter: Point;
 } {
   const { left: leftOuter, right: rightOuter } = calculateArrowMarkerPoints(to, angle, size);
   const cos = Math.cos(angle);
   const sin = Math.sin(angle);
   const depth = size * Math.cos(ARROW_ANGLE);
-  const halfWidth = size * Math.sin(ARROW_ANGLE);
-  const innerDepth = depth * STEALTH_NOTCH_DEPTH;
-  const innerHalf = halfWidth * STEALTH_NOTCH_WIDTH;
-  const leftInner = {
-    x: to.x - innerDepth * cos + innerHalf * sin,
-    y: to.y - innerDepth * sin - innerHalf * cos,
+  const heelDepth = depth * STEALTH_HEEL_DEPTH;
+  const heel = {
+    x: to.x - heelDepth * cos,
+    y: to.y - heelDepth * sin,
   };
-  const rightInner = {
-    x: to.x - innerDepth * cos - innerHalf * sin,
-    y: to.y - innerDepth * sin + innerHalf * cos,
-  };
-  return { tip: to, leftOuter, leftInner, rightInner, rightOuter };
+  return { tip: to, leftOuter, heel, rightOuter };
 }
 
 /**
@@ -198,12 +189,8 @@ export function generateSvgStealthMarker(
   fillOpacity: number,
   stroke: string
 ): string {
-  const { tip, leftOuter, leftInner, rightInner, rightOuter } = calculateStealthMarkerPoints(
-    to,
-    angle,
-    size
-  );
-  return `<path d="M ${tip.x} ${tip.y} L ${leftOuter.x} ${leftOuter.y} L ${leftInner.x} ${leftInner.y} L ${rightInner.x} ${rightInner.y} L ${rightOuter.x} ${rightOuter.y} Z" fill="${fill}" fill-opacity="${fillOpacity}" stroke="${stroke}" stroke-width="1"/>`;
+  const { tip, leftOuter, heel, rightOuter } = calculateStealthMarkerPoints(to, angle, size);
+  return `<path d="M ${tip.x} ${tip.y} L ${leftOuter.x} ${leftOuter.y} L ${heel.x} ${heel.y} L ${rightOuter.x} ${rightOuter.y} Z" fill="${fill}" fill-opacity="${fillOpacity}" stroke="${stroke}" stroke-width="1"/>`;
 }
 
 /**

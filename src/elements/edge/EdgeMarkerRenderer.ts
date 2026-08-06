@@ -150,16 +150,11 @@ function drawStealthMarker(
   fillColor: string,
   fillOpacity: number
 ): void {
-  const { tip, leftOuter, leftInner, rightInner, rightOuter } = calculateStealthMarkerPoints(
-    to,
-    angle,
-    size
-  );
+  const { tip, leftOuter, heel, rightOuter } = calculateStealthMarkerPoints(to, angle, size);
   ctx.beginPath();
   ctx.moveTo(tip.x, tip.y);
   ctx.lineTo(leftOuter.x, leftOuter.y);
-  ctx.lineTo(leftInner.x, leftInner.y);
-  ctx.lineTo(rightInner.x, rightInner.y);
+  ctx.lineTo(heel.x, heel.y);
   ctx.lineTo(rightOuter.x, rightOuter.y);
   ctx.closePath();
   fillAndStroke(ctx, fillColor, fillOpacity);
