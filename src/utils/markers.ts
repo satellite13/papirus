@@ -75,6 +75,43 @@ export function calculateArrowMarkerPoints(
   return { tip: to, left, right };
 }
 
+/** Depth of stealth heel notch along the edge (fraction of arrow shaft length). */
+const STEALTH_NOTCH_DEPTH = 0.55;
+/** Lateral inset of heel vs outer barb half-width. */
+const STEALTH_NOTCH_WIDTH = 0.35;
+
+/**
+ * Stealth (barbed) marker: tip + outer barbs + concave heel (two inner points).
+ */
+export function calculateStealthMarkerPoints(
+  to: Point,
+  angle: number,
+  size: number
+): {
+  tip: Point;
+  leftOuter: Point;
+  leftInner: Point;
+  rightInner: Point;
+  rightOuter: Point;
+} {
+  const { left: leftOuter, right: rightOuter } = calculateArrowMarkerPoints(to, angle, size);
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  const depth = size * Math.cos(ARROW_ANGLE);
+  const halfWidth = size * Math.sin(ARROW_ANGLE);
+  const innerDepth = depth * STEALTH_NOTCH_DEPTH;
+  const innerHalf = halfWidth * STEALTH_NOTCH_WIDTH;
+  const leftInner = {
+    x: to.x - innerDepth * cos + innerHalf * sin,
+    y: to.y - innerDepth * sin - innerHalf * cos,
+  };
+  const rightInner = {
+    x: to.x - innerDepth * cos - innerHalf * sin,
+    y: to.y - innerDepth * sin + innerHalf * cos,
+  };
+  return { tip: to, leftOuter, leftInner, rightInner, rightOuter };
+}
+
 /**
  * Calculate diamond marker vertex points
  */
@@ -123,6 +160,7 @@ export function getMarkerLength(config: ArrowMarkerConfig): number {
   const size = config.size ?? 12;
   switch (config.type) {
     case 'arrow':
+    case 'stealth':
       return size * Math.cos(ARROW_ANGLE);
     case 'open':
       return 0;
@@ -150,6 +188,22 @@ export function generateSvgArrowMarker(
 ): string {
   const { left, right } = calculateArrowMarkerPoints(to, angle, size);
   return `<path d="M ${to.x} ${to.y} L ${left.x} ${left.y} L ${right.x} ${right.y} Z" fill="${fill}" fill-opacity="${fillOpacity}" stroke="${stroke}" stroke-width="1"/>`;
+}
+
+export function generateSvgStealthMarker(
+  to: Point,
+  angle: number,
+  size: number,
+  fill: string,
+  fillOpacity: number,
+  stroke: string
+): string {
+  const { tip, leftOuter, leftInner, rightInner, rightOuter } = calculateStealthMarkerPoints(
+    to,
+    angle,
+    size
+  );
+  return `<path d="M ${tip.x} ${tip.y} L ${leftOuter.x} ${leftOuter.y} L ${leftInner.x} ${leftInner.y} L ${rightInner.x} ${rightInner.y} L ${rightOuter.x} ${rightOuter.y} Z" fill="${fill}" fill-opacity="${fillOpacity}" stroke="${stroke}" stroke-width="1"/>`;
 }
 
 /**
@@ -243,6 +297,8 @@ export function generateSvgMarker(
       return generateSvgCircleMarker(to, angle, size, fill, fillOpacity, stroke);
     case 'square':
       return generateSvgSquareMarker(to, angle, size, fill, fillOpacity, stroke);
+    case 'stealth':
+      return generateSvgStealthMarker(to, angle, size, fill, fillOpacity, stroke);
     case 'arrow':
     default:
       return generateSvgArrowMarker(to, angle, size, fill, fillOpacity, stroke);

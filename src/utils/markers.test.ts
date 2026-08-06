@@ -33,15 +33,20 @@ describe('stealth marker', () => {
   });
 
   it('generates a filled closed SVG path', () => {
+    const to = { x: 100, y: 0 };
     const svg = generateSvgMarker(
       { type: 'stealth', size: 12, fillColor: '#000', fillOpacity: 1 },
       { x: 0, y: 0 },
-      { x: 100, y: 0 },
+      to,
       '#000'
     );
+    const p = calculateStealthMarkerPoints(to, 0, 12);
     expect(svg).toMatch(/^<path /);
     expect(svg).toContain(' Z"');
     expect(svg).toContain('fill="#000"');
     expect(svg).not.toContain('fill="none"');
+    // Pentagon: tip→outer→inner→inner→outer (4 L segments); arrow fallback has only 2
+    expect((svg.match(/ L /g) ?? []).length).toBe(4);
+    expect(svg).toContain(`${p.leftInner.x} ${p.leftInner.y}`);
   });
 });
