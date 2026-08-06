@@ -76,7 +76,7 @@ export function calculateArrowMarkerPoints(
 }
 
 /** Heel inset along the edge (fraction of arrow shaft length). Closer to tip = deeper notch. */
-const STEALTH_HEEL_DEPTH = 0.55;
+const STEALTH_HEEL_DEPTH = 0.82;
 
 /**
  * Stealth (barbed) marker: tip + outer barbs + centerline heel (classic Graphviz stealth).
