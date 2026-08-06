@@ -717,7 +717,7 @@ describe('Edge', () => {
     });
 
     it('supports all marker types', () => {
-      const types = ['none', 'arrow', 'open', 'diamond', 'circle', 'square'] as const;
+      const types = ['none', 'arrow', 'open', 'diamond', 'circle', 'square', 'stealth'] as const;
 
       for (const type of types) {
         const edge = new Edge({

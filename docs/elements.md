@@ -176,7 +176,7 @@ const node = new RectangleNode({
 
 - тип пути (`type`: `straight | polyline | bezier | editable-polyline`)
 - стрелки: устаревшее `arrowType` или явные `startMarker` / `endMarker` (`ArrowMarkerConfig`: `type`, `size`)
-- типы маркеров (`ArrowMarkerType`): `none`, `arrow`, `open`, `diamond`, `circle`, `square` (canvas и SVG-экспорт)
+- типы маркеров (`ArrowMarkerType`): `none`, `arrow`, `open`, `diamond`, `circle`, `square`, `stealth` (canvas и SVG-экспорт)
 - подпись (`label`), смещение подписи от центра пути (`labelOffset`) и фон подписи (`labelBackground`)
 - позиция подписи вдоль пути (`labelPosition`: `0..1`) и поворот подписи по касательной (`labelFollowPath`)
 - **разрыв линии под меткой** (`labelLineGap`): если `true` и задана метка, линия ребра не рисуется на участке, пересекающем прямоугольник метки — рисуются два отрезка (до метки и после), так что линия визуально «обрывается» под подписью

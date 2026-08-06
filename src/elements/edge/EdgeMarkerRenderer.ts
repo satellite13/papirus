@@ -5,6 +5,7 @@ import {
   calculateCircleMarkerCenter,
   calculateDiamondMarkerPoints,
   calculateMarkerPoints,
+  calculateStealthMarkerPoints,
 } from '@/utils/markers';
 
 export interface EdgeMarkerRenderOptions {
@@ -19,6 +20,7 @@ export function getCanvasMarkerLength(config: ArrowMarkerConfig): number {
   const size = config.size ?? MARKER_SIZES[config.type] ?? ARROW_SIZE;
   switch (config.type) {
     case 'arrow':
+    case 'stealth':
       return size * Math.cos(ARROW_ANGLE);
     case 'open':
       return 0;
@@ -103,6 +105,9 @@ function drawMarker(
     case 'arrow':
       drawArrowMarker(ctx, to, angle, size, fillColor, fillOpacity);
       break;
+    case 'stealth':
+      drawStealthMarker(ctx, to, angle, size, fillColor, fillOpacity);
+      break;
     case 'open':
       drawOpenArrowMarker(ctx, to, angle, size);
       break;
@@ -133,6 +138,29 @@ function drawArrowMarker(
   ctx.moveTo(to.x, to.y);
   ctx.lineTo(left.x, left.y);
   ctx.lineTo(right.x, right.y);
+  ctx.closePath();
+  fillAndStroke(ctx, fillColor, fillOpacity);
+}
+
+function drawStealthMarker(
+  ctx: CanvasRenderingContext2D,
+  to: Point,
+  angle: number,
+  size: number,
+  fillColor: string,
+  fillOpacity: number
+): void {
+  const { tip, leftOuter, leftInner, rightInner, rightOuter } = calculateStealthMarkerPoints(
+    to,
+    angle,
+    size
+  );
+  ctx.beginPath();
+  ctx.moveTo(tip.x, tip.y);
+  ctx.lineTo(leftOuter.x, leftOuter.y);
+  ctx.lineTo(leftInner.x, leftInner.y);
+  ctx.lineTo(rightInner.x, rightInner.y);
+  ctx.lineTo(rightOuter.x, rightOuter.y);
   ctx.closePath();
   fillAndStroke(ctx, fillColor, fillOpacity);
 }
