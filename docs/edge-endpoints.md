@@ -42,7 +42,7 @@ Helpers:
 ## Interactive connect-to-edge
 
 `ConnectionManager` accepts a drop onto an existing edge while drawing a connection
-(Shift+drag with `attachToOutline`, or from a port). The new edge’s target (or source)
+(outline `+` handle or Shift+drag with `attachToOutline`, or from a port). The new edge’s target (or source)
 is `{ edgeId, pathParam }` at the closest point on the host path within hit tolerance.
 
 ## Non-goals (v1)

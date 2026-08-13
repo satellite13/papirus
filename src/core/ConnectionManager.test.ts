@@ -27,6 +27,98 @@ describe('ConnectionManager', () => {
     return canvas;
   }
 
+  it('starts outline connection from hover handle without Shift', () => {
+    const canvas = createCanvas(400, 200);
+    const renderer = new DiagramRenderer(canvas, { width: 400, height: 200, retina: false });
+    const interaction = renderer.enableInteractions({
+      attachToOutline: true,
+      createEdge: (from, to) => new Edge({ from, to, type: 'straight' }),
+    });
+
+    const nodeA = new RectangleNode({ x: 50, y: 80, width: 60, height: 40 });
+    const nodeB = new RectangleNode({ x: 250, y: 80, width: 60, height: 40 });
+    renderer.addNode(nodeA);
+    renderer.addNode(nodeB);
+
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', {
+        clientX: 110,
+        clientY: 100,
+        button: 0,
+        bubbles: true,
+      })
+    );
+
+    expect(interaction.connection.connecting).toBe(true);
+
+    canvas.dispatchEvent(
+      new MouseEvent('mousemove', {
+        clientX: 280,
+        clientY: 100,
+        button: 0,
+        buttons: 1,
+        bubbles: true,
+      })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mouseup', {
+        clientX: 280,
+        clientY: 100,
+        button: 0,
+        bubbles: true,
+      })
+    );
+
+    expect(renderer.edges.size).toBe(1);
+    const edge = Array.from(renderer.edges.values())[0]!;
+    expect(edge.from.nodeId).toBe(nodeA.id);
+    expect(edge.to.nodeId).toBe(nodeB.id);
+  });
+
+  it('starts outline connection from the closest visible edge, not the side midpoint', () => {
+    const canvas = createCanvas(400, 200);
+    const renderer = new DiagramRenderer(canvas, { width: 400, height: 200, retina: false });
+    const interaction = renderer.enableInteractions({
+      attachToOutline: true,
+      createEdge: (from, to) => new Edge({ from, to, type: 'straight' }),
+    });
+
+    renderer.addNode(new RectangleNode({ x: 0, y: 0, width: 360, height: 180 }));
+
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', {
+        clientX: 40,
+        clientY: 0,
+        button: 0,
+        bubbles: true,
+      })
+    );
+
+    expect(interaction.connection.connecting).toBe(true);
+  });
+
+  it('does not start outline connection from node body without Shift', () => {
+    const canvas = createCanvas(400, 200);
+    const renderer = new DiagramRenderer(canvas, { width: 400, height: 200, retina: false });
+    const interaction = renderer.enableInteractions({
+      attachToOutline: true,
+      createEdge: (from, to) => new Edge({ from, to, type: 'straight' }),
+    });
+
+    renderer.addNode(new RectangleNode({ x: 50, y: 80, width: 60, height: 40 }));
+
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', {
+        clientX: 80,
+        clientY: 100,
+        button: 0,
+        bubbles: true,
+      })
+    );
+
+    expect(interaction.connection.connecting).toBe(false);
+  });
+
   it('creates edge when connection completed with attachToOutline', () => {
     const canvas = createCanvas(400, 200);
     const renderer = new DiagramRenderer(canvas, { width: 400, height: 200, retina: false });

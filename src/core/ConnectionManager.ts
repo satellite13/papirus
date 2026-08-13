@@ -18,6 +18,11 @@ import {
 } from '@/constants';
 import { clonePoints, distance } from '@/utils/geometry';
 import { getDirectionFromOutlineParam } from '@/utils/direction';
+import {
+  OUTLINE_CONNECT_HANDLE_HYSTERESIS,
+  getOutlineConnectHandle,
+  type OutlineSide,
+} from '@/utils/outlineConnectHandle';
 import type { PathObstacle } from '@/elements/paths';
 
 /**
@@ -65,6 +70,9 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
   private sourceAnchorId: string | null = null;
   private hoverNodeId: string | null = null;
   private hoverAnchorId: string | null = null;
+  private hoverPoint: Point | null = null;
+  private hoverOutlineHandle = false;
+  private hoverOutlineSide: OutlineSide | null = null;
   private hoverDisabled = false;
   private reconnectPoint: Point | null = null;
   private previewTargetAnchorId: string | null = null;
@@ -145,9 +153,12 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     if (this.hoverDisabled) {
       return;
     }
-    if (this.hoverNodeId !== null || this.hoverAnchorId !== null) {
+    if (this.hoverNodeId !== null || this.hoverAnchorId !== null || this.hoverOutlineHandle) {
       this.hoverNodeId = null;
       this.hoverAnchorId = null;
+      this.hoverPoint = null;
+      this.hoverOutlineSide = null;
+      this.clearOutlineHandleCursor();
       this.renderer.markDirty();
     }
   }
@@ -178,9 +189,12 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
    */
   disableHover(): void {
     this.hoverDisabled = true;
-    if (this.hoverNodeId !== null || this.hoverAnchorId !== null) {
+    if (this.hoverNodeId !== null || this.hoverAnchorId !== null || this.hoverOutlineHandle) {
       this.hoverNodeId = null;
       this.hoverAnchorId = null;
+      this.hoverPoint = null;
+      this.hoverOutlineSide = null;
+      this.clearOutlineHandleCursor();
       this.renderer.markDirty();
     }
   }
@@ -194,7 +208,7 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
 
   /**
    * Try to start connection from a hovered anchor point.
-   * When attachToOutline + Shift: start from anywhere on node outline.
+   * When attachToOutline: drag the outline handle, or Shift+drag from the node body.
    * Otherwise: requires clicking on an anchor/port so that node drag still works.
    */
   tryStartConnectionAtPoint(event: InputEvent): boolean {
@@ -202,21 +216,23 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
       return false;
     }
     const point = { x: event.worldX, y: event.worldY };
+
+    if (this.attachToOutline) {
+      const handleHit = this.findOutlineConnectHandleAt(point);
+      if (handleHit) {
+        this.startOutlineConnection(handleHit.node, handleHit.attach);
+        return true;
+      }
+    }
+
     const node = this.getNodeAtPoint(point, false);
     if (!node) {
       return false;
     }
 
     if (this.attachToOutline && event.shiftKey) {
-      const { point: outlinePoint, param } = node.getClosestPointOnOutline(point);
-      this.sourceNode = node;
-      this.isConnecting = true;
-      this.sourceAnchorId = null;
-      this.sourcePoint = outlinePoint;
-      this.sourceOutlineParam = param;
-      this.previewEndpoint = point;
-      this.emit('connectionStart', node);
-      this.renderer.markDirty();
+      const { point: outlinePoint } = node.getClosestPointOnOutline(point);
+      this.startOutlineConnection(node, outlinePoint);
       return true;
     }
 
@@ -1030,6 +1046,7 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     this.renderEditablePolylineControls(ctx);
 
     if (this.attachToOutline) {
+      this.renderOutlineConnectHandle(ctx);
       return;
     }
 
@@ -1062,7 +1079,7 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
 
       // Draw white plus on hover
       if (isHovered) {
-        this.drawPlus(radius, ctx, anchor);
+        this.drawPlus(radius, ctx, anchor.point);
       }
     }
 
@@ -1248,21 +1265,16 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     return { x, y };
   }
 
-  private drawPlus(
-    radius: number,
-    ctx: CanvasRenderingContext2D,
-    anchor: { id: AnchorId; point: Point }
-  ): void {
+  private drawPlus(radius: number, ctx: CanvasRenderingContext2D, point: Point): void {
     const plusSize = radius * 0.5;
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.moveTo(anchor.point.x - plusSize, anchor.point.y);
-    ctx.lineTo(anchor.point.x + plusSize, anchor.point.y);
-    ctx.moveTo(anchor.point.x, anchor.point.y - plusSize);
-    ctx.lineTo(anchor.point.x, anchor.point.y + plusSize);
+    ctx.moveTo(point.x - plusSize, point.y);
+    ctx.lineTo(point.x + plusSize, point.y);
+    ctx.moveTo(point.x, point.y - plusSize);
+    ctx.lineTo(point.x, point.y + plusSize);
     ctx.stroke();
-    return;
   }
 
   private renderAnchorHighlights(
@@ -1307,7 +1319,7 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
         if (forbidden) {
           this.drawCross(radius, ctx, anchor);
         } else {
-          this.drawPlus(radius, ctx, anchor);
+          this.drawPlus(radius, ctx, anchor.point);
         }
       }
     }
@@ -1351,25 +1363,129 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     return null;
   }
 
+  private startOutlineConnection(node: Node, attach: Point): void {
+    const { point: outlinePoint, param } = node.getClosestPointOnOutline(attach);
+    this.sourceNode = node;
+    this.isConnecting = true;
+    this.sourceAnchorId = null;
+    this.sourcePoint = outlinePoint;
+    this.sourceOutlineParam = param;
+    this.previewEndpoint = attach;
+    this.emit('connectionStart', node);
+    this.renderer.markDirty();
+  }
+
+  private outlineHandleHysteresis(): number {
+    return OUTLINE_CONNECT_HANDLE_HYSTERESIS / Math.max(this.renderer.zoom, 0.0001);
+  }
+
+  private outlineConnectHandleFor(
+    node: Node,
+    pointer: Point
+  ): { attach: Point; handle: Point; side: OutlineSide } {
+    const prevSide = node.id === this.hoverNodeId ? this.hoverOutlineSide : null;
+    const geom = getOutlineConnectHandle(
+      node.getBounds(),
+      pointer,
+      0,
+      prevSide,
+      this.outlineHandleHysteresis()
+    );
+    const { point: onOutline } = node.getClosestPointOnOutline(geom.attach);
+    return { attach: onOutline, handle: onOutline, side: geom.side };
+  }
+
+  private outlineHandleHitRadius(): number {
+    return ANCHOR_POINT_HITBOX_RADIUS / Math.max(this.renderer.zoom, 0.0001);
+  }
+
+  private findOutlineConnectHandleAt(
+    point: Point
+  ): { node: Node; attach: Point; handle: Point } | null {
+    if (!this.attachToOutline) {
+      return null;
+    }
+    const radiusSq = this.outlineHandleHitRadius() ** 2;
+    const nodes = Array.from(this.renderer.nodes.values());
+    for (let i = nodes.length - 1; i >= 0; i--) {
+      const node = nodes[i]!;
+      if (!node.visible || !this.isCompatibleTarget(node)) {
+        continue;
+      }
+      const { attach, handle } = this.outlineConnectHandleFor(node, point);
+      const dx = point.x - handle.x;
+      const dy = point.y - handle.y;
+      if (dx * dx + dy * dy <= radiusSq) {
+        return { node, attach, handle };
+      }
+    }
+    return null;
+  }
+
+  private renderOutlineConnectHandle(ctx: CanvasRenderingContext2D): void {
+    if (!this.hoverNodeId || !this.hoverPoint) {
+      return;
+    }
+    const node = this.renderer.getNode(this.hoverNodeId);
+    if (!node) {
+      return;
+    }
+    const { handle } = this.outlineConnectHandleFor(node, this.hoverPoint);
+    const radius = this.hoverOutlineHandle ? ANCHOR_POINT_HOVER_RADIUS : ANCHOR_POINT_RADIUS;
+    ctx.save();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#3b82f6';
+    ctx.beginPath();
+    ctx.arc(handle.x, handle.y, radius, 0, Math.PI * 2);
+    ctx.fill();
+    this.drawPlus(radius, ctx, handle);
+    ctx.restore();
+  }
+
+  private clearOutlineHandleCursor(): void {
+    if (this.hoverOutlineHandle) {
+      this.hoverOutlineHandle = false;
+      this.setCursor('');
+    }
+  }
+
   private updateHover(point: Point): void {
     if (this.hoverDisabled) {
       return;
     }
 
-    const node = this.getNodeAtPoint(point, false);
+    const handleHit = this.findOutlineConnectHandleAt(point);
+    const node = handleHit?.node ?? this.getNodeAtPoint(point, false);
     const prevNodeId = this.hoverNodeId;
     const prevAnchorId = this.hoverAnchorId;
+    const prevOutlineHandle = this.hoverOutlineHandle;
 
+    this.hoverPoint = node ? point : null;
     if (!node) {
       this.hoverNodeId = null;
       this.hoverAnchorId = null;
+      this.hoverOutlineSide = null;
+      this.clearOutlineHandleCursor();
     } else {
       this.hoverNodeId = node.id;
-      const anchor = this.getAnchorAtPoint(node, point);
-      this.hoverAnchorId = anchor?.id ?? null;
+      this.hoverAnchorId = handleHit ? null : (this.getAnchorAtPoint(node, point)?.id ?? null);
+      this.hoverOutlineHandle = handleHit !== null;
+      if (this.attachToOutline) {
+        this.hoverOutlineSide = this.outlineConnectHandleFor(node, point).side;
+      }
+      if (this.hoverOutlineHandle) {
+        this.setCursor('crosshair');
+      } else if (prevOutlineHandle) {
+        this.setCursor('');
+      }
     }
 
-    if (prevNodeId !== this.hoverNodeId || prevAnchorId !== this.hoverAnchorId) {
+    if (
+      prevNodeId !== this.hoverNodeId ||
+      prevAnchorId !== this.hoverAnchorId ||
+      prevOutlineHandle !== this.hoverOutlineHandle ||
+      (this.attachToOutline && node !== null)
+    ) {
       this.renderer.markDirty();
     }
   }

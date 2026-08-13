@@ -9,6 +9,11 @@
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-08-13
+
+### Добавлено
+- В режиме `attachToOutline` при наведении на узел ручка «+» появляется в ближайшей к курсору точке контура; перетаскивание ручки начинает связь без Shift.
+
 ## [0.9.0] - 2026-08-13
 
 ### Добавлено
@@ -414,7 +419,8 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.0...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.1...HEAD
+[0.9.1]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.0...v0.9.1
 [0.9.0]: https://gitverse.ru/ngroznykh/papirus/compare/v0.8.4...v0.9.0
 [0.8.4]: https://gitverse.ru/ngroznykh/papirus/compare/v0.8.3...v0.8.4
 [0.8.3]: https://gitverse.ru/ngroznykh/papirus/compare/v0.8.2...v0.8.3
