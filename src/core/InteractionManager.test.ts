@@ -349,6 +349,179 @@ describe('InteractionManager', () => {
     expect(edge.controlPoints![1]).toEqual(cpBefore[1]);
   });
 
+  it('undo restores editable-polyline control point after drag', () => {
+    const canvas = document.createElement('canvas');
+    vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 400,
+      height: 200,
+      right: 400,
+      bottom: 200,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+    const renderer = new DiagramRenderer(canvas, { width: 400, height: 200, retina: false });
+    const interaction = renderer.enableInteractions({ alignToNodes: false });
+
+    const nodeA = new RectangleNode({ x: 50, y: 80, width: 60, height: 40 });
+    const nodeB = new RectangleNode({ x: 250, y: 80, width: 60, height: 40 });
+    renderer.addNode(nodeA);
+    renderer.addNode(nodeB);
+
+    const edge = new Edge({
+      from: { nodeId: nodeA.id },
+      to: { nodeId: nodeB.id },
+      type: 'editable-polyline',
+      controlPoints: [
+        { x: 150, y: 50 },
+        { x: 200, y: 120 },
+      ],
+    });
+    renderer.addEdge(edge);
+    edge.updateEndpoints({ x: 110, y: 100 }, { x: 250, y: 100 });
+    interaction.selection.select(edge.id);
+
+    const before = [
+      { x: edge.controlPoints![0]!.x, y: edge.controlPoints![0]!.y },
+      { x: edge.controlPoints![1]!.x, y: edge.controlPoints![1]!.y },
+    ];
+
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', { clientX: 150, clientY: 50, button: 0, bubbles: true })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mousemove', {
+        clientX: 160,
+        clientY: 70,
+        button: 0,
+        buttons: 1,
+        bubbles: true,
+      })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mouseup', { clientX: 160, clientY: 70, button: 0, bubbles: true })
+    );
+
+    expect(edge.controlPoints![0]).not.toEqual(before[0]);
+    expect(interaction.history.canUndo).toBe(true);
+
+    interaction.history.undo();
+    expect(edge.controlPoints![0]).toEqual(before[0]);
+    expect(edge.controlPoints![1]).toEqual(before[1]);
+  });
+
+  it('undo of insert-then-drag removes the inserted control point', () => {
+    const canvas = document.createElement('canvas');
+    vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 400,
+      height: 200,
+      right: 400,
+      bottom: 200,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+    const renderer = new DiagramRenderer(canvas, { width: 400, height: 200, retina: false });
+    const interaction = renderer.enableInteractions({ alignToNodes: false });
+
+    const nodeA = new RectangleNode({ x: 50, y: 80, width: 60, height: 40 });
+    const nodeB = new RectangleNode({ x: 250, y: 80, width: 60, height: 40 });
+    renderer.addNode(nodeA);
+    renderer.addNode(nodeB);
+
+    const edge = new Edge({
+      from: { nodeId: nodeA.id },
+      to: { nodeId: nodeB.id },
+      type: 'editable-polyline',
+      controlPoints: [{ x: 180, y: 100 }],
+    });
+    renderer.addEdge(edge);
+    edge.updateEndpoints({ x: 110, y: 100 }, { x: 250, y: 100 });
+    interaction.selection.select(edge.id);
+
+    const beforeCount = edge.controlPoints!.length;
+    const insertX = (110 + 180) / 2;
+    const insertY = 100;
+
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', {
+        clientX: insertX,
+        clientY: insertY,
+        button: 0,
+        bubbles: true,
+      })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mousemove', {
+        clientX: insertX,
+        clientY: insertY + 30,
+        button: 0,
+        buttons: 1,
+        bubbles: true,
+      })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mouseup', {
+        clientX: insertX,
+        clientY: insertY + 30,
+        button: 0,
+        bubbles: true,
+      })
+    );
+
+    expect(edge.controlPoints!.length).toBeGreaterThan(beforeCount);
+    interaction.history.undo();
+    expect(edge.controlPoints).toHaveLength(beforeCount);
+  });
+
+  it('undo restores control point removed by double click', () => {
+    const canvas = document.createElement('canvas');
+    vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 400,
+      height: 200,
+      right: 400,
+      bottom: 200,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+    const renderer = new DiagramRenderer(canvas, { width: 400, height: 200, retina: false });
+    const interaction = renderer.enableInteractions({ alignToNodes: false });
+
+    const nodeA = new RectangleNode({ x: 50, y: 80, width: 60, height: 40 });
+    const nodeB = new RectangleNode({ x: 250, y: 80, width: 60, height: 40 });
+    renderer.addNode(nodeA);
+    renderer.addNode(nodeB);
+
+    const edge = new Edge({
+      from: { nodeId: nodeA.id },
+      to: { nodeId: nodeB.id },
+      type: 'editable-polyline',
+      controlPoints: [
+        { x: 150, y: 50 },
+        { x: 200, y: 120 },
+      ],
+    });
+    renderer.addEdge(edge);
+    edge.updateEndpoints({ x: 110, y: 100 }, { x: 250, y: 100 });
+    interaction.selection.select(edge.id);
+
+    canvas.dispatchEvent(
+      new MouseEvent('dblclick', { clientX: 150, clientY: 50, bubbles: true })
+    );
+
+    expect(edge.controlPoints).toHaveLength(1);
+    interaction.history.undo();
+    expect(edge.controlPoints).toHaveLength(2);
+    expect(edge.controlPoints![0]).toEqual({ x: 150, y: 50 });
+  });
+
   it('edits node label on double click', () => {
     const canvas = document.createElement('canvas');
     vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({
@@ -885,6 +1058,60 @@ describe('InteractionManager', () => {
 
     expect(node.width).toBe(80);
     expect(node.height).toBe(50);
+    expect(interaction.history.canUndo).toBe(true);
+
+    interaction.history.undo();
+    expect(node.x).toBe(50);
+    expect(node.y).toBe(50);
+    expect(node.width).toBe(60);
+    expect(node.height).toBe(40);
+
+    interaction.history.redo();
+    expect(node.width).toBe(80);
+    expect(node.height).toBe(50);
+  });
+
+  it('does not record history when resize bounds are unchanged', () => {
+    const canvas = document.createElement('canvas');
+    vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 300,
+      height: 200,
+      right: 300,
+      bottom: 200,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+    const renderer = new DiagramRenderer(canvas, { width: 300, height: 200, retina: false });
+    const interaction = renderer.enableInteractions();
+
+    const node = new RectangleNode({ x: 50, y: 50, width: 60, height: 40 });
+    renderer.addNode(node);
+    interaction.selection.select(node.id);
+
+    const seHandleX = 50 + 60 + 6;
+    const seHandleY = 50 + 40 + 6;
+
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', {
+        clientX: seHandleX,
+        clientY: seHandleY,
+        button: 0,
+        bubbles: true,
+      })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mouseup', {
+        clientX: seHandleX,
+        clientY: seHandleY,
+        button: 0,
+        bubbles: true,
+      })
+    );
+
+    expect(interaction.history.canUndo).toBe(false);
   });
 
   it('selection rect selects nodes within bounds', () => {

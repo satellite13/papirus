@@ -30,7 +30,7 @@ export interface ConnectionEvents {
   connect: [edge: Edge];
   edgeReconnectStart: [edge: Edge, endpoint: 'start' | 'end', original: EdgeEndpoint];
   edgeReconnect: [edge: Edge, endpoint: 'start' | 'end'];
-  controlPointDragStart: [];
+  controlPointDragStart: [edge: Edge, before: Point[]];
   controlPointDragEnd: [];
 }
 
@@ -1086,6 +1086,10 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
       const controlPoints = edge.getEditableControlPoints();
       if (controlPoints.length === 0) continue;
 
+      const beforePoints = edge.controlPoints?.length
+        ? clonePoints(edge.controlPoints)
+        : clonePoints(controlPoints);
+
       for (let i = 0; i < controlPoints.length; i++) {
         const dx = point.x - controlPoints[i]!.x;
         const dy = point.y - controlPoints[i]!.y;
@@ -1097,7 +1101,7 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
           edge.controlPoints = controlPoints;
         }
         this.activeControlPointDrag = { edge, index: i };
-        this.emit('controlPointDragStart');
+        this.emit('controlPointDragStart', edge, beforePoints);
         this.renderer.markDirty();
         return true;
       }
@@ -1116,7 +1120,7 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
         materialized.splice(insertControl.index, 0, this.snapPoint(insertControl.point));
         edge.controlPoints = materialized;
         this.activeControlPointDrag = { edge, index: insertControl.index };
-        this.emit('controlPointDragStart');
+        this.emit('controlPointDragStart', edge, beforePoints);
         this.renderer.markDirty();
         return true;
       }

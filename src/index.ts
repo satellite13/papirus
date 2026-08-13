@@ -62,6 +62,7 @@ export type { AnimationState } from './core/AnimationManager';
 export { HistoryManager } from './core/HistoryManager';
 export {
   MoveNodesCommand,
+  ResizeNodesCommand,
   AddNodeCommand,
   RemoveNodeCommand,
   CompositeCommand,

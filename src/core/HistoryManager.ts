@@ -141,6 +141,7 @@ export class HistoryManager extends EventEmitter<HistoryEvents> {
 
 export {
   MoveNodesCommand,
+  ResizeNodesCommand,
   AddNodeCommand,
   RemoveNodeCommand,
   CompositeCommand,

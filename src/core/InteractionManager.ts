@@ -15,6 +15,7 @@ import type { ConnectionPreviewPathType } from './ConnectionManager';
 import {
   HistoryManager,
   MoveNodesCommand,
+  ResizeNodesCommand,
   RemoveNodeFromGroupsCommand,
   createEdgeSnapshot,
   createGroupSnapshot,
@@ -89,6 +90,8 @@ export class InteractionManager {
 
   private dragStartPositions = new Map<string, { x: number; y: number }>();
   private dragStartEditablePolylinePoints = new Map<string, Point[]>();
+  private controlPointGestureBefore = new Map<string, Point[]>();
+  private resizeStartBounds: Bounds | null = null;
   private reconnectOrigins = new Map<
     string,
     { endpoint: 'start' | 'end'; original: EdgeEndpoint }
@@ -476,6 +479,68 @@ export class InteractionManager {
         });
         this.reconnectOrigins.delete(edge.id);
       });
+
+      this.resizeManager.on('resizeStart', (_nodeId, _handle, startBounds) => {
+        this.resizeStartBounds = { ...startBounds };
+      });
+
+      this.resizeManager.on('resizeEnd', (nodeId, bounds) => {
+        const before = this.resizeStartBounds;
+        this.resizeStartBounds = null;
+        if (!before) {
+          return;
+        }
+        if (
+          before.x === bounds.x &&
+          before.y === bounds.y &&
+          before.width === bounds.width &&
+          before.height === bounds.height
+        ) {
+          return;
+        }
+        this.historyManager.execute(
+          new ResizeNodesCommand(
+            (id) => this.renderer.getNode(id),
+            new Map([
+              [
+                nodeId,
+                {
+                  before: { ...before },
+                  after: { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height },
+                },
+              ],
+            ])
+          )
+        );
+      });
+
+      this.connectionManager.on('controlPointDragStart', (edge, before) => {
+        this.controlPointGestureBefore.set(edge.id, clonePoints(before));
+      });
+
+      this.connectionManager.on('controlPointDragEnd', () => {
+        const changes = new Map<string, { before: Point[]; after: Point[] }>();
+        for (const [id, before] of this.controlPointGestureBefore) {
+          const edge = this.renderer.getEdge(id);
+          if (!edge?.isEditablePolyline()) {
+            continue;
+          }
+          const after = clonePoints(edge.controlPoints ?? []);
+          if (!this.editablePolylinePointsEqual(before, after)) {
+            changes.set(id, { before: clonePoints(before), after });
+          }
+        }
+        this.controlPointGestureBefore.clear();
+        if (changes.size === 0) {
+          return;
+        }
+        this.historyManager.execute(
+          new ChangeEditablePolylineControlPointsCommand(
+            (id) => this.renderer.getEdge(id),
+            changes
+          )
+        );
+      });
     }
 
     this.historyManager.on('change', () => {
@@ -757,7 +822,34 @@ export class InteractionManager {
       return;
     }
 
+    const polylineBeforeByEdge = new Map<string, Point[]>();
+    for (const edge of this.renderer.edges.values()) {
+      if (edge.state !== 'selected' || !edge.isEditablePolyline()) {
+        continue;
+      }
+      polylineBeforeByEdge.set(
+        edge.id,
+        clonePoints(edge.controlPoints?.length ? edge.controlPoints : edge.getEditableControlPoints())
+      );
+    }
+
     if (this.connectionManager.handleDoubleClick(event)) {
+      const changes = new Map<string, { before: Point[]; after: Point[] }>();
+      for (const [id, before] of polylineBeforeByEdge) {
+        const edge = this.renderer.getEdge(id);
+        const after = clonePoints(edge?.controlPoints ?? []);
+        if (!this.editablePolylinePointsEqual(before, after)) {
+          changes.set(id, { before: clonePoints(before), after });
+        }
+      }
+      if (changes.size > 0) {
+        this.historyManager.execute(
+          new ChangeEditablePolylineControlPointsCommand(
+            (id) => this.renderer.getEdge(id),
+            changes
+          )
+        );
+      }
       return;
     }
 

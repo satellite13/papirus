@@ -178,6 +178,55 @@ export class MoveNodesCommand implements Command {
   }
 }
 
+export type NodeBoundsSnapshot = { x: number; y: number; width: number; height: number };
+
+export class ResizeNodesCommand implements Command {
+  private readonly changes: Map<string, { before: NodeBoundsSnapshot; after: NodeBoundsSnapshot }>;
+  private readonly getNode: (
+    id: string
+  ) => { x: number; y: number; width: number; height: number } | undefined;
+
+  constructor(
+    getNode: (
+      id: string
+    ) => { x: number; y: number; width: number; height: number } | undefined,
+    changes: Map<string, { before: NodeBoundsSnapshot; after: NodeBoundsSnapshot }>
+  ) {
+    this.getNode = getNode;
+    this.changes = new Map(
+      Array.from(changes.entries()).map(([id, v]) => [
+        id,
+        {
+          before: { ...v.before },
+          after: { ...v.after },
+        },
+      ])
+    );
+  }
+
+  execute(): void {
+    this.apply('after');
+  }
+
+  undo(): void {
+    this.apply('before');
+  }
+
+  private apply(which: 'before' | 'after'): void {
+    for (const [id, bounds] of this.changes) {
+      const node = this.getNode(id);
+      if (node === undefined) {
+        continue;
+      }
+      const next = bounds[which];
+      node.x = next.x;
+      node.y = next.y;
+      node.width = next.width;
+      node.height = next.height;
+    }
+  }
+}
+
 /**
  * Restores editable-polyline control points on undo (used with node drag composite).
  */
@@ -202,7 +251,7 @@ export class ChangeEditablePolylineControlPointsCommand implements Command {
     for (const [id, { after }] of this.changes) {
       const edge = this.getEdge(id);
       if (edge?.isEditablePolyline()) {
-        edge.controlPoints = clonePoints(after);
+        edge.controlPoints = after.length > 0 ? clonePoints(after) : undefined;
       }
     }
   }
@@ -211,7 +260,7 @@ export class ChangeEditablePolylineControlPointsCommand implements Command {
     for (const [id, { before }] of this.changes) {
       const edge = this.getEdge(id);
       if (edge?.isEditablePolyline()) {
-        edge.controlPoints = clonePoints(before);
+        edge.controlPoints = before.length > 0 ? clonePoints(before) : undefined;
       }
     }
   }
