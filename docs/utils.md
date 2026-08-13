@@ -109,7 +109,7 @@ layout.applyGridLayout(nodes, { columns: 3, rowGap: 40, columnGap: 40 });
 
 ## AutoRouting
 
-Автоматически пересчитывает путь рёбер (тип: `straight | polyline | bezier`).
+Автоматически пересчитывает путь рёбер (тип: `straight | polyline | bezier`). Для `polyline` со сторонами и препятствиями используется ортогональный обход (`routeOrthogonalAround`); см. [Элементы](./elements.md).
 
 ```ts
 const router = new AutoRouting();

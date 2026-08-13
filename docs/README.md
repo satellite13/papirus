@@ -12,8 +12,6 @@
 - [SearchManager](./search.md)
 - [Оверлеи](./overlays.md)
 - [Утилиты](./utils.md)
-- [Аудит кода (июль 2026)](./code-audit-2026-07.md)
-- [Remediation аудита](./code-audit-2026-07-remediation.md)
 
 ## Основная документация
 

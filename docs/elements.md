@@ -175,6 +175,7 @@ const node = new RectangleNode({
 `Edge` соединяет узлы и поддерживает:
 
 - тип пути (`type`: `straight | polyline | bezier | editable-polyline`)
+- для `polyline` при известных сторонах (`fromDir` / `toDir`) и препятствиях родителя/цели путь строится ортогонально: выход перпендикулярно стороне, обход по кратчайшему внешнему каналу (`routeOrthogonalAround`), вход снаружи цели; без сторон остаётся прежний undirected-роутинг
 - стрелки: устаревшее `arrowType` или явные `startMarker` / `endMarker` (`ArrowMarkerConfig`: `type`, `size`)
 - типы маркеров (`ArrowMarkerType`): `none`, `arrow`, `open`, `diamond`, `circle`, `square`, `stealth` (canvas и SVG-экспорт)
 - подпись (`label`), смещение подписи от центра пути (`labelOffset`) и фон подписи (`labelBackground`)
