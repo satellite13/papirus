@@ -9,6 +9,11 @@
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-08-13
+
+### Добавлено
+- Undo и redo для изменения размера узлов и правки контрольных точек polyline (вставка, перетаскивание и удаление двойным кликом — один жест).
+
 ## [0.8.4] - 2026-08-06
 
 ### Добавлено
@@ -409,7 +414,8 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.8.4...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.0...HEAD
+[0.9.0]: https://gitverse.ru/ngroznykh/papirus/compare/v0.8.4...v0.9.0
 [0.8.4]: https://gitverse.ru/ngroznykh/papirus/compare/v0.8.3...v0.8.4
 [0.8.3]: https://gitverse.ru/ngroznykh/papirus/compare/v0.8.2...v0.8.3
 [0.8.2]: https://gitverse.ru/ngroznykh/papirus/compare/v0.8.1...v0.8.2
