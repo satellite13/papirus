@@ -29,6 +29,10 @@ export class DiamondNode extends Node {
     return dx / hw + dy / hh <= 1;
   }
 
+  override getOutlineDirection(param: number): 'top' | 'right' | 'bottom' | 'left' {
+    return this.outlineDirectionFromCenter(param);
+  }
+
   override getConnectionPointAtOutlineParam(param: number): Point {
     const center = this.getCenter();
     const hw = this._width / 2;

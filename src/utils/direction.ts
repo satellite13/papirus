@@ -33,6 +33,14 @@ export function getDirectionFromOutlineParam(
   return 'left';
 }
 
+/** Snap a vector to a cardinal side (Y-down canvas). */
+export function directionFromDelta(dx: number, dy: number): Exclude<Direction, undefined> {
+  if (Math.abs(dx) > Math.abs(dy)) {
+    return dx >= 0 ? 'right' : 'left';
+  }
+  return dy >= 0 ? 'bottom' : 'top';
+}
+
 export function isHorizontal(dir?: string): boolean {
   return dir === 'left' || dir === 'right';
 }

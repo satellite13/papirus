@@ -1,10 +1,28 @@
 import { describe, expect, it } from 'vitest';
 import { ARROW_ANGLE } from '@/constants';
+import { BezierPathStrategy } from '@/elements/paths/BezierPathStrategy';
 import {
+  calculateMarkerPoints,
   calculateStealthMarkerPoints,
   generateSvgMarker,
   getMarkerLength,
 } from '@/utils/markers';
+
+describe('calculateMarkerPoints bezier', () => {
+  it('points the end marker along the incoming tangent (left side → into the node)', () => {
+    const path = new BezierPathStrategy().calculatePath(
+      { x: 40, y: 20 },
+      { x: 200, y: 180 },
+      'bottom',
+      'left'
+    );
+    const points = calculateMarkerPoints(path, 'end', 'bezier');
+    expect(points).not.toBeNull();
+    const angle = Math.atan2(points!.to.y - points!.from.y, points!.to.x - points!.from.x);
+    // Incoming from the left: tip points right into the target.
+    expect(angle).toBeCloseTo(0, 5);
+  });
+});
 
 describe('stealth marker', () => {
   it('builds a barbed quad with tip at to and concave heel on centerline', () => {

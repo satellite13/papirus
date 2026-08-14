@@ -9,6 +9,11 @@
 
 ## [Unreleased]
 
+## [0.9.2] - 2026-08-14
+
+### Исправлено
+- Связи по контуру у кругов, ромбов и custom-shape берут исходящую сторону из реальной точки контура, а не из долей прямоугольного периметра.
+
 ## [0.9.1] - 2026-08-13
 
 ### Добавлено
@@ -419,7 +424,8 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.1...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.2...HEAD
+[0.9.2]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.1...v0.9.2
 [0.9.1]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.0...v0.9.1
 [0.9.0]: https://gitverse.ru/ngroznykh/papirus/compare/v0.8.4...v0.9.0
 [0.8.4]: https://gitverse.ru/ngroznykh/papirus/compare/v0.8.3...v0.8.4

@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.2] - 2026-08-14
+
+### Fixed
+- Outline-attached edges on circles, diamonds, and custom shapes take the outward side from the real outline point, not from rectangular perimeter fractions.
+
 ## [0.9.1] - 2026-08-13
 
 ### Added
@@ -412,7 +417,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Edge animations (flow effect)
 - Context menu and search/filter
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.1...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.2...HEAD
+[0.9.2]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.1...v0.9.2
 [0.9.1]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.0...v0.9.1
 [0.9.0]: https://gitverse.ru/ngroznykh/papirus/compare/v0.8.4...v0.9.0
 [0.8.4]: https://gitverse.ru/ngroznykh/papirus/compare/v0.8.3...v0.8.4

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Edge } from '@/elements/Edge';
 import type { PathObstacle } from '@/elements/paths';
+import { CircleNode } from '@/elements/nodes/CircleNode';
 import { RectangleNode } from '@/elements/nodes/RectangleNode';
 import { stubAnimationFrame, stubCanvasContext } from '@/test/testUtils';
 import { isNodeEdgeEndpoint } from '@/types';
@@ -302,6 +303,34 @@ describe('EdgeEndpointUpdater edge attachments', () => {
         mid.y < device.y + device.height;
       expect(inOs || inDevice).toBe(false);
     }
+  });
+
+  it('aims a bezier at a wide ellipse from the real outline side, not AABB param', () => {
+    const source = new RectangleNode({ id: 'home', x: 20, y: 20, width: 80, height: 60 });
+    const target = new CircleNode({ id: 'work', x: 280, y: 160, width: 400, height: 50 });
+    const nodes = new Map([
+      ['home', source],
+      ['work', target],
+    ]);
+    const edge = new Edge({
+      id: 'e-bezier',
+      from: { nodeId: 'home', outlineParam: 0.55 },
+      to: { nodeId: 'work', outlineParam: 0.25 },
+      type: 'bezier',
+      lockAnchors: true,
+    });
+    const updater = new EdgeEndpointUpdater({
+      getNodes: () => nodes,
+      getEdges: () => new Map([['e-bezier', edge]]),
+      getNodeObstacles: () => [],
+    });
+    updater.updateAll();
+
+    const end = edge.path[edge.path.length - 1]!;
+    const pre = edge.path[edge.path.length - 2]!;
+    expect(end.x).toBeLessThan(target.getCenter().x);
+    expect(pre.x).toBeLessThan(end.x);
+    expect(Math.abs(pre.y - end.y)).toBeLessThan(Math.abs(pre.x - end.x));
   });
 
   it('keeps outlineParam same-side bottoms on a vertical stack', () => {

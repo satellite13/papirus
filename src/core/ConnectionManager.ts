@@ -343,7 +343,7 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
         snappedPoint = bestResult.point;
         this.reconnectingOutlineParam = bestResult.param;
         this.reconnectingTargetNodeId = bestResult.node.id;
-        snappedDir = getDirectionFromOutlineParam(bestResult.param, bestResult.node.getBounds());
+        snappedDir = bestResult.node.getOutlineDirection(bestResult.param);
 
         const otherNode = this.reconnectingEndpoint === 'start' ? toNode : fromNode;
         if (otherNode) {
@@ -356,7 +356,7 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
           const reprojected = targetNode.getClosestPointOnOutline(snappedPoint);
           snappedPoint = reprojected.point;
           this.reconnectingOutlineParam = reprojected.param;
-          snappedDir = getDirectionFromOutlineParam(reprojected.param, targetNode.getBounds());
+          snappedDir = targetNode.getOutlineDirection(reprojected.param);
         }
       } else {
         this.reconnectingOutlineParam = null;
@@ -455,7 +455,9 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     const ep = endpoint === 'from' ? edge.from : edge.to;
     if (this.attachToOutline && ep.outlineParam !== undefined) {
       const node = ep.nodeId ? this.renderer.getNode(ep.nodeId) : undefined;
-      return getDirectionFromOutlineParam(ep.outlineParam, node?.getBounds());
+      return node
+        ? node.getOutlineDirection(ep.outlineParam)
+        : getDirectionFromOutlineParam(ep.outlineParam);
     }
     const anchorId = ep.portId?.replace(ANCHOR_PORT_PREFIX, '');
     return anchorId?.split(':')[0];
@@ -869,17 +871,15 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
           : undefined;
       const fromDir =
         this.sourceOutlineParam !== null
-          ? getDirectionFromOutlineParam(
-              this.sourceOutlineParam,
-              this.sourceNode?.getBounds()
-            )
+          ? this.sourceNode
+            ? this.sourceNode.getOutlineDirection(this.sourceOutlineParam)
+            : getDirectionFromOutlineParam(this.sourceOutlineParam)
           : this.sourceAnchorId?.split(':')[0];
       const toDir =
         this.previewTargetOutlineParam !== null
-          ? getDirectionFromOutlineParam(
-              this.previewTargetOutlineParam,
-              previewTarget?.getBounds()
-            )
+          ? previewTarget
+            ? previewTarget.getOutlineDirection(this.previewTargetOutlineParam)
+            : getDirectionFromOutlineParam(this.previewTargetOutlineParam)
           : this.previewTargetAnchorId?.split(':')[0];
       this.drawBezierPreview(ctx, start, end, fromDir, toDir);
     }

@@ -233,4 +233,20 @@ describe('Node', () => {
     const { param: backParam } = node.getClosestPointOnOutline(pt);
     expect(Math.abs((backParam % 1) - (testParam % 1))).toBeLessThan(0.01);
   });
+
+  it('getOutlineDirection follows the real outline, not AABB perimeter fractions', () => {
+    const rect = new RectangleNode({ x: 0, y: 0, width: 400, height: 50 });
+    expect(rect.getOutlineDirection(0.8)).toBe('bottom');
+    expect(rect.getOutlineDirection(0.95)).toBe('left');
+
+    // Wide ellipse: param 0.25 is the leftmost point, but the same param on the
+    // AABB walk is still on the long top edge — that mismatch rotates bezier arrows.
+    const ellipse = new CircleNode({ x: 0, y: 0, width: 400, height: 50 });
+    const left = ellipse.getConnectionPointAtOutlineParam(0.25);
+    expect(left.x).toBeLessThan(ellipse.getCenter().x);
+    expect(ellipse.getOutlineDirection(0.25)).toBe('left');
+
+    const diamond = new DiamondNode({ x: 0, y: 0, width: 400, height: 50 });
+    expect(diamond.getOutlineDirection(0.75)).toBe('left');
+  });
 });

@@ -5,7 +5,6 @@ import type { PathObstacle } from '@/elements/paths';
 import type { EdgeEndpoint, Point } from '@/types';
 import { isEdgeEdgeEndpoint, isNodeEdgeEndpoint } from '@/types';
 import { directionFromAngle } from '@/utils/edgePath';
-import { getDirectionFromOutlineParam } from '@/utils/direction';
 import { routeDebug } from '@/utils/routeDebug';
 
 export interface EdgeEndpointUpdaterHost {
@@ -285,7 +284,7 @@ export class EdgeEndpointUpdater {
     const fromPort = this.portSide(endpoint.portId);
     if (fromPort) return fromPort;
     if (endpoint.outlineParam === undefined) return undefined;
-    return getDirectionFromOutlineParam(endpoint.outlineParam, node.getBounds());
+    return node.getOutlineDirection(endpoint.outlineParam);
   }
 
   private nearestAnchorOnSide(
@@ -349,10 +348,9 @@ export class EdgeEndpointUpdater {
     }
 
     if (isNodeEdgeEndpoint(endpoint) && endpoint.outlineParam !== undefined) {
-      const bounds = node.getBounds();
       return {
         point: node.getConnectionPointAtOutlineParam(endpoint.outlineParam),
-        direction: getDirectionFromOutlineParam(endpoint.outlineParam, bounds),
+        direction: node.getOutlineDirection(endpoint.outlineParam),
       };
     }
 

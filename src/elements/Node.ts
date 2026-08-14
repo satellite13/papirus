@@ -13,6 +13,11 @@ import type {
 import { shallowEqual } from '@/utils/style';
 import { getIconBoxSize, getIconBounds } from '@/utils/iconLayout';
 import {
+  getDirectionFromOutlineParam,
+  directionFromDelta,
+  type Direction,
+} from '@/utils/direction';
+import {
   resolveContentInset,
   type ContentInsetScaleSides,
 } from '@/utils/resolveContentInset';
@@ -902,6 +907,23 @@ export abstract class Node extends Element {
    * Get point on outline at normalized param (0-1 along perimeter).
    * Base implementation uses rectangular outline. Override for non-rectangular shapes.
    */
+  /**
+   * Outward cardinal side at an outline param. Rectangles use AABB perimeter
+   * fractions; non-rectangular shapes override from the real outline point.
+   */
+  getOutlineDirection(param: number): Exclude<Direction, undefined> {
+    return getDirectionFromOutlineParam(param, this.getBounds());
+  }
+
+  /**
+   * Outward side from node center toward a point on the outline.
+   */
+  protected outlineDirectionFromCenter(param: number): Exclude<Direction, undefined> {
+    const point = this.getConnectionPointAtOutlineParam(param);
+    const center = this.getCenter();
+    return directionFromDelta(point.x - center.x, point.y - center.y);
+  }
+
   getConnectionPointAtOutlineParam(param: number): Point {
     const bounds = this.getBounds();
     const { x, y, width: w, height: h } = bounds;

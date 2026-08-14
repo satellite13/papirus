@@ -40,6 +40,10 @@ export class CircleNode extends Node {
     return (dx * dx) / (rx * rx) + (dy * dy) / (ry * ry) <= 1;
   }
 
+  override getOutlineDirection(param: number): 'top' | 'right' | 'bottom' | 'left' {
+    return this.outlineDirectionFromCenter(param);
+  }
+
   override getConnectionPointAtOutlineParam(param: number): Point {
     const center = this.getCenter();
     const rx = this._width / 2;

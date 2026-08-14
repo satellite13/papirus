@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   directionToVector,
+  directionFromDelta,
   getDirectionFromOutlineParam,
   isHorizontal,
   isOppositeDirections,
@@ -29,6 +30,15 @@ describe('direction utilities', () => {
     expect(getDirectionFromOutlineParam(0.95, wide)).toBe('left');
     // Equal-quarter fallback wrongly called this "left"
     expect(getDirectionFromOutlineParam(0.8)).toBe('left');
+  });
+
+  it.each([
+    [1, 0, 'right'],
+    [-4, 1, 'left'],
+    [0, 3, 'bottom'],
+    [1, -5, 'top'],
+  ] as const)('snaps delta (%s, %s) to %s', (dx, dy, expected) => {
+    expect(directionFromDelta(dx, dy)).toBe(expected);
   });
 
   it('classifies horizontal and vertical directions', () => {

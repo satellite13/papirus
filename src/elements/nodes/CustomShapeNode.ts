@@ -185,6 +185,13 @@ export class CustomShapeNode extends Node {
     return { x: p.x + this._x, y: p.y + this._y };
   }
 
+  override getOutlineDirection(param: number): 'top' | 'right' | 'bottom' | 'left' {
+    if (!this.getOutlineSample()) {
+      return super.getOutlineDirection(param);
+    }
+    return this.outlineDirectionFromCenter(param);
+  }
+
   override getConnectionPointAtOutlineParam(param: number): Point {
     const sample = this.getOutlineSample();
     if (!sample) return super.getConnectionPointAtOutlineParam(param);
