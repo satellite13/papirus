@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { DiagramRenderer } from './DiagramRenderer';
 import { RectangleNode } from '../elements/nodes/RectangleNode';
+import { DiamondNode } from '../elements/nodes/DiamondNode';
 import { Edge } from '../elements/Edge';
 import { stubCanvasContext, stubAnimationFrame } from '../test/testUtils';
 
@@ -89,6 +90,38 @@ describe('ConnectionManager', () => {
       new MouseEvent('mousedown', {
         clientX: 40,
         clientY: 0,
+        button: 0,
+        bubbles: true,
+      })
+    );
+
+    expect(interaction.connection.connecting).toBe(true);
+  });
+
+  it('shows outline handle on a diamond edge far from the bounding box', () => {
+    const canvas = createCanvas(400, 220);
+    const renderer = new DiagramRenderer(canvas, { width: 400, height: 220, retina: false });
+    const interaction = renderer.enableInteractions({
+      attachToOutline: true,
+      createEdge: (from, to) => new Edge({ from, to, type: 'straight' }),
+    });
+
+    renderer.addNode(new DiamondNode({ x: 20, y: 20, width: 200, height: 160 }));
+
+    canvas.dispatchEvent(
+      new MouseEvent('mousemove', {
+        clientX: 170,
+        clientY: 60,
+        bubbles: true,
+      })
+    );
+
+    expect(canvas.style.cursor).toBe('crosshair');
+
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', {
+        clientX: 170,
+        clientY: 60,
         button: 0,
         bubbles: true,
       })

@@ -1388,6 +1388,7 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     node: Node,
     pointer: Point
   ): { attach: Point; handle: Point; side: OutlineSide } {
+    const { point: onOutline } = node.getClosestPointOnOutline(pointer);
     const prevSide = node.id === this.hoverNodeId ? this.hoverOutlineSide : null;
     const geom = getOutlineConnectHandle(
       node.getBounds(),
@@ -1396,7 +1397,6 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
       prevSide,
       this.outlineHandleHysteresis()
     );
-    const { point: onOutline } = node.getClosestPointOnOutline(geom.attach);
     return { attach: onOutline, handle: onOutline, side: geom.side };
   }
 

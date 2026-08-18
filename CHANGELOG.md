@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - With `attachToOutline`, the floating connect handle appears only within 4px of the contour and stays hidden over resize corners, so corner resize is not blocked by the crosshair.
 
+### Fixed
+- The outline connect handle is placed on the real shape contour, so diamonds, circles, and custom paths show the port even where the outline sits far inside the bounding box.
+
 ## [0.9.2] - 2026-08-14
 
 ### Fixed
