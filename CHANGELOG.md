@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.3] - 2026-08-18
+
 ### Changed
 - With `attachToOutline`, the floating connect handle appears only within 4px of the contour and stays hidden over resize corners, so corner resize is not blocked by the crosshair.
 
@@ -423,7 +425,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Edge animations (flow effect)
 - Context menu and search/filter
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.2...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.3...HEAD
+[0.9.3]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.2...v0.9.3
 [0.9.2]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.1...v0.9.2
 [0.9.1]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.0...v0.9.1
 [0.9.0]: https://gitverse.ru/ngroznykh/papirus/compare/v0.8.4...v0.9.0
