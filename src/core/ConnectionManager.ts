@@ -11,6 +11,7 @@ import {
   EDGE_CONTROL_POINT_RADIUS,
   EDGE_HANDLE_RADIUS,
   OUTLINE_SNAP_SCREEN_TOLERANCE,
+  OUTLINE_CONNECT_HANDLE_HIT_RADIUS,
   ANCHOR_POINT_HITBOX_RADIUS,
   ANCHOR_POINT_HOVER_RADIUS,
   ANCHOR_POINT_RADIUS,
@@ -234,6 +235,10 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
       const { point: outlinePoint } = node.getClosestPointOnOutline(point);
       this.startOutlineConnection(node, outlinePoint);
       return true;
+    }
+
+    if (this.attachToOutline) {
+      return false;
     }
 
     // Try to find anchor at point (for precise click on port)
@@ -1396,7 +1401,7 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
   }
 
   private outlineHandleHitRadius(): number {
-    return ANCHOR_POINT_HITBOX_RADIUS / Math.max(this.renderer.zoom, 0.0001);
+    return OUTLINE_CONNECT_HANDLE_HIT_RADIUS / Math.max(this.renderer.zoom, 0.0001);
   }
 
   private findOutlineConnectHandleAt(
@@ -1412,6 +1417,9 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
       if (!node.visible || !this.isCompatibleTarget(node)) {
         continue;
       }
+      if (node.hitTestResizeHandle(point)) {
+        continue;
+      }
       const { attach, handle } = this.outlineConnectHandleFor(node, point);
       const dx = point.x - handle.x;
       const dy = point.y - handle.y;
@@ -1423,7 +1431,7 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
   }
 
   private renderOutlineConnectHandle(ctx: CanvasRenderingContext2D): void {
-    if (!this.hoverNodeId || !this.hoverPoint) {
+    if (!this.hoverOutlineHandle || !this.hoverNodeId || !this.hoverPoint) {
       return;
     }
     const node = this.renderer.getNode(this.hoverNodeId);

@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- With `attachToOutline`, the floating connect handle appears only within 4px of the contour and stays hidden over resize corners, so corner resize is not blocked by the crosshair.
+
 ## [0.9.2] - 2026-08-14
 
 ### Fixed

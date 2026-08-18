@@ -119,6 +119,93 @@ describe('ConnectionManager', () => {
     expect(interaction.connection.connecting).toBe(false);
   });
 
+  it('does not show outline handle or start connection 8px inside the edge', () => {
+    const canvas = createCanvas(400, 200);
+    const renderer = new DiagramRenderer(canvas, { width: 400, height: 200, retina: false });
+    const interaction = renderer.enableInteractions({
+      attachToOutline: true,
+      createEdge: (from, to) => new Edge({ from, to, type: 'straight' }),
+    });
+
+    renderer.addNode(new RectangleNode({ x: 50, y: 80, width: 60, height: 40 }));
+
+    canvas.dispatchEvent(
+      new MouseEvent('mousemove', {
+        clientX: 102,
+        clientY: 100,
+        bubbles: true,
+      })
+    );
+
+    expect(canvas.style.cursor).not.toBe('crosshair');
+
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', {
+        clientX: 102,
+        clientY: 100,
+        button: 0,
+        bubbles: true,
+      })
+    );
+
+    expect(interaction.connection.connecting).toBe(false);
+  });
+
+  it('shows outline handle and starts connection 2px from the edge', () => {
+    const canvas = createCanvas(400, 200);
+    const renderer = new DiagramRenderer(canvas, { width: 400, height: 200, retina: false });
+    const interaction = renderer.enableInteractions({
+      attachToOutline: true,
+      createEdge: (from, to) => new Edge({ from, to, type: 'straight' }),
+    });
+
+    renderer.addNode(new RectangleNode({ x: 50, y: 80, width: 60, height: 40 }));
+
+    canvas.dispatchEvent(
+      new MouseEvent('mousemove', {
+        clientX: 108,
+        clientY: 100,
+        bubbles: true,
+      })
+    );
+
+    expect(canvas.style.cursor).toBe('crosshair');
+
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', {
+        clientX: 108,
+        clientY: 100,
+        button: 0,
+        bubbles: true,
+      })
+    );
+
+    expect(interaction.connection.connecting).toBe(true);
+  });
+
+  it('does not show outline handle on a selected node resize corner', () => {
+    const canvas = createCanvas(400, 200);
+    const renderer = new DiagramRenderer(canvas, { width: 400, height: 200, retina: false });
+    const interaction = renderer.enableInteractions({
+      attachToOutline: true,
+      createEdge: (from, to) => new Edge({ from, to, type: 'straight' }),
+    });
+
+    const node = new RectangleNode({ x: 50, y: 80, width: 60, height: 40 });
+    renderer.addNode(node);
+    interaction.selection.select(node.id);
+
+    canvas.dispatchEvent(
+      new MouseEvent('mousemove', {
+        clientX: 112,
+        clientY: 122,
+        bubbles: true,
+      })
+    );
+
+    expect(canvas.style.cursor).not.toBe('crosshair');
+  });
+
   it('creates edge when connection completed with attachToOutline', () => {
     const canvas = createCanvas(400, 200);
     const renderer = new DiagramRenderer(canvas, { width: 400, height: 200, retina: false });
