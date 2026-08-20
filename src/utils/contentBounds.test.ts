@@ -59,6 +59,22 @@ describe('contentBounds', () => {
     });
   });
 
+  it('prefers getVisualBounds when a node has an external label', () => {
+    const nodes = [
+      {
+        visible: true,
+        getBounds: () => ({ x: 10, y: 10, width: 36, height: 36 }),
+        getVisualBounds: () => ({ x: 10, y: 10, width: 36, height: 60 }),
+      },
+    ];
+    expect(getContentBounds({ nodes })).toEqual({
+      x: 10,
+      y: 10,
+      width: 36,
+      height: 60,
+    });
+  });
+
   it('merges nodes and edges', () => {
     const nodes = [{ visible: true, getBounds: () => ({ x: 0, y: 0, width: 20, height: 20 }) }];
     const edges = [{ visible: true, getBounds: () => ({ x: 50, y: 10, width: 100, height: 5 }) }];

@@ -52,6 +52,23 @@ describe('getClosestPointOnPath', () => {
     expect(closest!.point.y).toBeCloseTo(0, 0);
     expect(closest!.pathParam).toBeCloseTo(0.4, 1);
   });
+
+  it('projects onto a long polyline instead of the nearest length sample', () => {
+    // Midway between sample 24 and 25 of the old 48-sample search: Euclidean
+    // miss was ~20px even though the point sits on the stroke.
+    const closest = getClosestPointOnPath(
+      [
+        { x: 0, y: 0 },
+        { x: 2000, y: 0 },
+      ],
+      'straight',
+      { x: 1020.833, y: 0 }
+    );
+    expect(closest).toBeTruthy();
+    expect(closest!.distance).toBeCloseTo(0, 5);
+    expect(closest!.point.x).toBeCloseTo(1020.833, 3);
+    expect(closest!.point.y).toBeCloseTo(0, 5);
+  });
 });
 
 describe('directionFromAngle', () => {

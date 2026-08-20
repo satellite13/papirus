@@ -26,7 +26,7 @@ export class DiamondNode extends Node {
     const dx = Math.abs(point.x - center.x);
     const dy = Math.abs(point.y - center.y);
 
-    return dx / hw + dy / hh <= 1;
+    return dx / hw + dy / hh <= 1 || this.hitTestExternalLabel(point);
   }
 
   override getOutlineDirection(param: number): 'top' | 'right' | 'bottom' | 'left' {

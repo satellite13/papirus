@@ -126,12 +126,12 @@ export class CompositeNode extends Node {
 
   override hitTest(point: Point): boolean {
     if (this._shapeType === 'circle') {
-      return this.hitTestEllipse(point);
+      return this.hitTestEllipse(point) || this.hitTestExternalLabel(point);
     }
     if (this._shapeType === 'diamond') {
-      return this.hitTestDiamond(point);
+      return this.hitTestDiamond(point) || this.hitTestExternalLabel(point);
     }
-    // rectangle, custom — bounding box
+    // rectangle, custom — bounding box + external label
     return super.hitTest(point);
   }
 
@@ -155,7 +155,42 @@ export class CompositeNode extends Node {
     return dx / hw + dy / hh <= 1;
   }
 
+  /**
+   * Copy color/font from the suppressed `__name__` CText onto the external Node.label.
+   */
+  syncExternalBoundNameLabelStyle(): void {
+    if (!this.usesExternalLabel() || !this._label) {
+      return;
+    }
+    const nameText = this._content.findBoundNameText();
+    if (!nameText) {
+      return;
+    }
+
+    const current = this._label.styleOverrides;
+    if (
+      current.color === nameText.color &&
+      current.fontFamily === nameText.fontFamily &&
+      current.fontWeight === nameText.fontWeight &&
+      current.fontStyle === nameText.fontStyle &&
+      current.fontSize === nameText.fontSize
+    ) {
+      return;
+    }
+
+    this._label.style = {
+      ...current,
+      color: nameText.color,
+      fontFamily: nameText.fontFamily,
+      fontWeight: nameText.fontWeight,
+      fontStyle: nameText.fontStyle,
+      fontSize: nameText.fontSize,
+    };
+  }
+
   render(ctx: CanvasRenderingContext2D): void {
+    this._content.setSuppressBoundName(this.usesExternalLabel());
+    this.syncExternalBoundNameLabelStyle();
     // Auto-size BEFORE drawing shape so bounds are correct
     if (this._autoSize) {
       this.applyAutoSize(ctx);
@@ -262,6 +297,12 @@ export class CompositeNode extends Node {
 
     const contentBounds = this.getContentBounds();
     this._content.render(ctx, contentBounds);
+
+    if (this.usesExternalLabel() && this._label) {
+      this._label.setAutoMaxWidth(this.getLabelWrapWidth(bounds));
+      const labelSize = this._label.measure(ctx);
+      this.renderLabel(ctx, this.getResolvedLabelBounds(labelSize));
+    }
 
     // Render ports (from Node)
     this.renderPorts(ctx);

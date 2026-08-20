@@ -336,7 +336,7 @@ export class CustomShapeNode extends Node {
     }
 
     ctx.lineWidth = NODE_HITBOX_PADDING * 2;
-    return ctx.isPointInStroke(path, localX, localY);
+    return ctx.isPointInStroke(path, localX, localY) || this.hitTestExternalLabel(point);
   }
 
   render(ctx: CanvasRenderingContext2D): void {

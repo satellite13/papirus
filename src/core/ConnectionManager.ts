@@ -10,6 +10,7 @@ import {
   EDGE_ADD_CONTROL_RADIUS,
   EDGE_CONTROL_POINT_RADIUS,
   EDGE_HANDLE_RADIUS,
+  EDGE_DROP_FILL_SCREEN_TOLERANCE,
   OUTLINE_SNAP_SCREEN_TOLERANCE,
   OUTLINE_CONNECT_HANDLE_HIT_RADIUS,
   ANCHOR_POINT_HITBOX_RADIUS,
@@ -18,6 +19,7 @@ import {
   BEZIER_MAX_OFFSET,
 } from '@/constants';
 import { clonePoints, distance } from '@/utils/geometry';
+import { directionFromAngle } from '@/utils/edgePath';
 import { getDirectionFromOutlineParam } from '@/utils/direction';
 import {
   OUTLINE_CONNECT_HANDLE_HYSTERESIS,
@@ -325,7 +327,20 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     let snappedDir: string | undefined;
     let targetNode = this.getNodeAtPoint(point, true);
 
-    if (this.attachToOutline) {
+    const edgeDrop = this.originalEdgeEndpoint?.edgeId
+      ? this.findEdgeDropTarget(point, {
+          maxScreenPx: EDGE_DROP_FILL_SCREEN_TOLERANCE,
+          skipEdgeIds: new Set([edge.id]),
+        })
+      : null;
+    if (edgeDrop) {
+      const at = edgeDrop.edge.getPointAt(edgeDrop.pathParam);
+      snappedPoint = edgeDrop.point;
+      snappedDir = at ? directionFromAngle(at.angle) : undefined;
+      targetNode = null;
+      this.reconnectingOutlineParam = null;
+      this.reconnectingTargetNodeId = null;
+    } else if (this.attachToOutline) {
       const tolerance = OUTLINE_SNAP_SCREEN_TOLERANCE / Math.max(this.renderer.zoom, 0.0001);
       const toleranceSq = tolerance * tolerance;
       let bestDistSq = Infinity;
@@ -543,6 +558,17 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     this.previewTargetNodeId = null;
     this.previewTargetEdgeId = null;
     this.previewTargetPathParam = null;
+    const rawNode = this.getRawNodeAtPoint(cursorPoint);
+    const forbiddenFill =
+      !!this._connectionValidator &&
+      !!this.sourceNode &&
+      !!rawNode &&
+      !this._connectionValidator(this.sourceNode.id, rawNode.id);
+    const searchGroupFill =
+      !!rawNode &&
+      (forbiddenFill ||
+        this.nodeContainsSource(rawNode) ||
+        this.nodeLooksLikeContainer(rawNode));
     let targetNode = this.getNodeAtPoint(cursorPoint, false);
 
     if (this.attachToOutline) {
@@ -597,7 +623,10 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     }
 
     // Prefer edge drop when closer than outline/node snap (outline tolerance is larger).
-    const edgeDrop = this.findEdgeDropTarget(cursorPoint);
+    const edgeDrop = this.findEdgeDropTarget(
+      cursorPoint,
+      searchGroupFill ? { maxScreenPx: EDGE_DROP_FILL_SCREEN_TOLERANCE } : undefined
+    );
     if (edgeDrop) {
       let nodeDistance = Infinity;
       if (targetNode) {
@@ -605,7 +634,7 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
         const dy = cursorPoint.y - snappedPoint.y;
         nodeDistance = Math.sqrt(dx * dx + dy * dy);
       }
-      if (!targetNode || edgeDrop.distance < nodeDistance) {
+      if (searchGroupFill || !targetNode || edgeDrop.distance <= nodeDistance) {
         targetNode = null;
         this.previewTargetNodeId = null;
         this.previewTargetOutlineParam = null;
@@ -614,6 +643,12 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
         this.previewTargetEdgeId = edgeDrop.edge.id;
         this.previewTargetPathParam = edgeDrop.pathParam;
       }
+    } else if (searchGroupFill) {
+      targetNode = null;
+      this.previewTargetNodeId = null;
+      this.previewTargetOutlineParam = null;
+      this.previewTargetAnchorId = null;
+      snappedPoint = cursorPoint;
     }
 
     if (targetNode) {
@@ -698,11 +733,31 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
       const point = { x: event.worldX, y: event.worldY };
       let reconnected = false;
 
+      const edgeDrop = this.originalEdgeEndpoint?.edgeId
+        ? this.findEdgeDropTarget(point, {
+            maxScreenPx: EDGE_DROP_FILL_SCREEN_TOLERANCE,
+            skipEdgeIds: new Set([this.reconnectingEdge.id]),
+          })
+        : null;
+      if (edgeDrop) {
+        const endpoint: EdgeEndpoint = {
+          edgeId: edgeDrop.edgeId,
+          pathParam: edgeDrop.pathParam,
+        };
+        if (this.reconnectingEndpoint === 'start') {
+          this.reconnectingEdge.from = endpoint;
+        } else {
+          this.reconnectingEdge.to = endpoint;
+        }
+        reconnected = true;
+        this.emit('edgeReconnect', this.reconnectingEdge, this.reconnectingEndpoint!);
+      }
+
       let node = this.getNodeAtPoint(point, true);
       if (!node && this.attachToOutline && this.reconnectingTargetNodeId) {
         node = this.renderer.getNode(this.reconnectingTargetNodeId) ?? null;
       }
-      if (node) {
+      if (!reconnected && node) {
         if (this.attachToOutline && this.reconnectingOutlineParam !== null) {
           const endpoint: EdgeEndpoint = {
             nodeId: node.id,
@@ -999,12 +1054,17 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
    * Find the nearest edge under the cursor for junction / note→relation drops.
    */
   private findEdgeDropTarget(
-    point: Point
+    point: Point,
+    options?: { maxScreenPx?: number; skipEdgeIds?: ReadonlySet<string> }
   ): { edge: Edge; edgeId: string; pathParam: number; point: Point; distance: number } | null {
-    const tolerance = Math.max(14, 20 / Math.max(this.renderer.zoom, 0.0001));
+    const tolerance =
+      options?.maxScreenPx === undefined
+        ? Math.max(14, 20 / Math.max(this.renderer.zoom, 0.0001))
+        : options.maxScreenPx / Math.max(this.renderer.zoom, 0.0001);
     let best: { edge: Edge; pathParam: number; point: Point; distance: number } | null = null;
     for (const edge of this.renderer.edges.values()) {
       if (!edge.visible || edge.path.length < 2) continue;
+      if (options?.skipEdgeIds?.has(edge.id)) continue;
       const closest = edge.getClosestPointOnPath(point);
       if (!closest || closest.distance > tolerance) continue;
       if (!best || closest.distance < best.distance) {
@@ -1366,6 +1426,42 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     }
 
     return null;
+  }
+
+  private getRawNodeAtPoint(point: Point): Node | null {
+    const nodes = Array.from(this.renderer.nodes.values());
+    for (let i = nodes.length - 1; i >= 0; i--) {
+      const node = nodes[i]!;
+      if (node.visible && node.hitTest(point)) {
+        return node;
+      }
+    }
+    return null;
+  }
+
+  private nodeLooksLikeContainer(node: Node, source = this.sourceNode): boolean {
+    if (!source || source.id === node.id) {
+      return false;
+    }
+    const nodeArea = node.width * node.height;
+    const sourceArea = Math.max(source.width * source.height, 1);
+    return nodeArea >= sourceArea * 4;
+  }
+
+  private nodeContainsSource(node: Node, source = this.sourceNode): boolean {
+    if (!source || source.id === node.id) {
+      return false;
+    }
+    const sourceBounds = source.getBounds();
+    const nodeBounds = node.getBounds();
+    const cx = sourceBounds.x + sourceBounds.width / 2;
+    const cy = sourceBounds.y + sourceBounds.height / 2;
+    return (
+      cx >= nodeBounds.x &&
+      cx <= nodeBounds.x + nodeBounds.width &&
+      cy >= nodeBounds.y &&
+      cy <= nodeBounds.y + nodeBounds.height
+    );
   }
 
   private startOutlineConnection(node: Node, attach: Point): void {

@@ -13,6 +13,7 @@ import type {
   SerializedTextLabel,
 } from '@/types';
 import { omitDefaultValues, omitEmptyValues, hasNonDefaultValues } from './omitDefaults';
+import { DEFAULT_LABEL_GAP } from './labelPlacement';
 
 const SERIALIZER_VERSION = '1.1';
 
@@ -318,6 +319,8 @@ export class Serializer {
       styleClass: node.styleClass,
       label,
       labelStyleClass: typeof label === 'string' ? node.label?.styleClass : undefined,
+      labelPlacement: node.labelPlacement !== 'center' ? node.labelPlacement : undefined,
+      labelGap: node.labelGap !== DEFAULT_LABEL_GAP ? node.labelGap : undefined,
       icon,
       contentInset: hasContentInset ? contentInset : undefined,
       anchorPoints,

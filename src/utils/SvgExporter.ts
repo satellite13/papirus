@@ -6,7 +6,7 @@ import type { Group } from '@/elements/Group';
 import type { ArrowMarkerConfig, TextStyle } from '@/types';
 import type { NodeImageOptions } from '@/elements/NodeImage';
 import { EDGE_LABEL_BACKGROUND_RADIUS } from '@/constants';
-import { applyStyleManagerToElements } from './style';
+import { applyStyleManagerToElements, canvasFontFromTextStyle } from './style';
 import { getContentBounds } from './contentBounds';
 import { downloadBlob } from './download';
 import { generateSvgMarker, calculateMarkerPoints } from './markers';
@@ -218,12 +218,16 @@ export class SvgExporter {
           }
         }
 
-        // Render component tree instead of label/icon
+        // Inner tree stays inside; external Node.label is drawn like a simple node.
+        cn.content.setSuppressBoundName(cn.usesExternalLabel());
+        cn.syncExternalBoundNameLabelStyle();
         const contentBounds = cn.getLabelContainerBounds(bounds);
         const contentSvg = cn.content.toSVG(contentBounds);
+        const labelSvg = cn.usesExternalLabel() ? this.renderNodeLabel(cn, bounds) : '';
         return [
           `${shape} fill="${fill}" fill-opacity="${fillOpacity}" stroke="${stroke}" stroke-width="${strokeWidth}" stroke-opacity="${strokeOpacity}"${dash}${dashOffset}/>`,
           contentSvg,
+          labelSvg,
         ].join('');
       }
       default: {
@@ -331,8 +335,6 @@ export class SvgExporter {
     inset: number | ContentInsetSides = 8
   ): { width: number; height: number } {
     const fontSize = style.fontSize ?? 14;
-    const fontFamily = style.fontFamily ?? 'sans-serif';
-    const fontWeight = style.fontWeight ?? 'normal';
     const lineHeight = fontSize * 1.2;
     const lines = text.split('\n');
     let maxWidth = 0;
@@ -341,7 +343,7 @@ export class SvgExporter {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
       if (ctx) {
-        ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
+        ctx.font = canvasFontFromTextStyle(style);
         for (const line of lines) {
           maxWidth = Math.max(maxWidth, ctx.measureText(line).width);
         }
@@ -506,6 +508,8 @@ export class SvgExporter {
     const fontSize = style.fontSize ?? 14;
     const fontFamily = style.fontFamily ?? 'sans-serif';
     const fontWeight = style.fontWeight ?? 'normal';
+    const fontStyle = style.fontStyle ?? 'normal';
+    const fontStyleAttr = fontStyle !== 'normal' ? ` font-style="${fontStyle}"` : '';
     const opacity = style.opacity ?? 1;
     const anchor = style.align === 'left' ? 'start' : style.align === 'right' ? 'end' : 'middle';
     const baseline =
@@ -519,7 +523,7 @@ export class SvgExporter {
 
     const lines = text.split('\n');
     if (lines.length <= 1) {
-      return `<text x="${point.x}" y="${point.y}" fill="${fill}" fill-opacity="${opacity}" font-size="${fontSize}" font-family="${fontFamily}" font-weight="${fontWeight}" text-anchor="${anchor}" dominant-baseline="${baseline}"${transform}>${this.escapeText(
+      return `<text x="${point.x}" y="${point.y}" fill="${fill}" fill-opacity="${opacity}" font-size="${fontSize}" font-family="${fontFamily}" font-weight="${fontWeight}"${fontStyleAttr} text-anchor="${anchor}" dominant-baseline="${baseline}"${transform}>${this.escapeText(
         text
       )}</text>`;
     }
@@ -529,7 +533,7 @@ export class SvgExporter {
     const tspans = lines
       .map((line, index) => `<tspan x="${point.x}" y="${startY + index * lineHeight}">${this.escapeText(line)}</tspan>`)
       .join('');
-    return `<text x="${point.x}" y="${point.y}" fill="${fill}" fill-opacity="${opacity}" font-size="${fontSize}" font-family="${fontFamily}" font-weight="${fontWeight}" text-anchor="${anchor}" dominant-baseline="${baseline}"${transform}>${tspans}</text>`;
+    return `<text x="${point.x}" y="${point.y}" fill="${fill}" fill-opacity="${opacity}" font-size="${fontSize}" font-family="${fontFamily}" font-weight="${fontWeight}"${fontStyleAttr} text-anchor="${anchor}" dominant-baseline="${baseline}"${transform}>${tspans}</text>`;
   }
 
   private buildEdgePath(edge: Edge, edgeLabelOffset?: number): string {

@@ -91,8 +91,53 @@ export function directionFromAngle(angle: number): string {
   return 'right';
 }
 
+function closestPointOnPolyline(
+  polyline: readonly Point[],
+  point: Point
+): { point: Point; pathParam: number; distance: number } | null {
+  if (polyline.length < 2) {
+    return null;
+  }
+
+  let totalLength = 0;
+  for (let i = 1; i < polyline.length; i++) {
+    const start = polyline[i - 1]!;
+    const end = polyline[i]!;
+    totalLength += Math.hypot(end.x - start.x, end.y - start.y);
+  }
+
+  let bestPoint = polyline[0]!;
+  let bestParam = 0;
+  let bestDist = Infinity;
+  let accumulated = 0;
+  for (let i = 1; i < polyline.length; i++) {
+    const start = polyline[i - 1]!;
+    const end = polyline[i]!;
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const lengthSq = dx * dx + dy * dy;
+    const segLen = Math.sqrt(lengthSq);
+    const t =
+      lengthSq === 0
+        ? 0
+        : Math.max(0, Math.min(1, ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSq));
+    const proj = { x: start.x + t * dx, y: start.y + t * dy };
+    const dist = Math.hypot(point.x - proj.x, point.y - proj.y);
+    if (dist < bestDist) {
+      bestDist = dist;
+      bestPoint = proj;
+      bestParam = totalLength > 0 ? (accumulated + t * segLen) / totalLength : 0;
+    }
+    accumulated += segLen;
+  }
+
+  return { point: bestPoint, pathParam: bestParam, distance: bestDist };
+}
+
 /**
- * Nearest point on an edge path to `point`, by sampling along normalized length.
+ * Nearest point on an edge path to `point`.
+ * Polylines project onto real segments so a click on a long orthogonal stroke
+ * is not lost between length samples. Bezier paths are densified, then projected.
  */
 export function getClosestPointOnPath(
   path: readonly Point[],
@@ -103,24 +148,13 @@ export function getClosestPointOnPath(
   if (path.length < 2) {
     return null;
   }
-  let bestPoint = getPathPointAt(path, type, 0).point;
-  let bestParam = 0;
-  let bestDistSq = Infinity;
-  for (let i = 0; i <= samples; i++) {
-    const pathParam = i / samples;
-    const at = getPathPointAt(path, type, pathParam).point;
-    const dx = at.x - point.x;
-    const dy = at.y - point.y;
-    const distSq = dx * dx + dy * dy;
-    if (distSq < bestDistSq) {
-      bestDistSq = distSq;
-      bestPoint = at;
-      bestParam = pathParam;
-    }
+  if (type !== 'bezier' || path.length < 4) {
+    return closestPointOnPolyline(path, point);
   }
-  return {
-    point: bestPoint,
-    pathParam: bestParam,
-    distance: Math.sqrt(bestDistSq),
-  };
+
+  const densified: Point[] = [];
+  for (let i = 0; i <= samples; i++) {
+    densified.push(getPathPointAt(path, type, i / samples).point);
+  }
+  return closestPointOnPolyline(densified, point);
 }

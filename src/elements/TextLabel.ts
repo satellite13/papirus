@@ -1,6 +1,6 @@
 import type { Bounds, ContentInsetSides, Point, TextStyle } from '@/types';
 import type { StyleManager } from '@/styles/StyleManager';
-import { shallowEqual } from '@/utils/style';
+import { canvasFontFromTextStyle, shallowEqual } from '@/utils/style';
 import { measureTextLines, wrapMeasuredText } from '@/utils/textMeasurer';
 
 const DEFAULT_INSET = 8;
@@ -44,6 +44,7 @@ const DEFAULT_STYLE: TextStyle & { align: CanvasTextAlign; baseline: CanvasTextB
   fontSize: 14,
   fontFamily: 'sans-serif',
   fontWeight: 'normal',
+  fontStyle: 'normal',
   color: '#000000',
   opacity: 1,
   align: 'center',
@@ -366,12 +367,7 @@ export class TextLabel {
   }
 
   private applyStyle(ctx: CanvasRenderingContext2D): void {
-    const fontSize = this._style.fontSize ?? 14;
-    const fontFamily = this._style.fontFamily ?? 'sans-serif';
-    const fontWeight = this._style.fontWeight ?? 'normal';
-
-    // Always construct font from individual properties to ensure fontSize changes are applied
-    ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
+    ctx.font = canvasFontFromTextStyle(this._style);
     ctx.textAlign = this._style.align ?? 'center';
     ctx.textBaseline = this._style.baseline ?? 'middle';
   }

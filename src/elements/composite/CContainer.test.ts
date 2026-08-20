@@ -221,6 +221,28 @@ describe('CContainer', () => {
     });
   });
 
+  describe('findBoundNameText', () => {
+    it('finds a direct __name__ text even when suppressed', () => {
+      const name = new CText({ text: 'Start', bindToProperty: '__name__', color: '#cc0000' });
+      const c = new CContainer({ children: [name, new CText({ text: '+' })] });
+      c.setSuppressBoundName(true);
+      expect(c.findBoundNameText()).toBe(name);
+    });
+
+    it('finds a nested __name__ text', () => {
+      const name = new CText({ text: 'Start', bindToProperty: '__name__' });
+      const outer = new CContainer({
+        children: [new CContainer({ children: [name] })],
+      });
+      expect(outer.findBoundNameText()).toBe(name);
+    });
+
+    it('returns undefined when there is no bound name', () => {
+      const c = new CContainer({ children: [new CText({ text: '+' })] });
+      expect(c.findBoundNameText()).toBeUndefined();
+    });
+  });
+
   describe('findById', () => {
     it('finds direct child by id', () => {
       const t = new CText({ id: 'title', text: 'Hello' });

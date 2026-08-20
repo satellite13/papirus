@@ -259,6 +259,11 @@ export type {
   SerializedGroup,
   Command,
   SerializedCompositeNode,
+  LabelPlacement,
 } from './types';
+export {
+  DEFAULT_LABEL_GAP,
+  isExternalLabelPlacement,
+} from './utils/labelPlacement';
 export { isEdgeEdgeEndpoint, isNodeEdgeEndpoint } from './types';
 export { getPathPointAt, getClosestPointOnPath, directionFromAngle } from './utils/edgePath';

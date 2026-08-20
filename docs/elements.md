@@ -101,8 +101,12 @@ const node = new CustomShapeNode({
 
 ### Опции узлов (общие)
 
-- `label` — текстовая метка (`string` или `TextLabelOptions`). Текст занимает всю контентную область; выравнивание задаётся в опциях метки: `style.align` (горизонталь), `style.verticalAlign` (вертикаль).
-- `icon` — изображение/иконка (`NodeImageOptions`).
+- `label` — текстовая метка (`string` или `TextLabelOptions`). При `labelPlacement: 'center' | 'auto'` текст занимает контентную область; выравнивание — `style.align` / `style.verticalAlign`.
+- `labelPlacement` — `center` / `auto` (внутри фигуры) или `top` / `bottom` / `left` / `right` (**снаружи** AABB фигуры). Порты и resize остаются на контуре.
+- `labelGap` — зазор в px между контуром и внешней меткой (по умолчанию 4).
+- Для **составного** узла при внешнем placement рисуется `Node.label`, а `CText` с `bindToProperty: '__name__'` скрывается, чтобы имя не дублировалось.
+- `icon` — изображение/иконка (`NodeImageOptions`). Зона иконки — AABB фигуры минус `contentInset` (не вписанный квадрат круга/ромба), поэтому центрированная иконка может заполнить фигуру.
+
 - `contentInset` — отступы контентной области от краёв фигуры (см. выше).
 - `ports` — список портов (`PortOptions`).
 - `anchorPoints` — количество anchor-точек по сторонам.
