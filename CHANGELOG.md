@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.4] - 2026-08-20
+
 ### Added
 - Node `labelPlacement` `top` / `bottom` / `left` / `right` draws the name outside the shape AABB (`labelGap`, default 4). `center` / `auto` stay inside. Works for simple nodes and for `CompositeNode` (external `Node.label`, internal `__name__` CText is skipped). `getVisualBounds()` includes the external label for fit/export.
 
@@ -437,7 +439,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Edge animations (flow effect)
 - Context menu and search/filter
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.3...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.4...HEAD
+[0.9.4]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.3...v0.9.4
 [0.9.3]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.2...v0.9.3
 [0.9.2]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.1...v0.9.2
 [0.9.1]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.0...v0.9.1
