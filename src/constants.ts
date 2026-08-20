@@ -40,6 +40,10 @@ export const BEZIER_MAX_OFFSET = 100;
 
 /** Screen distance (px) within which edge endpoint snaps to shape outline when attachToOutline */
 export const OUTLINE_SNAP_SCREEN_TOLERANCE = 40;
+/** Screen distance (px) to treat the cursor as being on a stroke */
+export const EDGE_DROP_STROKE_SCREEN_TOLERANCE = 16;
+/** When a stroke crosses a node/container fill, snap to the closest path within this range */
+export const EDGE_DROP_FILL_SCREEN_TOLERANCE = 40;
 /** Screen distance (px) to show/grab the floating outline connect handle */
 export const OUTLINE_CONNECT_HANDLE_HIT_RADIUS = 4;
 

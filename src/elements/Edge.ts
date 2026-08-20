@@ -1029,7 +1029,16 @@ export class Edge extends Element {
   getClosestPointOnPath(
     point: Point
   ): { point: Point; pathParam: number; distance: number } | null {
-    return getClosestPointOnPath(this._path, this._type, point);
+    const onPath = getClosestPointOnPath(this._path, this._type, point);
+    if (onPath) {
+      return onPath;
+    }
+    const start = this._fromPoint;
+    const end = this._toPoint;
+    if (start.x === end.x && start.y === end.y) {
+      return null;
+    }
+    return getClosestPointOnPath([start, end], 'straight', point);
   }
 
   /**

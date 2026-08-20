@@ -872,9 +872,15 @@ export class InteractionManager {
     }
 
     if ('typeName' in hitElement) {
-      // CompositeNode: edit CText bound to display name (`bindToProperty === '__name__'`)
+      // CompositeNode: external Node.label, otherwise CText bound to `__name__`
       if (hitElement.typeName === 'composite') {
-        this.startCompositeNameEdit(hitElement as CompositeNode);
+        const composite = hitElement as CompositeNode;
+        if (composite.usesExternalLabel()) {
+          const editText = composite.label?.editableText ?? composite.label?.text ?? '';
+          this.startLabelEdit('node', composite.id, editText, composite.getLabelPosition());
+          return;
+        }
+        this.startCompositeNameEdit(composite);
         return;
       }
       const editText = hitElement.label?.editableText ?? hitElement.label?.text ?? '';

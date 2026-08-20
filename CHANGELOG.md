@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Node `labelPlacement` `top` / `bottom` / `left` / `right` draws the name outside the shape AABB (`labelGap`, default 4). `center` / `auto` stay inside. Works for simple nodes and for `CompositeNode` (external `Node.label`, internal `__name__` CText is skipped). `getVisualBounds()` includes the external label for fit/export.
+
+### Fixed
+- From a child E you can drop a new connection onto a visible C–D stroke that crosses nested containers A⊃B: the group fill no longer shows a lock or steals the drop. The new edge attaches on the path (midpoint if you release there). Node-to-node inside the container is unchanged.
+- Dragging an endpoint that is already glued to a relation can reattach it to another visible stroke (or slide along the same one), not only to nodes. As with a new connection, a visible stroke within 40px wins over component fill and outline.
+- Pointer hit-testing prefers edges over node fills, matching paint order, so a stroke on a container body is selectable.
+- External `CompositeNode` labels inherit color and font (including italic) from the suppressed `__name__` CText instead of the default Node.label style.
+- Centered node icons use the full shape box (minus `contentInset`), so they can fill a circle/diamond instead of stopping at the inscribed text square.
+- `hitTestResizeHandle` ignores corners when `resizeHandlesEnabled` is false, so hidden handles cannot start a resize.
+- With `resizeHandlesEnabled` false the dashed selection frame still draws; only the resize ports are omitted.
+
 ## [0.9.3] - 2026-08-18
 
 ### Changed

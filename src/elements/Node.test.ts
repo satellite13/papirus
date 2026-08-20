@@ -150,6 +150,35 @@ describe('Node', () => {
     expect(textX).toBeGreaterThan(iconX + iconW + 8);
   });
 
+  it('lets a centered icon fill a circle, not only the inscribed square', () => {
+    const ctx = mockCanvasContext();
+    const node = new CircleNode({
+      x: 0,
+      y: 0,
+      width: 50,
+      height: 50,
+      label: 'Terminate',
+      labelPlacement: 'bottom',
+      icon: {
+        source: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"></svg>',
+        placement: 'center',
+        width: 50,
+        height: 50,
+        inset: 0,
+        fit: 'contain',
+      },
+    });
+
+    node.render(ctx);
+
+    const drawCall = ctx.drawImage.mock.calls[0];
+    expect(drawCall).toBeDefined();
+    expect(Number(drawCall?.[3])).toBeCloseTo(50);
+    expect(Number(drawCall?.[4])).toBeCloseTo(50);
+    expect(node.width).toBe(50);
+    expect(node.height).toBe(50);
+  });
+
   it('uses inscribed text area for circle and diamond labels', () => {
     const ctx = mockCanvasContext();
     ctx.measureText = ((text: string) => ({
@@ -248,5 +277,89 @@ describe('Node', () => {
 
     const diamond = new DiamondNode({ x: 0, y: 0, width: 400, height: 50 });
     expect(diamond.getOutlineDirection(0.75)).toBe('left');
+  });
+
+  describe('external label (simple node)', () => {
+    it('keeps shape size when the name is placed outside', () => {
+      const ctx = mockCanvasContext();
+      ctx.measureText = ((text: string) => ({
+        width: text.length * 8,
+      })) as CanvasRenderingContext2D['measureText'];
+
+      const node = new CircleNode({
+        x: 0,
+        y: 0,
+        width: 36,
+        height: 36,
+        label: 'Start Event',
+        labelPlacement: 'bottom',
+        labelGap: 4,
+      });
+
+      node.render(ctx);
+
+      expect(node.width).toBe(36);
+      expect(node.height).toBe(36);
+    });
+
+    it('includes the external label in visual bounds and hit-test', () => {
+      const ctx = mockCanvasContext();
+      ctx.measureText = ((text: string) => ({
+        width: text.length * 8,
+      })) as CanvasRenderingContext2D['measureText'];
+
+      const node = new CircleNode({
+        x: 10,
+        y: 10,
+        width: 36,
+        height: 36,
+        label: 'Start',
+        labelPlacement: 'bottom',
+        labelGap: 4,
+      });
+      node.render(ctx);
+
+      const visual = node.getVisualBounds();
+      expect(visual.y + visual.height).toBeGreaterThan(10 + 36);
+
+      const below = { x: 28, y: 10 + 36 + 12 };
+      expect(node.hitTest(below)).toBe(true);
+      expect(node.getLabelPosition().y).toBeGreaterThan(10 + 36);
+    });
+  });
+
+  it('does not hit resize handles when they are disabled', () => {
+    const node = new RectangleNode({
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 50,
+      resizeHandlesEnabled: false,
+    });
+    node.state = 'selected';
+    expect(node.hitTestResizeHandle({ x: 106, y: 56 })).toBeNull();
+
+    node.resizeHandlesEnabled = true;
+    expect(node.hitTestResizeHandle({ x: 106, y: 56 })).toBe('se');
+  });
+
+  it('draws the selection frame without resize ports when handles are disabled', () => {
+    const ctx = mockCanvasContext();
+    const node = new RectangleNode({
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 50,
+      resizeHandlesEnabled: false,
+    });
+    node.state = 'selected';
+    node.renderResizeHandles(ctx);
+
+    expect(ctx.strokeRect).toHaveBeenCalledTimes(1);
+    expect(ctx.rect).not.toHaveBeenCalled();
+
+    node.resizeHandlesEnabled = true;
+    node.renderResizeHandles(ctx);
+    expect(ctx.rect).toHaveBeenCalled();
   });
 });

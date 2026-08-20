@@ -3,6 +3,7 @@ import type { Bounds } from '@/types';
 export interface BoundsSource {
   visible: boolean;
   getBounds(): Bounds;
+  getVisualBounds?(): Bounds;
 }
 
 export interface ContentBoundsInput {
@@ -28,7 +29,7 @@ export function getContentBounds({
     if (!includeInvisible && !source.visible) {
       return;
     }
-    const bounds = source.getBounds();
+    const bounds = source.getVisualBounds?.() ?? source.getBounds();
     minX = Math.min(minX, bounds.x);
     minY = Math.min(minY, bounds.y);
     maxX = Math.max(maxX, bounds.x + bounds.width);

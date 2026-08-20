@@ -665,19 +665,12 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> implements Diag
   }
 
   /**
-   * Find element at a point (nodes, then edges, then groups)
+   * Find element at a point. Edges are painted above nodes, so a stroke over a
+   * nested pool/lane fill is hit before the covering container.
    */
   getElementAtPoint(worldPoint: Point): Node | Edge | Group | undefined {
-    // Check nodes first (front to back)
-    const nodesArray = Array.from(this._nodes.values());
-    for (let i = nodesArray.length - 1; i >= 0; i--) {
-      const node = nodesArray[i]!;
-      if (node.visible && node.hitTest(worldPoint)) {
-        return node;
-      }
-    }
-
-    // Check edges
+    let bestEdge: Edge | undefined;
+    let bestDist = Infinity;
     for (const edge of this._edges.values()) {
       if (!edge.visible) {
         continue;
@@ -685,8 +678,21 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> implements Diag
 
       const baseTolerance = Math.max((edge.style.strokeWidth ?? 2) * 2, 8);
       const tolerance = baseTolerance / Math.max(this._zoom, 0.0001);
-      if (edge.hitTestWithTolerance(worldPoint, tolerance)) {
-        return edge;
+      const closest = edge.getClosestPointOnPath(worldPoint);
+      if (closest && closest.distance <= tolerance && closest.distance < bestDist) {
+        bestDist = closest.distance;
+        bestEdge = edge;
+      }
+    }
+    if (bestEdge) {
+      return bestEdge;
+    }
+
+    const nodesArray = Array.from(this._nodes.values());
+    for (let i = nodesArray.length - 1; i >= 0; i--) {
+      const node = nodesArray[i]!;
+      if (node.visible && node.hitTest(worldPoint)) {
+        return node;
       }
     }
 

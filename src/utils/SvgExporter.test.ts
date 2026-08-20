@@ -275,4 +275,33 @@ describe('SvgExporter', () => {
 
     renderer.destroy();
   });
+
+  it('exports an external composite name once, outside the shape', () => {
+    const canvas = document.createElement('canvas');
+    const renderer = new DiagramRenderer(canvas, { width: 300, height: 200, retina: false });
+    renderer.addNode(
+      new CompositeNode({
+        x: 40,
+        y: 20,
+        width: 36,
+        height: 36,
+        label: 'Start',
+        labelPlacement: 'bottom',
+        shapeType: 'circle',
+        content: container({
+          children: [
+            text({ text: 'Start', color: '#cc2244', fontStyle: 'italic', bindToProperty: '__name__' }),
+          ],
+        }),
+      })
+    );
+
+    const svg = new SvgExporter(renderer).exportSVG({ includeBackground: false });
+    expect(svg.match(/>Start</g)).toHaveLength(1);
+    expect(svg).toMatch(/<text[^>]*y="[5-9]\d/);
+    expect(svg).toMatch(/<text[^>]*fill="#cc2244"/);
+    expect(svg).toMatch(/<text[^>]*font-style="italic"/);
+
+    renderer.destroy();
+  });
 });

@@ -109,6 +109,83 @@ describe('CompositeNode', () => {
       node.render(ctx);
       expect(ctx.arcTo).toHaveBeenCalled();
     });
+
+    it('draws Node.label outside and skips the bound name CText', () => {
+      ctx.measureText = ((value: string) => ({
+        width: value.length * 8,
+      })) as CanvasRenderingContext2D['measureText'];
+
+      const node = new CompositeNode({
+        x: 0,
+        y: 0,
+        width: 36,
+        height: 36,
+        label: 'Start',
+        labelPlacement: 'bottom',
+        labelGap: 4,
+        shapeType: 'circle',
+        content: container({
+          direction: 'column',
+          children: [
+            text({ id: 'title', text: 'Start', bindToProperty: '__name__' }),
+            text({ id: 'mark', text: '+' }),
+          ],
+        }),
+      });
+      node.render(ctx);
+
+      const texts = vi.mocked(ctx.fillText).mock.calls.map((call) => call[0]);
+      expect(texts).toContain('Start');
+      expect(texts.filter((value) => value === 'Start')).toHaveLength(1);
+      expect(texts).toContain('+');
+
+      const nameCall = vi.mocked(ctx.fillText).mock.calls.find((call) => call[0] === 'Start');
+      expect(nameCall?.[2]).toBeGreaterThan(36);
+
+      expect(node.width).toBe(36);
+      expect(node.height).toBe(36);
+      expect(node.hitTest({ x: 18, y: 50 })).toBe(true);
+    });
+
+    it('uses the bound name CText color and italic on the external Node.label', () => {
+      ctx.measureText = ((value: string) => ({
+        width: value.length * 8,
+      })) as CanvasRenderingContext2D['measureText'];
+
+      const colorsByText = new Map<string, string>();
+      const fontsByText = new Map<string, string>();
+      vi.mocked(ctx.fillText).mockImplementation((value) => {
+        colorsByText.set(String(value), String(ctx.fillStyle));
+        fontsByText.set(String(value), String(ctx.font));
+      });
+
+      const node = new CompositeNode({
+        x: 0,
+        y: 0,
+        width: 36,
+        height: 36,
+        label: { text: 'Start', style: { color: '#333333' } },
+        labelPlacement: 'bottom',
+        shapeType: 'circle',
+        content: container({
+          children: [
+            text({
+              id: 'title',
+              text: 'Start',
+              color: '#cc2244',
+              fontStyle: 'italic',
+              bindToProperty: '__name__',
+            }),
+          ],
+        }),
+      });
+      node.render(ctx);
+
+      expect(colorsByText.get('Start')).toBe('#cc2244');
+      expect(fontsByText.get('Start')).toContain('italic');
+      expect(node.label?.style.color).toBe('#cc2244');
+      expect(node.label?.style.fontStyle).toBe('italic');
+    });
   });
 
   describe('auto-size', () => {

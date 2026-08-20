@@ -6,11 +6,20 @@ import type { StyleManager } from '@/styles/StyleManager';
 import type {
   Bounds,
   ContentInsetSides,
+  LabelPlacement,
   NodeStyle,
   Point,
   Size,
 } from '@/types';
 import { shallowEqual } from '@/utils/style';
+import {
+  DEFAULT_LABEL_GAP,
+  externalLabelWrapWidth,
+  isExternalLabelPlacement,
+  pointInBounds,
+  resolveExternalLabelBounds,
+  unionBounds,
+} from '@/utils/labelPlacement';
 import { getIconBoxSize, getIconBounds } from '@/utils/iconLayout';
 import {
   getDirectionFromOutlineParam,
@@ -66,6 +75,13 @@ export interface NodeOptions {
   resizeHandlesEnabled?: boolean;
   /** Optional badges drawn in top-left corner of content area */
   badges?: NodeBadgeOption[];
+  /**
+   * `auto` / `center` — label inside the shape.
+   * `top` / `bottom` / `left` / `right` — label outside the shape AABB.
+   */
+  labelPlacement?: LabelPlacement;
+  /** Gap in px between the shape AABB and an external label. Default 4. */
+  labelGap?: number;
 }
 
 export type ResizeHandle = 'nw' | 'ne' | 'se' | 'sw';
@@ -112,6 +128,8 @@ export abstract class Node extends Element {
   private _anchorCache: { id: AnchorId; point: Point }[] | null = null;
   private _badgeImageCache = new Map<string, { img: HTMLImageElement; loaded: boolean }>();
   private _hoveredBadgeIndex = -1;
+  protected _labelPlacement: LabelPlacement;
+  protected _labelGap: number;
 
   protected constructor(options: NodeOptions) {
     super({
@@ -134,6 +152,11 @@ export abstract class Node extends Element {
     this._contentInsetBaseSize = this.normalizeContentInsetBaseSize(
       options.contentInsetBaseSize
     );
+    this._labelPlacement = options.labelPlacement ?? 'center';
+    this._labelGap =
+      options.labelGap !== undefined && Number.isFinite(options.labelGap)
+        ? Math.max(0, options.labelGap)
+        : DEFAULT_LABEL_GAP;
 
     if (options.label !== undefined) {
       if (typeof options.label === 'string') {
@@ -197,6 +220,41 @@ export abstract class Node extends Element {
    */
   get ports(): readonly Port[] {
     return this._ports;
+  }
+
+  get labelPlacement(): LabelPlacement {
+    return this._labelPlacement;
+  }
+
+  set labelPlacement(value: LabelPlacement) {
+    if (this._labelPlacement !== value) {
+      this._labelPlacement = value;
+      this.markDirty();
+    }
+  }
+
+  get labelGap(): number {
+    return this._labelGap;
+  }
+
+  set labelGap(value: number) {
+    const next = Number.isFinite(value) ? Math.max(0, value) : DEFAULT_LABEL_GAP;
+    if (this._labelGap !== next) {
+      this._labelGap = next;
+      this.markDirty();
+    }
+  }
+
+  usesExternalLabel(): boolean {
+    return isExternalLabelPlacement(this._labelPlacement) && this._label !== undefined;
+  }
+
+  getVisualBounds(): Bounds {
+    const shape = this.getBounds();
+    if (!this.usesExternalLabel()) {
+      return shape;
+    }
+    return unionBounds(shape, this.getResolvedLabelBounds());
   }
 
   /**
@@ -498,18 +556,23 @@ export abstract class Node extends Element {
   protected calculateContentLayout(
     bounds: Bounds,
     iconBoxSize?: Size,
-    _labelSize?: Size
+    labelSize?: Size
   ): { iconBounds: Bounds; labelBounds: Bounds } {
+    const iconContainer = this.getIconContainerBounds(bounds);
     const contentBounds = this.getLabelContainerBounds(bounds);
-    let iconBounds = contentBounds;
+    let iconBounds = iconContainer;
     if (this._icon && iconBoxSize) {
       iconBounds = this.getIconBounds(
-        contentBounds,
+        iconContainer,
         iconBoxSize,
         this._icon.placement
       );
     }
-    return { iconBounds, labelBounds: contentBounds };
+    const labelBounds =
+      isExternalLabelPlacement(this._labelPlacement) && this._label && labelSize
+        ? resolveExternalLabelBounds(bounds, this._labelPlacement, this._labelGap, labelSize)
+        : contentBounds;
+    return { iconBounds, labelBounds };
   }
 
   /**
@@ -524,10 +587,10 @@ export abstract class Node extends Element {
     }
 
     const bounds = this.getBounds();
-    const contentBounds = this.getLabelContainerBounds(bounds);
+    const wrapWidth = this.getLabelWrapWidth(bounds);
     const iconBoxSize = this._icon ? this.getIconBoxSize() : undefined;
 
-    this._label.setAutoMaxWidth(contentBounds.width);
+    this._label.setAutoMaxWidth(wrapWidth);
     const labelSize = this._label.measure(ctx);
 
     const { labelBounds } = this.calculateContentLayout(
@@ -536,10 +599,7 @@ export abstract class Node extends Element {
       labelSize
     );
 
-    const lines = this._label.getWrappedLines(
-      ctx,
-      Math.max(0, contentBounds.width)
-    );
+    const lines = this._label.getWrappedLines(ctx, Math.max(0, wrapWidth));
     return { bounds: labelBounds, lines };
   }
 
@@ -558,10 +618,10 @@ export abstract class Node extends Element {
   }
 
   /**
-   * Get world position of label center (center of content area).
+   * Get world position of label center (content area or external label box).
    */
   getLabelPosition(): Point {
-    const bounds = this.getLabelContainerBounds(this.getBounds());
+    const bounds = this.getResolvedLabelBounds();
     return {
       x: bounds.x + bounds.width / 2,
       y: bounds.y + bounds.height / 2,
@@ -579,18 +639,19 @@ export abstract class Node extends Element {
     let bounds = this.getBounds();
     this.renderBadges(ctx, bounds);
     const iconBoxSize = this._icon ? this.getIconBoxSize() : undefined;
+    const externalLabel = this.usesExternalLabel();
 
     if (this._label) {
-      this._label.setAutoMaxWidth(this.getLabelContainerBounds(bounds).width);
+      this._label.setAutoMaxWidth(this.getLabelWrapWidth(bounds));
     }
     const labelSize = this._label ? this._label.measure(ctx) : undefined;
 
-    if (labelSize || iconBoxSize) {
+    if ((labelSize || iconBoxSize) && !externalLabel) {
       this.ensureContentsFit(labelSize, iconBoxSize);
       // Re-measure after potential resize
       if (this._label && iconBoxSize) {
         bounds = this.getBounds();
-        this._label.setAutoMaxWidth(this.getLabelContainerBounds(bounds).width);
+        this._label.setAutoMaxWidth(this.getLabelWrapWidth(bounds));
       }
     }
 
@@ -682,10 +743,10 @@ export abstract class Node extends Element {
   }
 
   /**
-   * Render resize handles when selected
+   * Render the selection frame when selected, and resize handles when they are enabled.
    */
   renderResizeHandles(ctx: CanvasRenderingContext2D): void {
-    if (this._state !== 'selected' || !this._resizeHandlesEnabled) {
+    if (this._state !== 'selected') {
       return;
     }
 
@@ -696,7 +757,7 @@ export abstract class Node extends Element {
 
     ctx.save();
 
-    // Draw dashed selection rectangle
+    // Draw dashed selection rectangle even when resize is locked
     ctx.strokeStyle = DEFAULT_SELECTION_COLOR;
     ctx.lineWidth = 1;
     ctx.setLineDash([4, 4]);
@@ -706,6 +767,11 @@ export abstract class Node extends Element {
       bounds.width + offset * 2,
       bounds.height + offset * 2
     );
+
+    if (!this._resizeHandlesEnabled) {
+      ctx.restore();
+      return;
+    }
 
     // Draw resize handles
     ctx.fillStyle = '#ffffff';
@@ -727,7 +793,7 @@ export abstract class Node extends Element {
    * Hit test a resize handle
    */
   hitTestResizeHandle(point: Point): ResizeHandle | null {
-    if (this._state !== 'selected') {
+    if (this._state !== 'selected' || !this._resizeHandlesEnabled) {
       return null;
     }
 
@@ -754,12 +820,41 @@ export abstract class Node extends Element {
   hitTest(point: Point): boolean {
     const bounds = this.getBounds();
     const padding = NODE_HITBOX_PADDING;
-    return (
+    const shapeHit =
       point.x >= bounds.x - padding &&
       point.x <= bounds.x + bounds.width + padding &&
       point.y >= bounds.y - padding &&
-      point.y <= bounds.y + bounds.height + padding
-    );
+      point.y <= bounds.y + bounds.height + padding;
+    return shapeHit || this.hitTestExternalLabel(point);
+  }
+
+  protected hitTestExternalLabel(point: Point): boolean {
+    if (!this.usesExternalLabel()) {
+      return false;
+    }
+    return pointInBounds(point, this.getResolvedLabelBounds());
+  }
+
+  protected getLabelWrapWidth(bounds: Bounds = this.getBounds()): number {
+    if (this.usesExternalLabel()) {
+      return externalLabelWrapWidth(bounds.width);
+    }
+    return this.getLabelContainerBounds(bounds).width;
+  }
+
+  protected getResolvedLabelBounds(measured?: Size): Bounds {
+    const shape = this.getBounds();
+    if (!this.usesExternalLabel() || !this._label) {
+      return this.getLabelContainerBounds(shape);
+    }
+    const size = measured ?? {
+      width: this._label.measuredWidth || this.getLabelWrapWidth(shape),
+      height: this._label.measuredHeight || (this._label.style.fontSize ?? 14) * 1.2,
+    };
+    if (!isExternalLabelPlacement(this._labelPlacement)) {
+      return this.getLabelContainerBounds(shape);
+    }
+    return resolveExternalLabelBounds(shape, this._labelPlacement, this._labelGap, size);
   }
 
   /**
@@ -1037,27 +1132,42 @@ export abstract class Node extends Element {
     bounds: Bounds
   ): Size {
     const labelContainer = this.getLabelContainerBounds(bounds);
-    const widthFactor =
+    const iconContainer = this.getIconContainerBounds(bounds);
+    const labelWidthFactor =
       labelContainer.width > 0 ? bounds.width / labelContainer.width : 1;
-    const heightFactor =
+    const labelHeightFactor =
       labelContainer.height > 0 ? bounds.height / labelContainer.height : 1;
-
-    const minContentWidth = Math.max(
-      labelSize?.width ?? 0,
-      iconBoxSize?.width ?? 0
-    );
-    const minContentHeight = Math.max(
-      labelSize?.height ?? 0,
-      iconBoxSize?.height ?? 0
-    );
+    const iconWidthFactor =
+      iconContainer.width > 0 ? bounds.width / iconContainer.width : 1;
+    const iconHeightFactor =
+      iconContainer.height > 0 ? bounds.height / iconContainer.height : 1;
 
     return {
-      width: minContentWidth * widthFactor,
-      height: minContentHeight * heightFactor,
+      width: Math.max(
+        (labelSize?.width ?? 0) * labelWidthFactor,
+        (iconBoxSize?.width ?? 0) * iconWidthFactor
+      ),
+      height: Math.max(
+        (labelSize?.height ?? 0) * labelHeightFactor,
+        (iconBoxSize?.height ?? 0) * iconHeightFactor
+      ),
     };
   }
 
+  /**
+   * Content box for the node icon: AABB minus contentInset.
+   * Unlike {@link getLabelContainerBounds}, this is not shrunk to the
+   * inscribed rectangle of a circle/diamond, so a centered icon can fill the shape.
+   */
+  protected getIconContainerBounds(bounds: Bounds): Bounds {
+    return this.applyContentInset(bounds);
+  }
+
   protected getLabelContainerBounds(bounds: Bounds): Bounds {
+    return this.applyContentInset(bounds);
+  }
+
+  private applyContentInset(bounds: Bounds): Bounds {
     const { top, right, bottom, left } = resolveContentInset(
       this._contentInset,
       this._contentInsetScale,

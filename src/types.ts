@@ -118,7 +118,9 @@ export interface NodeStyle extends ElementStyle {
 }
 
 /**
- * Placement for label inside node bounds
+ * Node name placement.
+ * `auto` / `center` — inside the shape (current content area).
+ * `top` / `bottom` / `left` / `right` — outside the shape AABB.
  */
 export type LabelPlacement = 'auto' | 'center' | 'top' | 'bottom' | 'left' | 'right';
 
@@ -162,6 +164,7 @@ export interface TextStyle {
   fontSize?: number;
   fontFamily?: string;
   fontWeight?: string;
+  fontStyle?: string;
   color?: string;
   opacity?: number;
   align?: CanvasTextAlign;
@@ -307,6 +310,8 @@ export interface SerializedNode {
   label?: string | SerializedTextLabel;
   labelStyleClass?: string;
   labelPlacement?: LabelPlacement;
+  /** Gap in px between the shape AABB and an external label. */
+  labelGap?: number;
   icon?: SerializedNodeIcon;
   /** Content area insets per side (default 0 = full bounds) */
   contentInset?: number | ContentInsetSides;

@@ -37,7 +37,7 @@ export class CircleNode extends Node {
     // Ellipse equation: (x-h)²/rx² + (y-k)²/ry² <= 1
     const dx = point.x - center.x;
     const dy = point.y - center.y;
-    return (dx * dx) / (rx * rx) + (dy * dy) / (ry * ry) <= 1;
+    return (dx * dx) / (rx * rx) + (dy * dy) / (ry * ry) <= 1 || this.hitTestExternalLabel(point);
   }
 
   override getOutlineDirection(param: number): 'top' | 'right' | 'bottom' | 'left' {

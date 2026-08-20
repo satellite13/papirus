@@ -2,6 +2,15 @@ import type { Edge } from '@/elements/Edge';
 import type { Group } from '@/elements/Group';
 import type { Node } from '@/elements/Node';
 import type { StyleManager } from '@/styles/StyleManager';
+import type { TextStyle } from '@/types';
+
+export function canvasFontFromTextStyle(style: TextStyle): string {
+  const fontStyle = style.fontStyle ?? 'normal';
+  const fontWeight = style.fontWeight ?? 'normal';
+  const fontSize = style.fontSize ?? 14;
+  const fontFamily = style.fontFamily ?? 'sans-serif';
+  return `${fontStyle} ${fontWeight} ${fontSize}px ${fontFamily}`;
+}
 
 /**
  * Shallow compare two objects

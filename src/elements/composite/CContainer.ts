@@ -9,6 +9,7 @@ import {
 import { CompositeComponentBase } from './CompositeComponentBase';
 import { flexLayout, type FlexChild, type FlexConfig } from './FlexLayout';
 import type { CShape } from './CShape';
+import type { CText } from './CText';
 
 function isCContainer(component: CComponent): component is CContainer {
   return component.type === 'container';
@@ -16,6 +17,10 @@ function isCContainer(component: CComponent): component is CContainer {
 
 function isCShape(component: CComponent): component is CShape {
   return component.type === 'shape';
+}
+
+function isCText(component: CComponent): component is CText {
+  return component.type === 'text';
 }
 
 export interface CContainerOptions {
@@ -48,6 +53,8 @@ export class CContainer extends CompositeComponentBase {
   // Cached layout results from last render (used by hitTest and toSVG)
   private _cachedBounds: Bounds[] | null = null;
   private _cachedContainerBounds: Bounds | null = null;
+  private _layoutChildren: CComponent[] | null = null;
+  private _suppressBoundName = false;
 
   constructor(options: CContainerOptions = {}) {
     super();
@@ -90,6 +97,38 @@ export class CContainer extends CompositeComponentBase {
     return this._children;
   }
 
+  /**
+   * When true, CText bound to `__name__` is omitted from measure/render/hit/SVG.
+   * Used when CompositeNode draws the name as an external Node.label.
+   */
+  setSuppressBoundName(value: boolean): void {
+    if (this._suppressBoundName === value) {
+      return;
+    }
+    this._suppressBoundName = value;
+    this._cachedBounds = null;
+    this._layoutChildren = null;
+    for (const child of this._children) {
+      if (isCContainer(child)) {
+        child.setSuppressBoundName(value);
+      }
+      if (isCShape(child) && child.content) {
+        child.content.setSuppressBoundName(value);
+      }
+    }
+  }
+
+  private isLayoutSkipped(child: CComponent): boolean {
+    if (child.style.visible === false) {
+      return true;
+    }
+    return this._suppressBoundName && isCText(child) && child.bindToProperty === '__name__';
+  }
+
+  private getLayoutChildren(): CComponent[] {
+    return this._children.filter((child) => !this.isLayoutSkipped(child));
+  }
+
   addChild(child: CComponent): void {
     child.setOnChange(() => this.handleChildChange());
     this._children.push(child);
@@ -126,8 +165,11 @@ export class CContainer extends CompositeComponentBase {
     };
   }
 
-  private buildFlexChildren(ctx: CanvasRenderingContext2D): FlexChild[] {
-    return this._children.map((child) => {
+  private buildFlexChildren(
+    ctx: CanvasRenderingContext2D,
+    children: readonly CComponent[] = this.getLayoutChildren()
+  ): FlexChild[] {
+    return children.map((child) => {
       const s = child.style;
       const measured = child.measure(ctx);
       return {
@@ -166,13 +208,15 @@ export class CContainer extends CompositeComponentBase {
   render(ctx: CanvasRenderingContext2D, bounds: Bounds): void {
     if (this.style.visible === false) return;
 
-    const flexChildren = this.buildFlexChildren(ctx);
+    const layoutChildren = this.getLayoutChildren();
+    const flexChildren = this.buildFlexChildren(ctx, layoutChildren);
     const result = flexLayout(
       { width: bounds.width, height: bounds.height },
       this.getFlexConfig(),
       flexChildren
     );
 
+    this._layoutChildren = layoutChildren;
     this._cachedBounds = result.childBounds;
     this._cachedContainerBounds = bounds;
 
@@ -182,9 +226,8 @@ export class CContainer extends CompositeComponentBase {
       ctx.globalAlpha *= opacity;
     }
 
-    for (let i = 0; i < this._children.length; i++) {
-      const child = this._children[i]!;
-      if (child.style.visible === false) continue;
+    for (let i = 0; i < layoutChildren.length; i++) {
+      const child = layoutChildren[i]!;
       const cb = result.childBounds[i]!;
       // Translate child bounds to absolute position
       child.render(ctx, {
@@ -204,12 +247,11 @@ export class CContainer extends CompositeComponentBase {
     if (this.style.visible === false) return null;
 
     // Use cached bounds if available, otherwise can't hit test children
-    if (!this._cachedBounds) return null;
+    if (!this._cachedBounds || !this._layoutChildren) return null;
 
     // Iterate back-to-front (last child is on top)
-    for (let i = this._children.length - 1; i >= 0; i--) {
-      const child = this._children[i]!;
-      if (child.style.visible === false) continue;
+    for (let i = this._layoutChildren.length - 1; i >= 0; i--) {
+      const child = this._layoutChildren[i]!;
       const cb = this._cachedBounds[i]!;
       const absBounds = {
         x: bounds.x + cb.x,
@@ -222,6 +264,26 @@ export class CContainer extends CompositeComponentBase {
     }
 
     return null;
+  }
+
+  /**
+   * First CText bound to `__name__`, including suppressed name text.
+   */
+  findBoundNameText(): CText | undefined {
+    for (const child of this._children) {
+      if (isCText(child) && child.bindToProperty === '__name__') {
+        return child;
+      }
+      if (isCContainer(child)) {
+        const found = child.findBoundNameText();
+        if (found) return found;
+      }
+      if (isCShape(child) && child.content) {
+        const found = child.content.findBoundNameText();
+        if (found) return found;
+      }
+    }
+    return undefined;
   }
 
   /**
@@ -273,10 +335,10 @@ export class CContainer extends CompositeComponentBase {
     // Use cached bounds from last render() for accurate layout
     const cachedBounds = this._cachedBounds;
     const cachedContainer = this._cachedContainerBounds;
+    const layoutChildren = this._layoutChildren ?? this.getLayoutChildren();
 
-    const childSvg = this._children
+    const childSvg = layoutChildren
       .map((child, i) => {
-        if (child.style.visible === false) return '';
         if (cachedBounds && cachedContainer) {
           // Use cached layout — translate from cached container origin to export bounds
           const cb = cachedBounds[i]!;
@@ -290,7 +352,7 @@ export class CContainer extends CompositeComponentBase {
           });
         }
         // Fallback: distribute evenly (no ctx available for proper layout)
-        const h = bounds.height / Math.max(1, this._children.length);
+        const h = bounds.height / Math.max(1, layoutChildren.length);
         return child.toSVG({
           x: bounds.x,
           y: bounds.y + i * h,
