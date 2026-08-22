@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.6] - 2026-08-23
+
+### Fixed
+- With `attachToOutline`, a drop on a node's contour stays on that node when a nearby crossing stroke is farther away, so a large container fill does not steal the connection.
+
 ## [0.9.5] - 2026-08-22
 
 ### Fixed
@@ -444,7 +449,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Edge animations (flow effect)
 - Context menu and search/filter
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.5...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.6...HEAD
+[0.9.6]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.5...v0.9.6
 [0.9.5]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.4...v0.9.5
 [0.9.4]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.3...v0.9.4
 [0.9.3]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.2...v0.9.3

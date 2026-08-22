@@ -9,6 +9,11 @@
 
 ## [Unreleased]
 
+## [0.9.6] - 2026-08-23
+
+### Исправлено
+- В режиме `attachToOutline` drop на контуре узла остаётся на узле, если соседняя пересекающая стрелка дальше, и заливка большого контейнера не перехватывает связь.
+
 ## [0.9.5] - 2026-08-22
 
 ### Исправлено
@@ -451,7 +456,8 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.5...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.6...HEAD
+[0.9.6]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.5...v0.9.6
 [0.9.5]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.4...v0.9.5
 [0.9.4]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.3...v0.9.4
 [0.9.3]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.2...v0.9.3
