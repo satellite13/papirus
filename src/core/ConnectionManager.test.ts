@@ -216,7 +216,7 @@ describe('ConnectionManager', () => {
     expect(interaction.connection.connecting).toBe(true);
   });
 
-  it('does not show outline handle on a selected node resize corner', () => {
+  it('shows resize cursor instead of outline handle on a selected node resize corner', () => {
     const canvas = createCanvas(400, 200);
     const renderer = new DiagramRenderer(canvas, { width: 400, height: 200, retina: false });
     const interaction = renderer.enableInteractions({
@@ -236,7 +236,7 @@ describe('ConnectionManager', () => {
       })
     );
 
-    expect(canvas.style.cursor).not.toBe('crosshair');
+    expect(canvas.style.cursor).toBe('nwse-resize');
   });
 
   it('creates edge when connection completed with attachToOutline', () => {

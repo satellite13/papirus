@@ -85,6 +85,7 @@ interactions.changeNodeProperties(node.id, (n) => {
 - `Middle Mouse drag` — панорамирование.
 - `Wheel` — zoom.
 - `Esc` — закрыть открытое контекстное меню.
+- Наведение на угловую ручку выбранного узла — курсор `nwse-resize` / `nesw-resize`.
 
 ## Inline-редактирование меток
 

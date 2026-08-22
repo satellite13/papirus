@@ -1071,6 +1071,77 @@ describe('InteractionManager', () => {
     expect(node.height).toBe(50);
   });
 
+  it('changes canvas cursor when hovering a selected node resize handle', () => {
+    const canvas = document.createElement('canvas');
+    vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 300,
+      height: 200,
+      right: 300,
+      bottom: 200,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+    const renderer = new DiagramRenderer(canvas, { width: 300, height: 200, retina: false });
+    const interaction = renderer.enableInteractions();
+
+    const node = new RectangleNode({ x: 50, y: 50, width: 60, height: 40 });
+    renderer.addNode(node);
+    interaction.selection.select(node.id);
+
+    const seHandleX = 50 + 60 + 6;
+    const seHandleY = 50 + 40 + 6;
+    const neHandleX = 50 + 60 + 6;
+    const neHandleY = 50 - 6;
+
+    canvas.dispatchEvent(
+      new MouseEvent('mousemove', { clientX: seHandleX, clientY: seHandleY, bubbles: true })
+    );
+    expect(canvas.style.cursor).toBe('nwse-resize');
+
+    canvas.dispatchEvent(
+      new MouseEvent('mousemove', { clientX: neHandleX, clientY: neHandleY, bubbles: true })
+    );
+    expect(canvas.style.cursor).toBe('nesw-resize');
+
+    canvas.dispatchEvent(new MouseEvent('mousemove', { clientX: 80, clientY: 70, bubbles: true }));
+    expect(canvas.style.cursor).not.toMatch(/resize/);
+  });
+
+  it('does not show a resize cursor when handles are disabled', () => {
+    const canvas = document.createElement('canvas');
+    vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 300,
+      height: 200,
+      right: 300,
+      bottom: 200,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+    const renderer = new DiagramRenderer(canvas, { width: 300, height: 200, retina: false });
+    const interaction = renderer.enableInteractions();
+
+    const node = new RectangleNode({
+      x: 50,
+      y: 50,
+      width: 60,
+      height: 40,
+      resizeHandlesEnabled: false,
+    });
+    renderer.addNode(node);
+    interaction.selection.select(node.id);
+
+    canvas.dispatchEvent(
+      new MouseEvent('mousemove', { clientX: 50 + 60 + 6, clientY: 50 + 40 + 6, bubbles: true })
+    );
+    expect(canvas.style.cursor).not.toMatch(/resize/);
+  });
+
   it('does not record history when resize bounds are unchanged', () => {
     const canvas = document.createElement('canvas');
     vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({
