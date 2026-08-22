@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Hovering a selected node's resize corner sets `nwse-resize` / `nesw-resize` instead of leaving the default cursor (`updateBadgeHover` was clearing it, and ResizeManager never set a replacement).
+
 ## [0.9.4] - 2026-08-20
 
 ### Added

@@ -6,6 +6,10 @@ import type { Bounds, Point } from '@/types';
 import type { ResizeHandle } from '@/elements/Node';
 import { distance } from '@/utils/geometry';
 
+function cursorForResizeHandle(handle: ResizeHandle): string {
+  return handle === 'nw' || handle === 'se' ? 'nwse-resize' : 'nesw-resize';
+}
+
 /**
  * Resize events
  */
@@ -111,6 +115,23 @@ export class ResizeManager extends EventEmitter<ResizeEvents> {
     this.minWidth = Math.max(this.minSize, contentMinSize.width);
     this.minHeight = Math.max(this.minSize, contentMinSize.height);
     return true;
+  }
+
+  /**
+   * Set canvas cursor when the pointer is over a selected node's resize handle.
+   * Call after badge/connection hover so the resize cursor wins on corners.
+   */
+  updateHoverCursor(event: InputEvent): void {
+    if (this.renderer.blocksDiagramPointerAtScreen(event.screenX, event.screenY)) {
+      return;
+    }
+
+    const handle = this.isResizing ? this.handle : this.hitTestSelectedHandle(event);
+    if (!handle) {
+      return;
+    }
+
+    this.setCursor(cursorForResizeHandle(handle));
   }
 
   /**
@@ -269,6 +290,27 @@ export class ResizeManager extends EventEmitter<ResizeEvents> {
     }
 
     return { x, y, width, height };
+  }
+
+  private hitTestSelectedHandle(event: InputEvent): ResizeHandle | null {
+    const selectedIds = Array.from(this.selectionManager.selectedIds);
+    if (selectedIds.length !== 1) {
+      return null;
+    }
+
+    const node = this.renderer.getNode(selectedIds[0]!);
+    if (!node) {
+      return null;
+    }
+
+    return node.hitTestResizeHandle({ x: event.worldX, y: event.worldY });
+  }
+
+  private setCursor(cursor: string): void {
+    const canvas = this.renderer.getCanvas();
+    if (canvas.style.cursor !== cursor) {
+      canvas.style.cursor = cursor;
+    }
   }
 
   private reset(): void {

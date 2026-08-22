@@ -701,6 +701,7 @@ export class InteractionManager {
 
     if (!this.navigationOnly) {
       if (this.resizeManager.handleMouseMove(event)) {
+        this.resizeManager.updateHoverCursor(event);
         return;
       }
 
@@ -711,6 +712,8 @@ export class InteractionManager {
       if (this.dragManager.handleMouseMove(event)) {
         return;
       }
+
+      this.resizeManager.updateHoverCursor(event);
     }
 
     if (this.selectionManager.selectionRectangle !== null) {
