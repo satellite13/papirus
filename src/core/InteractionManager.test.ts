@@ -1331,4 +1331,203 @@ describe('InteractionManager', () => {
     expect(follower.x).toBe(followerInitial.x);
     expect(follower.y).toBe(followerInitial.y);
   });
+
+  it('undo restores inner editable-polyline control points moved with a group leader', () => {
+    const canvas = document.createElement('canvas');
+    vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 400,
+      height: 300,
+      right: 400,
+      bottom: 300,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+    const renderer = new DiagramRenderer(canvas, { width: 400, height: 300, retina: false });
+    const interaction = new InteractionManager({ renderer });
+
+    const leader = new RectangleNode({ x: 0, y: 0, width: 280, height: 200 });
+    const childA = new RectangleNode({ x: 30, y: 40, width: 40, height: 30 });
+    const childB = new RectangleNode({ x: 180, y: 40, width: 40, height: 30 });
+    renderer.addNode(leader);
+    renderer.addNode(childA);
+    renderer.addNode(childB);
+    const edge = new Edge({
+      from: { nodeId: childA.id },
+      to: { nodeId: childB.id },
+      type: 'editable-polyline',
+      controlPoints: [
+        { x: 90, y: 20 },
+        { x: 150, y: 80 },
+      ],
+    });
+    renderer.addEdge(edge);
+    edge.updateEndpoints({ x: 70, y: 55 }, { x: 180, y: 55 });
+
+    const cpBefore = [
+      { x: edge.controlPoints![0]!.x, y: edge.controlPoints![0]!.y },
+      { x: edge.controlPoints![1]!.x, y: edge.controlPoints![1]!.y },
+    ];
+    let leaderInitial = { x: leader.x, y: leader.y };
+    let childAInitial = { x: childA.x, y: childA.y };
+    let childBInitial = { x: childB.x, y: childB.y };
+
+    interaction.selection.select(leader.id);
+    interaction.drag.on('dragstart', (ids: string[]) => {
+      if (ids.length === 1 && ids[0] === leader.id) {
+        leaderInitial = { x: leader.x, y: leader.y };
+        childAInitial = { x: childA.x, y: childA.y };
+        childBInitial = { x: childB.x, y: childB.y };
+        interaction.recordAdditionalDragStartPositions([childA.id, childB.id]);
+      }
+    });
+    interaction.drag.on('drag', () => {
+      const dx = leader.x - leaderInitial.x;
+      const dy = leader.y - leaderInitial.y;
+      childA.x = childAInitial.x + dx;
+      childA.y = childAInitial.y + dy;
+      childB.x = childBInitial.x + dx;
+      childB.y = childBInitial.y + dy;
+      edge.controlPoints = cpBefore.map((p) => ({ x: p.x + dx, y: p.y + dy }));
+    });
+
+    const startX = 20;
+    const startY = 20;
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', { clientX: startX, clientY: startY, button: 0, bubbles: true })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mousemove', {
+        clientX: startX + 40,
+        clientY: startY + 25,
+        button: 0,
+        buttons: 1,
+        bubbles: true,
+      })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mouseup', {
+        clientX: startX + 40,
+        clientY: startY + 25,
+        button: 0,
+        bubbles: true,
+      })
+    );
+
+    expect(leader.x).not.toBe(leaderInitial.x);
+    expect(edge.controlPoints![0]!.x).not.toBe(cpBefore[0]!.x);
+
+    interaction.history.undo();
+
+    expect(leader.x).toBe(leaderInitial.x);
+    expect(childA.x).toBe(childAInitial.x);
+    expect(childB.x).toBe(childBInitial.x);
+    expect(edge.controlPoints![0]).toEqual(cpBefore[0]);
+    expect(edge.controlPoints![1]).toEqual(cpBefore[1]);
+  });
+
+  it('undo restores editable-polyline bends inside a nested grouping box', () => {
+    const canvas = document.createElement('canvas');
+    vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 500,
+      height: 360,
+      right: 500,
+      bottom: 360,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+    const renderer = new DiagramRenderer(canvas, { width: 500, height: 360, retina: false });
+    const interaction = new InteractionManager({ renderer });
+
+    const outer = new RectangleNode({ x: 0, y: 0, width: 360, height: 260 });
+    const inner = new RectangleNode({ x: 40, y: 40, width: 380, height: 180 });
+    const childA = new RectangleNode({ x: 60, y: 70, width: 40, height: 30 });
+    const childB = new RectangleNode({ x: 340, y: 70, width: 40, height: 30 });
+    renderer.addNode(outer);
+    renderer.addNode(inner);
+    renderer.addNode(childA);
+    renderer.addNode(childB);
+    const edge = new Edge({
+      from: { nodeId: childA.id },
+      to: { nodeId: childB.id },
+      type: 'editable-polyline',
+      controlPoints: [
+        { x: 120, y: 30 },
+        { x: 250, y: 90 },
+      ],
+    });
+    renderer.addEdge(edge);
+    edge.updateEndpoints({ x: 100, y: 85 }, { x: 340, y: 85 });
+
+    const cpBefore = [
+      { x: edge.controlPoints![0]!.x, y: edge.controlPoints![0]!.y },
+      { x: edge.controlPoints![1]!.x, y: edge.controlPoints![1]!.y },
+    ];
+    let outerInitial = { x: outer.x, y: outer.y };
+    let innerInitial = { x: inner.x, y: inner.y };
+    let childAInitial = { x: childA.x, y: childA.y };
+    let childBInitial = { x: childB.x, y: childB.y };
+
+    interaction.selection.select(outer.id);
+    interaction.drag.on('dragstart', (ids: string[]) => {
+      if (ids.length === 1 && ids[0] === outer.id) {
+        outerInitial = { x: outer.x, y: outer.y };
+        innerInitial = { x: inner.x, y: inner.y };
+        childAInitial = { x: childA.x, y: childA.y };
+        childBInitial = { x: childB.x, y: childB.y };
+        interaction.recordAdditionalDragStartPositions([inner.id, childA.id, childB.id]);
+      }
+    });
+    interaction.drag.on('drag', () => {
+      const dx = outer.x - outerInitial.x;
+      const dy = outer.y - outerInitial.y;
+      inner.x = innerInitial.x + dx;
+      inner.y = innerInitial.y + dy;
+      childA.x = childAInitial.x + dx;
+      childA.y = childAInitial.y + dy;
+      childB.x = childBInitial.x + dx;
+      childB.y = childBInitial.y + dy;
+      edge.controlPoints = cpBefore.map((p) => ({ x: p.x + dx, y: p.y + dy }));
+    });
+
+    const startX = 20;
+    const startY = 20;
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', { clientX: startX, clientY: startY, button: 0, bubbles: true })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mousemove', {
+        clientX: startX + 36,
+        clientY: startY + 20,
+        button: 0,
+        buttons: 1,
+        bubbles: true,
+      })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mouseup', {
+        clientX: startX + 36,
+        clientY: startY + 20,
+        button: 0,
+        bubbles: true,
+      })
+    );
+
+    expect(outer.x).not.toBe(outerInitial.x);
+    expect(edge.controlPoints![0]!.x).not.toBe(cpBefore[0]!.x);
+
+    interaction.history.undo();
+
+    expect(outer.x).toBe(outerInitial.x);
+    expect(inner.x).toBe(innerInitial.x);
+    expect(childA.x).toBe(childAInitial.x);
+    expect(childB.x).toBe(childBInitial.x);
+    expect(edge.controlPoints![0]).toEqual(cpBefore[0]);
+    expect(edge.controlPoints![1]).toEqual(cpBefore[1]);
+  });
 });
