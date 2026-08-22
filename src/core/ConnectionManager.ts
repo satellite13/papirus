@@ -623,6 +623,8 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     }
 
     // Prefer edge drop when closer than outline/node snap (outline tolerance is larger).
+    // A container fill must not steal an outline snap that is strictly closer than the stroke —
+    // otherwise node→node attach-to-outline is remapped onto a nearby crossing edge.
     const edgeDrop = this.findEdgeDropTarget(
       cursorPoint,
       searchGroupFill ? { maxScreenPx: EDGE_DROP_FILL_SCREEN_TOLERANCE } : undefined
@@ -634,7 +636,15 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
         const dy = cursorPoint.y - snappedPoint.y;
         nodeDistance = Math.sqrt(dx * dx + dy * dy);
       }
-      if (searchGroupFill || !targetNode || edgeDrop.distance <= nodeDistance) {
+      const preferOutlineOverFillEdge =
+        this.attachToOutline &&
+        this.previewTargetOutlineParam !== null &&
+        nodeDistance < edgeDrop.distance;
+      if (
+        (searchGroupFill && !preferOutlineOverFillEdge) ||
+        !targetNode ||
+        edgeDrop.distance <= nodeDistance
+      ) {
         targetNode = null;
         this.previewTargetNodeId = null;
         this.previewTargetOutlineParam = null;

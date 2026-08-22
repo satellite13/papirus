@@ -390,6 +390,69 @@ describe('ConnectionManager', () => {
     expect(created.to.pathParam).toBeLessThan(0.8);
   });
 
+  it('keeps attach-to-outline snap on a node when a nearby polyline crosses the outline', () => {
+    const canvas = createCanvas(420, 280);
+    const renderer = new DiagramRenderer(canvas, { width: 420, height: 280, retina: false });
+    renderer.enableInteractions({
+      attachToOutline: true,
+      createEdge: (from, to) => new Edge({ from, to, type: 'straight' }),
+    });
+
+    const source = new RectangleNode({ x: 20, y: 210, width: 40, height: 30 });
+    const group = new RectangleNode({ x: 100, y: 20, width: 280, height: 160 });
+    const innerA = new RectangleNode({ x: 140, y: 40, width: 40, height: 24 });
+    const innerB = new RectangleNode({ x: 300, y: 40, width: 40, height: 24 });
+    renderer.addNode(source);
+    renderer.addNode(group);
+    renderer.addNode(innerA);
+    renderer.addNode(innerB);
+
+    const host = new Edge({
+      from: { nodeId: innerA.id },
+      to: { nodeId: innerB.id },
+      type: 'straight',
+    });
+    renderer.addEdge(host);
+    host.updateEndpoints({ x: 120, y: 30 }, { x: 120, y: 170 });
+
+    const dropX = 100;
+    const dropY = 100;
+
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', {
+        clientX: 60,
+        clientY: 225,
+        button: 0,
+        shiftKey: true,
+        bubbles: true,
+      })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mousemove', {
+        clientX: dropX,
+        clientY: dropY,
+        button: 0,
+        buttons: 1,
+        shiftKey: true,
+        bubbles: true,
+      })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mouseup', {
+        clientX: dropX,
+        clientY: dropY,
+        button: 0,
+        bubbles: true,
+      })
+    );
+
+    const created = Array.from(renderer.edges.values()).find(edge => edge.id !== host.id);
+    expect(created?.from.nodeId).toBe(source.id);
+    expect(created?.to.nodeId).toBe(group.id);
+    expect(created?.to.edgeId).toBeUndefined();
+    expect(created?.to.outlineParam).toBeDefined();
+  });
+
   it('attaches a note to an edge that crosses a group node fill, not to the group', () => {
     const canvas = createCanvas(400, 220);
     const renderer = new DiagramRenderer(canvas, { width: 400, height: 220, retina: false });
