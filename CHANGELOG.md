@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.5] - 2026-08-22
+
 ### Fixed
 - Hovering a selected node's resize corner sets `nwse-resize` / `nesw-resize` instead of leaving the default cursor (`updateBadgeHover` was clearing it, and ResizeManager never set a replacement).
 
@@ -442,7 +444,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Edge animations (flow effect)
 - Context menu and search/filter
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.4...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.5...HEAD
+[0.9.5]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.4...v0.9.5
 [0.9.4]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.3...v0.9.4
 [0.9.3]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.2...v0.9.3
 [0.9.2]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.1...v0.9.2

@@ -9,6 +9,8 @@
 
 ## [Unreleased]
 
+## [0.9.5] - 2026-08-22
+
 ### Исправлено
 - При наведении на угловую ручку выбранного узла курсор становится `nwse-resize` / `nesw-resize`, а не остаётся обычной стрелкой (`updateBadgeHover` сбрасывал курсор, а ResizeManager его не выставлял).
 
@@ -449,7 +451,8 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.4...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.5...HEAD
+[0.9.5]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.4...v0.9.5
 [0.9.4]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.3...v0.9.4
 [0.9.3]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.2...v0.9.3
 [0.9.2]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.1...v0.9.2
