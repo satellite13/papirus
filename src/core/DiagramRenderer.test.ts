@@ -5,6 +5,36 @@ import { Group } from '../elements/Group';
 import { RectangleNode } from '../elements/nodes/RectangleNode';
 import { stubCanvasContext, stubAnimationFrame } from '../test/testUtils';
 
+type DirtyRenderer = { _dirty: boolean; renderFrame: (now: number) => void };
+
+function trackCanvasWidthWrites(canvas: HTMLCanvasElement): number[] {
+  const writes: number[] = [];
+  let value = canvas.width;
+  Object.defineProperty(canvas, 'width', {
+    configurable: true,
+    get: () => value,
+    set: (next: number) => {
+      writes.push(next);
+      value = next;
+    },
+  });
+  return writes;
+}
+
+function stubFlushableAnimationFrame(): { flush: () => void } {
+  const frames: FrameRequestCallback[] = [];
+  vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+    frames.push(callback);
+    return frames.length;
+  });
+  return {
+    flush(): void {
+      const callback = frames.shift();
+      callback?.(0);
+    },
+  };
+}
+
 describe('DiagramRenderer', () => {
   beforeEach(() => {
     stubCanvasContext();
@@ -153,5 +183,34 @@ describe('DiagramRenderer', () => {
     renderer.render();
 
     expect(calls).toEqual(['underlay', 'node', 'overlay', 'top-overlay']);
+  });
+
+  it('resets the canvas backing store only when resize changes the size', () => {
+    const canvas = document.createElement('canvas');
+    const widthWrites = trackCanvasWidthWrites(canvas);
+    const renderer = new DiagramRenderer(canvas, { width: 200, height: 100, retina: false });
+    const writesAfterSetup = widthWrites.length;
+
+    renderer.resize(200, 100);
+
+    expect(widthWrites.length).toBe(writesAfterSetup);
+
+    renderer.resize(240, 120);
+
+    expect(widthWrites.length).toBe(writesAfterSetup + 1);
+  });
+
+  it('keeps the next frame dirty when a redraw is requested during paint', () => {
+    const frames = stubFlushableAnimationFrame();
+    const canvas = document.createElement('canvas');
+    const renderer = new DiagramRenderer(canvas, { width: 200, height: 100, retina: false });
+    const dirtyRenderer = renderer as unknown as DirtyRenderer;
+    renderer.on('render', () => {
+      renderer.markDirty();
+    });
+
+    frames.flush();
+
+    expect(dirtyRenderer._dirty).toBe(true);
   });
 });

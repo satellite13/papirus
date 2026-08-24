@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.7] - 2026-08-24
+
+### Fixed
+- Panning a large diagram no longer leaves a blank canvas (grid, rulers, and minimap vanished until the next pan). Same-size resize no longer resets the bitmap, and a redraw requested during paint is kept for the next frame.
+
 ## [0.9.6] - 2026-08-23
 
 ### Fixed
@@ -449,7 +454,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Edge animations (flow effect)
 - Context menu and search/filter
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.6...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.7...HEAD
+[0.9.7]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.6...v0.9.7
 [0.9.6]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.5...v0.9.6
 [0.9.5]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.4...v0.9.5
 [0.9.4]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.3...v0.9.4

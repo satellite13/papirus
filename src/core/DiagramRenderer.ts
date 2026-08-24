@@ -347,11 +347,18 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> implements Diag
    * Resize the canvas
    */
   resize(width: number, height: number): void {
+    const nextRatio = this.options.retina ? window.devicePixelRatio || 1 : 1;
+    const sizeChanged =
+      this.options.width !== width ||
+      this.options.height !== height ||
+      this.devicePixelRatio !== nextRatio;
     this.options.width = width;
     this.options.height = height;
-    this.setupCanvas();
+    if (sizeChanged) {
+      this.setupCanvas();
+      this.markDirty();
+    }
     this.updateCanvasRect();
-    this.markDirty();
   }
 
   /**
@@ -879,8 +886,10 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> implements Diag
       this._canvasRect = null;
 
       if (this._dirty) {
-        this.renderFrame(now);
+        // Clear before paint so resize/markDirty during the frame still schedules the next one.
+        // Setting canvas.width after paint would otherwise leave a blank buffer with _dirty=false.
         this._dirty = false;
+        this.renderFrame(now);
       }
 
       this.animationFrameId = requestAnimationFrame(loop);

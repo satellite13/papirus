@@ -9,6 +9,11 @@
 
 ## [Unreleased]
 
+## [0.9.7] - 2026-08-24
+
+### Исправлено
+- При панорамировании большой диаграммы холст больше не остаётся пустым (пропадали сетка, линейки и миникарта, пока снова не сдвинуть вид). Resize с тем же размером больше не сбрасывает bitmap, а запрос перерисовки во время кадра сохраняется на следующий.
+
 ## [0.9.6] - 2026-08-23
 
 ### Исправлено
@@ -456,7 +461,8 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.6...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.7...HEAD
+[0.9.7]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.6...v0.9.7
 [0.9.6]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.5...v0.9.6
 [0.9.5]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.4...v0.9.5
 [0.9.4]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.3...v0.9.4
