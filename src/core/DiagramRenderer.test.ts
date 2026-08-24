@@ -200,6 +200,81 @@ describe('DiagramRenderer', () => {
     expect(widthWrites.length).toBe(writesAfterSetup + 1);
   });
 
+  it('does not paint while the 2D context is lost and keeps the frame dirty', () => {
+    const frames = stubFlushableAnimationFrame();
+    const canvas = document.createElement('canvas');
+    const renderer = new DiagramRenderer(canvas, { width: 200, height: 100, retina: false });
+    const dirtyRenderer = renderer as unknown as DirtyRenderer;
+    const renderSpy = vi.spyOn(dirtyRenderer, 'renderFrame');
+
+    canvas.dispatchEvent(new Event('contextlost'));
+    dirtyRenderer._dirty = true;
+    frames.flush();
+
+    expect(renderSpy).not.toHaveBeenCalled();
+    expect(dirtyRenderer._dirty).toBe(true);
+  });
+
+  it('paints after the 2D context is restored without resetting the backing store', () => {
+    const frames = stubFlushableAnimationFrame();
+    const canvas = document.createElement('canvas');
+    const renderer = new DiagramRenderer(canvas, { width: 200, height: 100, retina: false });
+    const dirtyRenderer = renderer as unknown as DirtyRenderer & {
+      setupCanvas: () => void;
+    };
+    const setupSpy = vi.spyOn(dirtyRenderer, 'setupCanvas');
+    const renderSpy = vi.spyOn(dirtyRenderer, 'renderFrame');
+
+    canvas.dispatchEvent(new Event('contextlost'));
+    dirtyRenderer._dirty = true;
+    frames.flush();
+    renderSpy.mockClear();
+    setupSpy.mockClear();
+
+    canvas.dispatchEvent(new Event('contextrestored'));
+
+    expect(setupSpy).not.toHaveBeenCalled();
+    expect(dirtyRenderer._dirty).toBe(true);
+
+    frames.flush();
+
+    expect(renderSpy).toHaveBeenCalled();
+  });
+
+  it('does not reset the canvas backing store when the 2D context is restored', () => {
+    const canvas = document.createElement('canvas');
+    const widthWrites = trackCanvasWidthWrites(canvas);
+    const renderer = new DiagramRenderer(canvas, { width: 200, height: 100, retina: false });
+    const writesAfterSetup = widthWrites.length;
+
+    canvas.dispatchEvent(new Event('contextlost'));
+    canvas.dispatchEvent(new Event('contextrestored'));
+
+    expect(widthWrites.length).toBe(writesAfterSetup);
+    expect((renderer as unknown as DirtyRenderer)._dirty).toBe(true);
+  });
+
+  it('does not preventDefault on 2D contextlost so Chrome can restore the context', () => {
+    const canvas = document.createElement('canvas');
+    new DiagramRenderer(canvas, { width: 200, height: 100, retina: false });
+    const event = new Event('contextlost', { cancelable: true });
+
+    canvas.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(false);
+  });
+
+  it('unsubscribes from context lost events on destroy', () => {
+    const canvas = document.createElement('canvas');
+    const renderer = new DiagramRenderer(canvas, { width: 200, height: 100, retina: false });
+    const removeSpy = vi.spyOn(canvas, 'removeEventListener');
+
+    renderer.destroy();
+
+    expect(removeSpy).toHaveBeenCalledWith('contextlost', expect.any(Function));
+    expect(removeSpy).toHaveBeenCalledWith('contextrestored', expect.any(Function));
+  });
+
   it('keeps the next frame dirty when a redraw is requested during paint', () => {
     const frames = stubFlushableAnimationFrame();
     const canvas = document.createElement('canvas');

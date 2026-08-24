@@ -108,6 +108,8 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> implements Diag
   /** Node/edge layout changed — edge endpoints must be resynced before paint. */
   private _contentDirty = true;
   private _destroyed = false;
+  /** Chrome may drop the accelerated 2D backing store; nothing can be painted until it returns. */
+  private _contextLost = false;
   private _canvasRect: DOMRectReadOnly | null = null;
   private _nodeObstaclesCache: PathObstacle[] | null = null;
 
@@ -175,8 +177,27 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> implements Diag
     });
 
     this.setupCanvas();
+    this.canvas.addEventListener('contextlost', this.handleContextLost);
+    this.canvas.addEventListener('contextrestored', this.handleContextRestored);
     this.startRenderLoop();
   }
+
+  private readonly handleContextLost = (): void => {
+    this._contextLost = true;
+  };
+
+  private readonly handleContextRestored = (): void => {
+    const ctx = this.canvas.getContext('2d');
+    if (ctx === null) {
+      return;
+    }
+    this._contextLost = false;
+    // Do not assign canvas.width/height here: that resets the backing store and
+    // Chrome often fires another contextlost on a large accelerated canvas.
+    this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+    this.ctx.scale(this.devicePixelRatio, this.devicePixelRatio);
+    this.markDirty();
+  };
 
   /**
    * Current zoom level
@@ -787,6 +808,8 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> implements Diag
       cancelAnimationFrame(this.animationFrameId);
       this.animationFrameId = null;
     }
+    this.canvas.removeEventListener('contextlost', this.handleContextLost);
+    this.canvas.removeEventListener('contextrestored', this.handleContextRestored);
     this.disableInteractions();
     this.disableContextMenu();
     for (const plugin of this.plugins) {
@@ -885,7 +908,9 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> implements Diag
       // or repositioned the canvas without changing its own dimensions).
       this._canvasRect = null;
 
-      if (this._dirty) {
+      // Painting into a lost context draws nothing, so keep the frame dirty and wait
+      // for contextrestored instead of swallowing the redraw request.
+      if (this._dirty && !this._contextLost) {
         // Clear before paint so resize/markDirty during the frame still schedules the next one.
         // Setting canvas.width after paint would otherwise leave a blank buffer with _dirty=false.
         this._dirty = false;

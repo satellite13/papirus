@@ -9,6 +9,11 @@
 
 ## [Unreleased]
 
+## [0.9.8] - 2026-08-24
+
+### Исправлено
+- После потери ускоренного 2D-контекста в Chrome при панорамировании большой диаграммы restore больше не сбрасывает `canvas.width`. Этот сброс вызывал повторный contextlost и более длинную пустую вспышку.
+
 ## [0.9.7] - 2026-08-24
 
 ### Исправлено
@@ -461,7 +466,8 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.7...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.8...HEAD
+[0.9.8]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.7...v0.9.8
 [0.9.7]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.6...v0.9.7
 [0.9.6]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.5...v0.9.6
 [0.9.5]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.4...v0.9.5
