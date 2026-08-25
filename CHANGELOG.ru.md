@@ -9,6 +9,11 @@
 
 ## [Unreleased]
 
+## [0.9.9] - 2026-08-26
+
+### Исправлено
+- В Chrome большая диаграмма больше не пропадает при панорамировании: 2D-холст рисуется в обычной памяти, и GPU не может выбросить контекст. Safari без изменений.
+
 ## [0.9.8] - 2026-08-24
 
 ### Исправлено
@@ -466,7 +471,8 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.8...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.9...HEAD
+[0.9.9]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.8...v0.9.9
 [0.9.8]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.7...v0.9.8
 [0.9.7]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.6...v0.9.7
 [0.9.6]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.5...v0.9.6

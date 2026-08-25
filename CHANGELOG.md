@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.9] - 2026-08-26
+
+### Fixed
+- Chrome no longer blanks a large diagram while panning: the 2D canvas uses a software backing store, so the GPU cannot drop the context. Safari is unchanged.
+
 ## [0.9.8] - 2026-08-24
 
 ### Fixed
@@ -459,7 +464,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Edge animations (flow effect)
 - Context menu and search/filter
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.8...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.9...HEAD
+[0.9.9]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.8...v0.9.9
 [0.9.8]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.7...v0.9.8
 [0.9.7]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.6...v0.9.7
 [0.9.6]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.5...v0.9.6

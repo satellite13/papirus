@@ -8,6 +8,7 @@ import type { Bounds, DiagramOptions, Point, ViewportState } from '@/types';
 import { InteractionManager } from './InteractionManager';
 import type { InteractionManagerOptions } from './InteractionManager';
 import { applyStyleManagerToElements } from '@/utils/style';
+import { shouldPreferSoftware2dContext } from '@/utils/software2dContext';
 import { getContentBounds } from '@/utils/contentBounds';
 import { AnimationManager } from './AnimationManager';
 import { ContextMenuManager } from './ContextMenuManager';
@@ -140,7 +141,9 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> implements Diag
     this.canvas = this.resolveCanvas(canvas);
     this.options = { ...DEFAULT_OPTIONS, ...options };
 
-    const ctx = this.canvas.getContext('2d');
+    const ctx = shouldPreferSoftware2dContext()
+      ? this.canvas.getContext('2d', { willReadFrequently: true })
+      : this.canvas.getContext('2d');
     if (ctx === null) {
       throw new Error('Failed to get 2D rendering context');
     }

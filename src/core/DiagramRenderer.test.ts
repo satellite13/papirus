@@ -3,7 +3,7 @@ import { DiagramRenderer, type DiagramPlugin } from './DiagramRenderer';
 import { Edge } from '../elements/Edge';
 import { Group } from '../elements/Group';
 import { RectangleNode } from '../elements/nodes/RectangleNode';
-import { stubCanvasContext, stubAnimationFrame } from '../test/testUtils';
+import { mockCanvasContext, stubCanvasContext, stubAnimationFrame } from '../test/testUtils';
 
 type DirtyRenderer = { _dirty: boolean; renderFrame: (now: number) => void };
 
@@ -39,6 +39,10 @@ describe('DiagramRenderer', () => {
   beforeEach(() => {
     stubCanvasContext();
     stubAnimationFrame();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('registers nodes and listens to element dirty state', () => {
@@ -198,6 +202,40 @@ describe('DiagramRenderer', () => {
     renderer.resize(240, 120);
 
     expect(widthWrites.length).toBe(writesAfterSetup + 1);
+  });
+
+  it('requests a software 2D context in Chromium', () => {
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      userAgent:
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36',
+    });
+    const calls: unknown[][] = [];
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation((...args) => {
+      calls.push(args);
+      return mockCanvasContext();
+    });
+
+    new DiagramRenderer(document.createElement('canvas'), { width: 200, height: 100, retina: false });
+
+    expect(calls[0]).toEqual(['2d', { willReadFrequently: true }]);
+  });
+
+  it('does not request a software 2D context in Safari', () => {
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      userAgent:
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Safari/605.1.15',
+    });
+    const calls: unknown[][] = [];
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation((...args) => {
+      calls.push(args);
+      return mockCanvasContext();
+    });
+
+    new DiagramRenderer(document.createElement('canvas'), { width: 200, height: 100, retina: false });
+
+    expect(calls[0]).toEqual(['2d']);
   });
 
   it('does not paint while the 2D context is lost and keeps the frame dirty', () => {
