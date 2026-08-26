@@ -114,8 +114,6 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> implements Diag
   private _destroyed = false;
   /** Chrome may drop the accelerated 2D backing store; nothing can be painted until it returns. */
   private _contextLost = false;
-  /** While true, retina canvases render at 1x to shrink the GPU/IOSurface buffer during pan. */
-  private _lowResPan = false;
   private _canvasRect: DOMRectReadOnly | null = null;
   private _nodeObstaclesCache: PathObstacle[] | null = null;
 
@@ -324,37 +322,6 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> implements Diag
    */
   get pixelRatio(): number {
     return this.devicePixelRatio;
-  }
-
-  /**
-   * Shrink a retina backing store to 1x for the duration of a pan gesture.
-   * Does not touch `canvas.width` while the 2D context is lost.
-   */
-  beginLowResPan(): void {
-    if (this._lowResPan || this._contextLost) {
-      return;
-    }
-    const native = this.nativePixelRatio();
-    if (native <= 1) {
-      return;
-    }
-    this._lowResPan = true;
-    this.setupCanvas();
-    this.markDirty();
-  }
-
-  /**
-   * Restore the native backing-store ratio after a pan gesture.
-   */
-  endLowResPan(): void {
-    if (!this._lowResPan) {
-      return;
-    }
-    this._lowResPan = false;
-    if (!this._contextLost) {
-      this.setupCanvas();
-    }
-    this.markDirty();
   }
 
   /**
@@ -922,8 +889,7 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> implements Diag
   }
 
   private resolvePixelRatio(): number {
-    const native = this.nativePixelRatio();
-    return this._lowResPan ? 1 : native;
+    return this.nativePixelRatio();
   }
 
   private setupCanvas(): void {

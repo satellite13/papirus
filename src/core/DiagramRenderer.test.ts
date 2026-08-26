@@ -217,56 +217,7 @@ describe('DiagramRenderer', () => {
     expect(calls[0]).toEqual(['2d']);
   });
 
-  it('drops the backing store to 1x while panning on a retina canvas', () => {
-    const previousRatio = window.devicePixelRatio;
-    Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value: 2 });
-    try {
-      const canvas = document.createElement('canvas');
-      const renderer = new DiagramRenderer(canvas, { width: 200, height: 100, retina: true });
-
-      expect(canvas.width).toBe(400);
-      expect(renderer.pixelRatio).toBe(2);
-
-      renderer.beginLowResPan();
-
-      expect(canvas.width).toBe(200);
-      expect(renderer.pixelRatio).toBe(1);
-
-      renderer.endLowResPan();
-
-      expect(canvas.width).toBe(400);
-      expect(renderer.pixelRatio).toBe(2);
-    } finally {
-      Object.defineProperty(window, 'devicePixelRatio', {
-        configurable: true,
-        value: previousRatio,
-      });
-    }
-  });
-
-  it('does not shrink the backing store while the 2D context is lost', () => {
-    const previousRatio = window.devicePixelRatio;
-    Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value: 2 });
-    try {
-      const canvas = document.createElement('canvas');
-      const widthWrites = trackCanvasWidthWrites(canvas);
-      const renderer = new DiagramRenderer(canvas, { width: 200, height: 100, retina: true });
-      const writesAfterSetup = widthWrites.length;
-
-      canvas.dispatchEvent(new Event('contextlost'));
-      renderer.beginLowResPan();
-
-      expect(widthWrites.length).toBe(writesAfterSetup);
-      expect(canvas.width).toBe(400);
-    } finally {
-      Object.defineProperty(window, 'devicePixelRatio', {
-        configurable: true,
-        value: previousRatio,
-      });
-    }
-  });
-
-  it('lowers the backing store when NavigationManager starts a pan', () => {
+  it('keeps the retina backing store when NavigationManager starts a pan', () => {
     const previousRatio = window.devicePixelRatio;
     Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value: 2 });
     try {
@@ -286,11 +237,16 @@ describe('DiagramRenderer', () => {
         originalEvent: new MouseEvent('mousedown'),
       };
 
+      expect(canvas.width).toBe(400);
+      expect(renderer.pixelRatio).toBe(2);
+
       navigation.startPan(event);
-      expect(canvas.width).toBe(200);
+      expect(canvas.width).toBe(400);
+      expect(renderer.pixelRatio).toBe(2);
 
       navigation.handleMouseUp(event);
       expect(canvas.width).toBe(400);
+      expect(renderer.pixelRatio).toBe(2);
     } finally {
       Object.defineProperty(window, 'devicePixelRatio', {
         configurable: true,

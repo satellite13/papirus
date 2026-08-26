@@ -256,14 +256,12 @@ export class NavigationManager extends EventEmitter<NavigationEvents> {
   startPan(event: InputEvent): void {
     this.isPanning = true;
     this.panStart = { x: event.screenX, y: event.screenY };
-    this.renderer.beginLowResPan();
     this.emit('panStart');
   }
 
   private endPan(): void {
     this.isPanning = false;
     this.panStart = null;
-    this.renderer.endLowResPan();
     this.emit('panEnd');
   }
 }
