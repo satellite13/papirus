@@ -12,6 +12,7 @@
 - [SearchManager](./search.md)
 - [Оверлеи](./overlays.md)
 - [Утилиты](./utils.md)
+- [План миграции на WebGL](./webgl-migration-plan.md) (черновик)
 
 ## Основная документация
 
