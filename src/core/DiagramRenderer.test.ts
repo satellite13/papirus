@@ -374,6 +374,108 @@ describe('DiagramRenderer', () => {
     expect(removeSpy).toHaveBeenCalledWith('contextrestored', expect.any(Function));
   });
 
+  it('does not paint a node that is fully outside the viewport', () => {
+    const canvas = document.createElement('canvas');
+    const renderer = new DiagramRenderer(canvas, {
+      width: 200,
+      height: 100,
+      retina: false,
+      scrollbar: false,
+    });
+    const inside = new RectangleNode({ id: 'in', x: 20, y: 20, width: 40, height: 20 });
+    const outside = new RectangleNode({ id: 'out', x: 800, y: 20, width: 40, height: 20 });
+    const insideSpy = vi.spyOn(inside, 'render');
+    const outsideSpy = vi.spyOn(outside, 'render');
+    renderer.addNode(inside);
+    renderer.addNode(outside);
+
+    renderer.render();
+
+    expect(insideSpy).toHaveBeenCalled();
+    expect(outsideSpy).not.toHaveBeenCalled();
+  });
+
+  it('paints a node that only overlaps the viewport padding', () => {
+    const canvas = document.createElement('canvas');
+    const renderer = new DiagramRenderer(canvas, {
+      width: 200,
+      height: 100,
+      retina: false,
+      scrollbar: false,
+    });
+    const nearEdge = new RectangleNode({ id: 'near', x: 220, y: 20, width: 20, height: 20 });
+    const renderSpy = vi.spyOn(nearEdge, 'render');
+    renderer.addNode(nearEdge);
+
+    renderer.render();
+
+    expect(renderSpy).toHaveBeenCalled();
+  });
+
+  it('does not paint an edge whose path is fully outside the viewport', () => {
+    const canvas = document.createElement('canvas');
+    const renderer = new DiagramRenderer(canvas, {
+      width: 200,
+      height: 100,
+      retina: false,
+      scrollbar: false,
+    });
+    const a = new RectangleNode({ id: 'a', x: 800, y: 20, width: 20, height: 20 });
+    const b = new RectangleNode({ id: 'b', x: 900, y: 20, width: 20, height: 20 });
+    const edge = new Edge({ id: 'e', from: { nodeId: 'a' }, to: { nodeId: 'b' } });
+    const renderSpy = vi.spyOn(edge, 'render');
+    const handleSpy = vi.spyOn(edge, 'renderHandles');
+    renderer.addNode(a);
+    renderer.addNode(b);
+    renderer.addEdge(edge);
+
+    renderer.render();
+
+    expect(renderSpy).not.toHaveBeenCalled();
+    expect(handleSpy).not.toHaveBeenCalled();
+  });
+
+  it('paints an edge that crosses into the viewport', () => {
+    const canvas = document.createElement('canvas');
+    const renderer = new DiagramRenderer(canvas, {
+      width: 200,
+      height: 100,
+      retina: false,
+      scrollbar: false,
+    });
+    const a = new RectangleNode({ id: 'a', x: 40, y: 40, width: 20, height: 20 });
+    const b = new RectangleNode({ id: 'b', x: 800, y: 40, width: 20, height: 20 });
+    const edge = new Edge({ id: 'e', from: { nodeId: 'a' }, to: { nodeId: 'b' } });
+    const renderSpy = vi.spyOn(edge, 'render');
+    renderer.addNode(a);
+    renderer.addNode(b);
+    renderer.addEdge(edge);
+
+    renderer.render();
+
+    expect(renderSpy).toHaveBeenCalled();
+  });
+
+  it('paints a previously culled node after the viewport pans over it', () => {
+    const canvas = document.createElement('canvas');
+    const renderer = new DiagramRenderer(canvas, {
+      width: 200,
+      height: 100,
+      retina: false,
+      scrollbar: false,
+    });
+    const node = new RectangleNode({ id: 'far', x: 400, y: 20, width: 40, height: 20 });
+    const renderSpy = vi.spyOn(node, 'render');
+    renderer.addNode(node);
+
+    renderer.render();
+    expect(renderSpy).not.toHaveBeenCalled();
+
+    renderer.offsetX = -360;
+    renderer.render();
+    expect(renderSpy).toHaveBeenCalled();
+  });
+
   it('keeps the next frame dirty when a redraw is requested during paint', () => {
     const frames = stubFlushableAnimationFrame();
     const canvas = document.createElement('canvas');

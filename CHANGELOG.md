@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.11] - 2026-08-26
+
+### Changed
+- Nodes, groups, and edges outside the viewport are not painted, so a large diagram does less work while you pan.
+
 ## [0.9.10] - 2026-08-26
 
 ### Changed
@@ -472,7 +477,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Edge animations (flow effect)
 - Context menu and search/filter
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.10...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.11...HEAD
+[0.9.11]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.10...v0.9.11
 [0.9.10]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.9...v0.9.10
 [0.9.9]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.8...v0.9.9
 [0.9.8]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.7...v0.9.8

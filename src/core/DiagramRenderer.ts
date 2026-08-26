@@ -9,6 +9,7 @@ import { InteractionManager } from './InteractionManager';
 import type { InteractionManagerOptions } from './InteractionManager';
 import { applyStyleManagerToElements } from '@/utils/style';
 import { getContentBounds } from '@/utils/contentBounds';
+import { rectsIntersect } from '@/utils/geometry';
 import { AnimationManager } from './AnimationManager';
 import { ContextMenuManager } from './ContextMenuManager';
 import { EdgeEndpointUpdater } from './EdgeEndpointUpdater';
@@ -41,6 +42,9 @@ export interface DiagramPlugin {
   install(renderer: DiagramRenderer): void;
   destroy?(renderer: DiagramRenderer): void;
 }
+
+/** Extra CSS pixels around the viewport so labels and markers are not clipped by culling. */
+const VIEWPORT_CULL_PAD_PX = 48;
 
 const DEFAULT_OPTIONS: Required<Omit<DiagramOptions, 'scrollbar'>> = {
   width: 800,
@@ -826,6 +830,34 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> implements Diag
   }
 
   /**
+   * Visible world rectangle plus padding so labels and arrow markers are not culled early.
+   */
+  private getViewportWorldBounds(): Bounds {
+    const zoom = this._zoom;
+    const pad = VIEWPORT_CULL_PAD_PX / zoom;
+    return {
+      x: -this._offsetX / zoom - pad,
+      y: -this._offsetY / zoom - pad,
+      width: this.options.width / zoom + pad * 2,
+      height: this.options.height / zoom + pad * 2,
+    };
+  }
+
+  private intersectsViewport(bounds: Bounds, viewport: Bounds): boolean {
+    return rectsIntersect(bounds, viewport);
+  }
+
+  /**
+   * Edges without a computed path stay drawable so the first layout pass can paint them.
+   */
+  private edgeIntersectsViewport(edge: Edge, viewport: Bounds): boolean {
+    if (edge.path.length === 0) {
+      return true;
+    }
+    return this.intersectsViewport(edge.getBounds(), viewport);
+  }
+
+  /**
    * Force an immediate render
    */
   render(): void {
@@ -1001,9 +1033,11 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> implements Diag
       group.recalculateBounds();
     }
 
+    const viewport = this.getViewportWorldBounds();
+
     // Render groups (back layer)
     for (const group of this._groups.values()) {
-      if (group.visible) {
+      if (group.visible && this.intersectsViewport(group.getBounds(), viewport)) {
         this.renderElementWithAnimation(ctx, group, () => group.render(ctx));
         group.clearDirty();
       }
@@ -1017,7 +1051,7 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> implements Diag
 
     // Render nodes (middle layer)
     for (const node of this._nodes.values()) {
-      if (node.visible) {
+      if (node.visible && this.intersectsViewport(node.getVisualBounds(), viewport)) {
         this.renderElementWithAnimation(ctx, node, () => node.render(ctx));
         node.clearDirty();
       }
@@ -1025,7 +1059,7 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> implements Diag
 
     // Render edges above nodes so lines/markers stay visible over figures.
     for (const edge of this._edges.values()) {
-      if (edge.visible) {
+      if (edge.visible && this.edgeIntersectsViewport(edge, viewport)) {
         this.renderElementWithAnimation(ctx, edge, () => edge.render(ctx));
         edge.clearDirty();
       }
@@ -1033,7 +1067,7 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> implements Diag
 
     // Ручки концов рёбер (над линиями; выше — оверлеи взаимодействия и topOverlay, напр. миникарта)
     for (const edge of this._edges.values()) {
-      if (edge.visible) {
+      if (edge.visible && this.edgeIntersectsViewport(edge, viewport)) {
         edge.renderHandles(ctx);
       }
     }

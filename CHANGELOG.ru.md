@@ -9,6 +9,11 @@
 
 ## [Unreleased]
 
+## [0.9.11] - 2026-08-26
+
+### Изменено
+- Узлы, группы и рёбра вне экрана не рисуются, поэтому большая диаграмма меньше работает во время панорамы.
+
 ## [0.9.10] - 2026-08-26
 
 ### Изменено
@@ -479,7 +484,8 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.10...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.11...HEAD
+[0.9.11]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.10...v0.9.11
 [0.9.10]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.9...v0.9.10
 [0.9.9]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.8...v0.9.9
 [0.9.8]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.7...v0.9.8
