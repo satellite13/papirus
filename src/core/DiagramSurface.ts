@@ -37,6 +37,8 @@ export interface DiagramSurface {
   removeEdge(id: string): boolean;
   markDirty(): void;
   markStyleDirty(): void;
+  beginLowResPan(): void;
+  endLowResPan(): void;
   screenToWorld(screenX: number, screenY: number): Point;
   worldToScreen(worldX: number, worldY: number): Point;
   getInteractableElementAtPoint(

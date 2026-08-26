@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.10] - 2026-08-26
+
+### Changed
+- Chrome no longer uses a software 2D context. That hint did not stop the canvas from going blank and made panning heavier.
+
+### Fixed
+- While panning a Retina diagram, the backing store drops to 1× and returns to the native ratio when the gesture ends, so Chrome has a smaller buffer to keep alive during the drag.
+
 ## [0.9.9] - 2026-08-26
 
 ### Fixed
@@ -464,7 +472,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Edge animations (flow effect)
 - Context menu and search/filter
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.9...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.10...HEAD
+[0.9.10]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.9...v0.9.10
 [0.9.9]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.8...v0.9.9
 [0.9.8]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.7...v0.9.8
 [0.9.7]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.6...v0.9.7

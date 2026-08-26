@@ -8,7 +8,6 @@ import type { Bounds, DiagramOptions, Point, ViewportState } from '@/types';
 import { InteractionManager } from './InteractionManager';
 import type { InteractionManagerOptions } from './InteractionManager';
 import { applyStyleManagerToElements } from '@/utils/style';
-import { shouldPreferSoftware2dContext } from '@/utils/software2dContext';
 import { getContentBounds } from '@/utils/contentBounds';
 import { AnimationManager } from './AnimationManager';
 import { ContextMenuManager } from './ContextMenuManager';
@@ -111,6 +110,8 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> implements Diag
   private _destroyed = false;
   /** Chrome may drop the accelerated 2D backing store; nothing can be painted until it returns. */
   private _contextLost = false;
+  /** While true, retina canvases render at 1x to shrink the GPU/IOSurface buffer during pan. */
+  private _lowResPan = false;
   private _canvasRect: DOMRectReadOnly | null = null;
   private _nodeObstaclesCache: PathObstacle[] | null = null;
 
@@ -141,9 +142,7 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> implements Diag
     this.canvas = this.resolveCanvas(canvas);
     this.options = { ...DEFAULT_OPTIONS, ...options };
 
-    const ctx = shouldPreferSoftware2dContext()
-      ? this.canvas.getContext('2d', { willReadFrequently: true })
-      : this.canvas.getContext('2d');
+    const ctx = this.canvas.getContext('2d');
     if (ctx === null) {
       throw new Error('Failed to get 2D rendering context');
     }
@@ -324,6 +323,37 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> implements Diag
   }
 
   /**
+   * Shrink a retina backing store to 1x for the duration of a pan gesture.
+   * Does not touch `canvas.width` while the 2D context is lost.
+   */
+  beginLowResPan(): void {
+    if (this._lowResPan || this._contextLost) {
+      return;
+    }
+    const native = this.nativePixelRatio();
+    if (native <= 1) {
+      return;
+    }
+    this._lowResPan = true;
+    this.setupCanvas();
+    this.markDirty();
+  }
+
+  /**
+   * Restore the native backing-store ratio after a pan gesture.
+   */
+  endLowResPan(): void {
+    if (!this._lowResPan) {
+      return;
+    }
+    this._lowResPan = false;
+    if (!this._contextLost) {
+      this.setupCanvas();
+    }
+    this.markDirty();
+  }
+
+  /**
    * Access the underlying canvas element
    */
   getCanvas(): HTMLCanvasElement {
@@ -371,7 +401,7 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> implements Diag
    * Resize the canvas
    */
   resize(width: number, height: number): void {
-    const nextRatio = this.options.retina ? window.devicePixelRatio || 1 : 1;
+    const nextRatio = this.resolvePixelRatio();
     const sizeChanged =
       this.options.width !== width ||
       this.options.height !== height ||
@@ -855,9 +885,18 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> implements Diag
     this.markDirty();
   }
 
+  private nativePixelRatio(): number {
+    return this.options.retina ? window.devicePixelRatio || 1 : 1;
+  }
+
+  private resolvePixelRatio(): number {
+    const native = this.nativePixelRatio();
+    return this._lowResPan ? 1 : native;
+  }
+
   private setupCanvas(): void {
     const { width, height } = this.options;
-    this.devicePixelRatio = this.options.retina ? window.devicePixelRatio || 1 : 1;
+    this.devicePixelRatio = this.resolvePixelRatio();
 
     // Set display size
     this.canvas.style.width = `${width}px`;

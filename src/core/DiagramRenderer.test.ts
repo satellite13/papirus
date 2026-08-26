@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { DiagramRenderer, type DiagramPlugin } from './DiagramRenderer';
+import { NavigationManager } from './NavigationManager';
 import { Edge } from '../elements/Edge';
 import { Group } from '../elements/Group';
 import { RectangleNode } from '../elements/nodes/RectangleNode';
@@ -204,29 +205,7 @@ describe('DiagramRenderer', () => {
     expect(widthWrites.length).toBe(writesAfterSetup + 1);
   });
 
-  it('requests a software 2D context in Chromium', () => {
-    vi.stubGlobal('navigator', {
-      ...navigator,
-      userAgent:
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36',
-    });
-    const calls: unknown[][] = [];
-    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation((...args) => {
-      calls.push(args);
-      return mockCanvasContext();
-    });
-
-    new DiagramRenderer(document.createElement('canvas'), { width: 200, height: 100, retina: false });
-
-    expect(calls[0]).toEqual(['2d', { willReadFrequently: true }]);
-  });
-
-  it('does not request a software 2D context in Safari', () => {
-    vi.stubGlobal('navigator', {
-      ...navigator,
-      userAgent:
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Safari/605.1.15',
-    });
+  it('creates a default 2D context without willReadFrequently', () => {
     const calls: unknown[][] = [];
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation((...args) => {
       calls.push(args);
@@ -236,6 +215,88 @@ describe('DiagramRenderer', () => {
     new DiagramRenderer(document.createElement('canvas'), { width: 200, height: 100, retina: false });
 
     expect(calls[0]).toEqual(['2d']);
+  });
+
+  it('drops the backing store to 1x while panning on a retina canvas', () => {
+    const previousRatio = window.devicePixelRatio;
+    Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value: 2 });
+    try {
+      const canvas = document.createElement('canvas');
+      const renderer = new DiagramRenderer(canvas, { width: 200, height: 100, retina: true });
+
+      expect(canvas.width).toBe(400);
+      expect(renderer.pixelRatio).toBe(2);
+
+      renderer.beginLowResPan();
+
+      expect(canvas.width).toBe(200);
+      expect(renderer.pixelRatio).toBe(1);
+
+      renderer.endLowResPan();
+
+      expect(canvas.width).toBe(400);
+      expect(renderer.pixelRatio).toBe(2);
+    } finally {
+      Object.defineProperty(window, 'devicePixelRatio', {
+        configurable: true,
+        value: previousRatio,
+      });
+    }
+  });
+
+  it('does not shrink the backing store while the 2D context is lost', () => {
+    const previousRatio = window.devicePixelRatio;
+    Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value: 2 });
+    try {
+      const canvas = document.createElement('canvas');
+      const widthWrites = trackCanvasWidthWrites(canvas);
+      const renderer = new DiagramRenderer(canvas, { width: 200, height: 100, retina: true });
+      const writesAfterSetup = widthWrites.length;
+
+      canvas.dispatchEvent(new Event('contextlost'));
+      renderer.beginLowResPan();
+
+      expect(widthWrites.length).toBe(writesAfterSetup);
+      expect(canvas.width).toBe(400);
+    } finally {
+      Object.defineProperty(window, 'devicePixelRatio', {
+        configurable: true,
+        value: previousRatio,
+      });
+    }
+  });
+
+  it('lowers the backing store when NavigationManager starts a pan', () => {
+    const previousRatio = window.devicePixelRatio;
+    Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value: 2 });
+    try {
+      const canvas = document.createElement('canvas');
+      const renderer = new DiagramRenderer(canvas, { width: 200, height: 100, retina: true });
+      const navigation = new NavigationManager({ renderer });
+      const event = {
+        screenX: 10,
+        screenY: 10,
+        worldX: 0,
+        worldY: 0,
+        button: 1,
+        ctrlKey: false,
+        shiftKey: false,
+        altKey: false,
+        metaKey: false,
+        originalEvent: new MouseEvent('mousedown'),
+      };
+
+      navigation.startPan(event);
+      expect(canvas.width).toBe(200);
+
+      navigation.handleMouseUp(event);
+      expect(canvas.width).toBe(400);
+    } finally {
+      Object.defineProperty(window, 'devicePixelRatio', {
+        configurable: true,
+        value: previousRatio,
+      });
+    }
   });
 
   it('does not paint while the 2D context is lost and keeps the frame dirty', () => {
