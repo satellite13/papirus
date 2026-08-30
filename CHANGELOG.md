@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.13] - 2026-08-31
+
+### Changed
+- Off-screen edges are culled by their real path, so fat bezier bounds no longer keep hidden links in the paint loop.
+- The minimap and rulers no longer rebuild on every pan; the minimap shows nodes only.
+- The grid keeps a readable step while zooming instead of jumping with the scale.
+- Labels stay until the element leaves the viewport, then hide together with the line gap under them.
+- Dragging empty canvas skips edit hover, so panning feels as light as the hand tool.
+
 ## [0.9.12] - 2026-08-27
 
 ### Changed
@@ -482,7 +491,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Edge animations (flow effect)
 - Context menu and search/filter
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.12...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.13...HEAD
+[0.9.13]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.12...v0.9.13
 [0.9.12]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.11...v0.9.12
 [0.9.11]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.10...v0.9.11
 [0.9.10]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.9...v0.9.10
