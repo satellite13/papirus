@@ -103,6 +103,7 @@ export class InteractionManager {
   private handledScrollbarMouseDown = false;
   private overlayDragSession: OverlayDragSession | null = null;
   private handledOverlayMouseDown = false;
+  private editHoverSuspendedForPan = false;
 
   constructor(options: InteractionManagerOptions) {
     this.renderer = options.renderer;
@@ -349,7 +350,7 @@ export class InteractionManager {
   private setupEvents(): void {
     this.overlayCleanup = this.renderer.addOverlayRenderer((ctx) => {
       this.selectionManager.renderSelectionRect(ctx);
-      if (!this.navigationOnly) {
+      if (!this.navigationOnly && !this.navigationManager.panning) {
         this.dragManager.renderAlignmentGuides(ctx);
         this.connectionManager.renderPreview(ctx);
         this.connectionManager.renderHoverAnchors(ctx);
@@ -595,7 +596,7 @@ export class InteractionManager {
     if (event.button === 0) {
       if (this.navigationOnly) {
         this.selectionManager.clearSelection();
-        this.navigationManager.startPan(event);
+        this.beginBackgroundPan(event);
         return;
       }
       if (hitElement === undefined) {
@@ -604,12 +605,13 @@ export class InteractionManager {
           return;
         }
         this.selectionManager.clearSelection();
-        this.navigationManager.startPan(event);
+        this.beginBackgroundPan(event);
         return;
       }
     }
 
     if (this.navigationManager.handleMouseDown(event)) {
+      this.suspendEditHover();
       return;
     }
 
@@ -635,8 +637,13 @@ export class InteractionManager {
         this.scrollbarDragState = null;
       }
       if (this.navigationManager.panning) {
-        this.navigationManager.handleMouseUp(event);
+        this.finishBackgroundPan(event);
       }
+    }
+
+    if (this.navigationManager.panning) {
+      this.navigationManager.handleMouseMove(event);
+      return;
     }
 
     const overScrollbar = this.renderer.updateScrollbarHover(event.screenX, event.screenY);
@@ -756,7 +763,7 @@ export class InteractionManager {
       return;
     }
 
-    this.navigationManager.handleMouseUp(event);
+    this.finishBackgroundPan(event);
   }
 
   private handleClick(event: InputEvent): void {
@@ -929,6 +936,32 @@ export class InteractionManager {
     return closestEdge;
   }
 
+  private suspendEditHover(): void {
+    if (this.navigationOnly || this.editHoverSuspendedForPan) {
+      return;
+    }
+    this.connectionManager.disableHover();
+    this.editHoverSuspendedForPan = true;
+  }
+
+  private resumeEditHover(): void {
+    if (!this.editHoverSuspendedForPan) {
+      return;
+    }
+    this.connectionManager.enableHover();
+    this.editHoverSuspendedForPan = false;
+  }
+
+  private beginBackgroundPan(event: InputEvent): void {
+    this.suspendEditHover();
+    this.navigationManager.startPan(event);
+  }
+
+  private finishBackgroundPan(event: InputEvent): void {
+    this.navigationManager.handleMouseUp(event);
+    this.resumeEditHover();
+  }
+
   private handleWheel(event: WheelInputEvent): void {
     if (this.renderer.blocksDiagramPointerAtScreen(event.screenX, event.screenY)) {
       return;
@@ -993,6 +1026,9 @@ export class InteractionManager {
 
   private handleKeyUp(event: KeyboardEvent): void {
     this.navigationManager.handleKeyUp(event);
+    if (!this.navigationManager.panning) {
+      this.resumeEditHover();
+    }
   }
 
   private handleViewportNavigationKey(event: KeyboardEvent): boolean {

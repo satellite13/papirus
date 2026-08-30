@@ -158,6 +158,9 @@ export class Group extends Element {
    */
   recalculateBounds(): void {
     if (this._children.length === 0) {
+      if (this._x === 0 && this._y === 0 && this._width === 0 && this._height === 0) {
+        return;
+      }
       this._x = 0;
       this._y = 0;
       this._width = 0;
@@ -179,11 +182,23 @@ export class Group extends Element {
       maxY = Math.max(maxY, bounds.y + bounds.height);
     }
 
-    this._x = minX - this._padding;
-    this._y = minY - this._padding;
-    this._width = maxX - minX + this._padding * 2;
-    this._height = maxY - minY + this._padding * 2;
+    const nextX = minX - this._padding;
+    const nextY = minY - this._padding;
+    const nextWidth = maxX - minX + this._padding * 2;
+    const nextHeight = maxY - minY + this._padding * 2;
+    if (
+      this._x === nextX &&
+      this._y === nextY &&
+      this._width === nextWidth &&
+      this._height === nextHeight
+    ) {
+      return;
+    }
 
+    this._x = nextX;
+    this._y = nextY;
+    this._width = nextWidth;
+    this._height = nextHeight;
     this.markDirty();
   }
 

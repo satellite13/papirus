@@ -11,6 +11,7 @@ import type {
   Point,
 } from '@/types';
 import type { StyleManager } from '@/styles/StyleManager';
+import { isScreenFontReadable } from '@/utils/screenText';
 import { shallowEqual } from '@/utils/style';
 import { getClosestPointOnPath, getPathPointAt } from '@/utils/edgePath';
 import { bezierPoint, segmentRectIntersections, distance } from '@/utils/geometry';
@@ -839,7 +840,10 @@ export class Edge extends Element {
       return pts;
     };
 
-    const shouldCreateGap = this._label !== undefined && this._labelLineGap;
+    const shouldCreateGap =
+      this._label !== undefined &&
+      this._labelLineGap &&
+      isScreenFontReadable(ctx, this._label.style.fontSize ?? 14);
 
     if (!shouldCreateGap) {
       // Legacy behavior without gaps

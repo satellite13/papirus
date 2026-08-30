@@ -78,6 +78,50 @@ describe('DiagramRenderer', () => {
     expect((renderer as unknown as { _contentDirty: boolean })._contentDirty).toBe(false);
   });
 
+  it('does not rescan edge bounds for scrollbars on viewport-only pan', () => {
+    const canvas = document.createElement('canvas');
+    const renderer = new DiagramRenderer(canvas, {
+      width: 200,
+      height: 100,
+      retina: false,
+      scrollbar: false,
+    });
+    const a = new RectangleNode({ id: 'a', x: 0, y: 0, width: 40, height: 20 });
+    const b = new RectangleNode({ id: 'b', x: 400, y: 0, width: 40, height: 20 });
+    const edge = new Edge({ id: 'e', from: { nodeId: 'a' }, to: { nodeId: 'b' } });
+    renderer.addNode(a);
+    renderer.addNode(b);
+    renderer.addEdge(edge);
+    renderer.render();
+
+    const readBounds = (): void => {
+      (renderer as unknown as { getContentBounds: () => unknown }).getContentBounds();
+    };
+    readBounds();
+    const boundsSpy = vi.spyOn(edge, 'getBounds');
+    renderer.offsetX += 24;
+    readBounds();
+
+    expect(boundsSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not recalculate group bounds on viewport-only pan', () => {
+    const canvas = document.createElement('canvas');
+    const renderer = new DiagramRenderer(canvas, { width: 200, height: 100, retina: false });
+    const node = new RectangleNode({ id: 'n', x: 10, y: 10, width: 40, height: 20 });
+    const group = new Group({ id: 'g', padding: 8 });
+    group.addChild(node);
+    renderer.addNode(node);
+    renderer.addGroup(group);
+    renderer.render();
+
+    const recalcSpy = vi.spyOn(group, 'recalculateBounds');
+    renderer.offsetX += 16;
+    renderer.render();
+
+    expect(recalcSpy).not.toHaveBeenCalled();
+  });
+
   it('resyncs edge endpoints after layout changes', () => {
     const canvas = document.createElement('canvas');
     const renderer = new DiagramRenderer(canvas, { width: 200, height: 100, retina: false });
@@ -410,6 +454,55 @@ describe('DiagramRenderer', () => {
     renderer.render();
 
     expect(renderSpy).toHaveBeenCalled();
+  });
+
+  it('does not paint a bezier whose control box hits the viewport but the curve misses', () => {
+    const canvas = document.createElement('canvas');
+    const renderer = new DiagramRenderer(canvas, {
+      width: 200,
+      height: 100,
+      retina: false,
+      scrollbar: false,
+    });
+    const a = new RectangleNode({ id: 'a', x: 0, y: 0, width: 10, height: 10 });
+    const b = new RectangleNode({ id: 'b', x: 90, y: 0, width: 10, height: 10 });
+    const edge = new Edge({
+      id: 'e',
+      from: { nodeId: 'a' },
+      to: { nodeId: 'b' },
+      type: 'bezier',
+    });
+    renderer.addNode(a);
+    renderer.addNode(b);
+    renderer.addEdge(edge);
+    Object.defineProperty(edge, 'path', {
+      configurable: true,
+      get: () => [
+        { x: 0, y: 0 },
+        { x: 50, y: 200 },
+        { x: 50, y: 200 },
+        { x: 100, y: 0 },
+      ],
+    });
+    vi.spyOn(edge, 'getBounds').mockReturnValue({ x: 0, y: 0, width: 100, height: 200 });
+    renderer.offsetY = -210;
+    const renderSpy = vi.spyOn(edge, 'render');
+
+    renderer.render();
+
+    expect(renderSpy).not.toHaveBeenCalled();
+  });
+
+  it('bumps content revision on layout changes and not on pan', () => {
+    const canvas = document.createElement('canvas');
+    const renderer = new DiagramRenderer(canvas, { width: 200, height: 100, retina: false });
+    const before = renderer.getContentRevision();
+    renderer.addNode(new RectangleNode({ id: 'n', x: 0, y: 0, width: 10, height: 10 }));
+    expect(renderer.getContentRevision()).toBeGreaterThan(before);
+
+    const afterAdd = renderer.getContentRevision();
+    renderer.offsetX += 20;
+    expect(renderer.getContentRevision()).toBe(afterAdd);
   });
 
   it('paints a previously culled node after the viewport pans over it', () => {

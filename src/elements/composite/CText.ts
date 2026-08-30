@@ -1,5 +1,6 @@
 import type { Bounds, Size } from '@/types';
 import { measureTextLines, wrapMeasuredText } from '@/utils/textMeasurer';
+import { isScreenFontReadable } from '@/utils/screenText';
 import type { CComponentStyle, SerializedCComponent } from './CComponent';
 import { CompositeComponentBase } from './CompositeComponentBase';
 
@@ -235,6 +236,7 @@ export class CText extends CompositeComponentBase {
 
     const opacity = this.style.opacity ?? 1;
     if (opacity <= 0) return;
+    if (!isScreenFontReadable(ctx, this._fontSize)) return;
 
     ctx.save();
     ctx.globalAlpha *= opacity;
@@ -298,11 +300,13 @@ export class CText extends CompositeComponentBase {
       const offsetX = xBase - (textBounds.x + textBounds.width / 2);
       const offsetY = yStart - (textBounds.y + textBounds.height / 2);
       for (let i = 0; i < lines.length; i++) {
-        ctx.fillText(lines[i]!, offsetX, offsetY + i * lineHeightPx);
+        const y = offsetY + i * lineHeightPx;
+        ctx.fillText(lines[i]!, offsetX, y);
       }
     } else {
       for (let i = 0; i < lines.length; i++) {
-        ctx.fillText(lines[i]!, xBase, yStart + i * lineHeightPx);
+        const y = yStart + i * lineHeightPx;
+        ctx.fillText(lines[i]!, xBase, y);
       }
     }
 

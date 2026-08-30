@@ -10,6 +10,7 @@ import type { InteractionManagerOptions } from './InteractionManager';
 import { applyStyleManagerToElements } from '@/utils/style';
 import { getContentBounds } from '@/utils/contentBounds';
 import { rectsIntersect } from '@/utils/geometry';
+import { edgePathIntersectsViewport } from '@/utils/pathViewport';
 import { AnimationManager } from './AnimationManager';
 import { ContextMenuManager } from './ContextMenuManager';
 import { EdgeEndpointUpdater } from './EdgeEndpointUpdater';
@@ -111,6 +112,9 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> implements Diag
   private _styleDirty = true;
   /** Node/edge layout changed — edge endpoints must be resynced before paint. */
   private _contentDirty = true;
+  /** Bumped in {@link markContentDirty}; MiniMap content bake key. */
+  private _contentRevision = 0;
+  private _contentBoundsCache: { revision: number; bounds: Bounds | null } | null = null;
   private _destroyed = false;
   /** Chrome may drop the accelerated 2D backing store; nothing can be painted until it returns. */
   private _contextLost = false;
@@ -672,7 +676,7 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> implements Diag
   addGroup(group: Group): void {
     group.setDirtyListener(() => this.markDirty());
     this._groups.set(group.id, group);
-    this.markDirty();
+    this.markContentDirty();
   }
 
   /**
@@ -685,7 +689,7 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> implements Diag
     }
     this._groups.delete(groupId);
     group.setDirtyListener(undefined);
-    this.markDirty();
+    this.markContentDirty();
     return true;
   }
 
@@ -792,8 +796,17 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> implements Diag
    */
   markContentDirty(): void {
     this._contentDirty = true;
+    this._contentRevision += 1;
     this._nodeObstaclesCache = null;
     this._dirty = true;
+  }
+
+  /**
+   * Monotonic counter bumped when nodes/edges/layout change (not on pan/zoom).
+   * Used by MiniMap to cache its content bake across viewport moves.
+   */
+  getContentRevision(): number {
+    return this._contentRevision;
   }
 
   /**
@@ -816,12 +829,10 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> implements Diag
 
   /**
    * Edges without a computed path stay drawable so the first layout pass can paint them.
+   * Bezier control-box AABB is not enough — walk the actual path.
    */
   private edgeIntersectsViewport(edge: Edge, viewport: Bounds): boolean {
-    if (edge.path.length === 0) {
-      return true;
-    }
-    return this.intersectsViewport(edge.getBounds(), viewport);
+    return edgePathIntersectsViewport({ path: edge.path, type: edge.type }, viewport);
   }
 
   /**
@@ -994,11 +1005,6 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> implements Diag
       this._styleDirty = false;
     }
 
-    // Update group bounds before rendering
-    for (const group of this._groups.values()) {
-      group.recalculateBounds();
-    }
-
     const viewport = this.getViewportWorldBounds();
 
     // Render groups (back layer)
@@ -1009,8 +1015,11 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> implements Diag
       }
     }
 
-    // Sync edge endpoints only after layout changes — not on every pan/zoom frame.
+    // Sync edge endpoints and group bounds only after layout changes — not on every pan/zoom.
     if (this._contentDirty) {
+      for (const group of this._groups.values()) {
+        group.recalculateBounds();
+      }
       this.edgeEndpointUpdater.updateAll();
       this._contentDirty = false;
     }
@@ -1114,11 +1123,16 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> implements Diag
   }
 
   private getContentBounds(): Bounds | null {
-    return getContentBounds({
+    if (this._contentBoundsCache?.revision === this._contentRevision) {
+      return this._contentBoundsCache.bounds;
+    }
+    const bounds = getContentBounds({
       nodes: this._nodes.values(),
       edges: this._edges.values(),
       groups: this._groups.values(),
     });
+    this._contentBoundsCache = { revision: this._contentRevision, bounds };
+    return bounds;
   }
 
   notifyScrollbarInteraction(): void {

@@ -895,6 +895,7 @@ describe('InteractionManager', () => {
     const renderer = new DiagramRenderer(canvas, { width: 400, height: 220, retina: false });
     renderer.use(new MiniMap({ width: 160, height: 96, padding: 10 }));
     new InteractionManager({ renderer });
+    renderer.addNode(new RectangleNode({ x: 0, y: 40, width: 120, height: 80 }));
     renderer.addNode(new RectangleNode({ x: 900, y: 40, width: 120, height: 80 }));
 
     canvas.dispatchEvent(
@@ -1529,5 +1530,56 @@ describe('InteractionManager', () => {
     expect(childB.x).toBe(childBInitial.x);
     expect(edge.controlPoints![0]).toEqual(cpBefore[0]);
     expect(edge.controlPoints![1]).toEqual(cpBefore[1]);
+  });
+
+  it('skips edit hover while panning empty canvas and restores it after mouseup', () => {
+    const canvas = document.createElement('canvas');
+    vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 300,
+      height: 200,
+      right: 300,
+      bottom: 200,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+    const renderer = new DiagramRenderer(canvas, { width: 300, height: 200, retina: false });
+    const interaction = new InteractionManager({ renderer });
+    renderer.addNode(new RectangleNode({ x: 50, y: 50, width: 60, height: 40 }));
+
+    const hoverMove = vi.spyOn(interaction.connection, 'handleMouseMove');
+    const badgeHover = vi.spyOn(renderer, 'updateBadgeHover');
+    const offsetBefore = { x: renderer.offsetX, y: renderer.offsetY };
+
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', { clientX: 10, clientY: 10, button: 0, bubbles: true })
+    );
+    hoverMove.mockClear();
+    badgeHover.mockClear();
+
+    canvas.dispatchEvent(
+      new MouseEvent('mousemove', {
+        clientX: 50,
+        clientY: 40,
+        button: 0,
+        buttons: 1,
+        bubbles: true,
+      })
+    );
+
+    expect(renderer.offsetX).not.toBe(offsetBefore.x);
+    expect(renderer.offsetY).not.toBe(offsetBefore.y);
+    expect(hoverMove).not.toHaveBeenCalled();
+    expect(badgeHover).not.toHaveBeenCalled();
+
+    canvas.dispatchEvent(
+      new MouseEvent('mouseup', { clientX: 50, clientY: 40, button: 0, bubbles: true })
+    );
+    hoverMove.mockClear();
+
+    canvas.dispatchEvent(new MouseEvent('mousemove', { clientX: 80, clientY: 70, bubbles: true }));
+    expect(hoverMove).toHaveBeenCalled();
   });
 });

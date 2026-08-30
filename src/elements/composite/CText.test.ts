@@ -104,6 +104,16 @@ describe('CText', () => {
       expect(ctx.fillText).toHaveBeenCalled();
     });
 
+    it('keeps text while the element still overlaps the canvas', () => {
+      Object.assign(ctx, {
+        canvas: { width: 200, height: 100 },
+        getTransform: () => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }),
+      });
+      const t = new CText({ text: 'Hello', fontSize: 14, align: 'center' });
+      t.render(ctx, { x: -80, y: 20, width: 120, height: 40 });
+      expect(ctx.fillText).toHaveBeenCalled();
+    });
+
     it('sets font, fillStyle, textAlign', () => {
       const t = new CText({
         text: 'Test',

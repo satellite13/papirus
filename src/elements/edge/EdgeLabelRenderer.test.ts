@@ -116,5 +116,28 @@ describe('EdgeLabelRenderer', () => {
       expect(ctx.moveTo).toHaveBeenCalledWith(60, 0);
       expect(ctx.lineTo).toHaveBeenCalledWith(100, 0);
     });
+
+    it('closes the line gap when the label is too small to read', () => {
+      Object.assign(ctx, {
+        getTransform: () => ({ a: 0.2, b: 0, c: 0, d: 0.2, e: 0, f: 0 }),
+      });
+      const edge = new Edge({
+        from: { nodeId: 'from' },
+        to: { nodeId: 'to' },
+        arrowType: 'none',
+        label: { text: 'label', style: { fontSize: 10 }, inset: 0 },
+        labelLineGap: true,
+        labelBackground: { color: '#ffffff', borderRadius: 0 },
+      });
+      edge.updateEndpoints({ x: 0, y: 0 }, { x: 100, y: 0 });
+
+      edge.render(ctx);
+
+      expect(ctx.lineTo).toHaveBeenCalledWith(100, 0);
+      expect(ctx.lineTo).not.toHaveBeenCalledWith(40, 0);
+      expect(ctx.moveTo).not.toHaveBeenCalledWith(60, 0);
+      expect(ctx.fillText).not.toHaveBeenCalled();
+      expect(ctx.fillRect).not.toHaveBeenCalled();
+    });
   });
 });

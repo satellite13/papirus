@@ -1,4 +1,5 @@
 import type { DiagramRenderer } from '../DiagramRenderer';
+import { adaptiveGridStep } from '@/utils/adaptiveGridStep';
 import { BaseOverlay, type BaseOverlayOptions } from './BaseOverlay';
 
 export interface GridOverlayOptions extends BaseOverlayOptions {
@@ -32,24 +33,24 @@ export class GridOverlay extends BaseOverlay {
 
       const width = renderer.width;
       const height = renderer.height;
-      const gridSize = this.gridSize;
-      const color = this.color;
+      const zoom = renderer.zoom;
+      const step = adaptiveGridStep(this.gridSize, zoom);
 
-      const startX = Math.floor(-renderer.offsetX / renderer.zoom / gridSize) * gridSize;
-      const startY = Math.floor(-renderer.offsetY / renderer.zoom / gridSize) * gridSize;
-      const endX = Math.ceil((width - renderer.offsetX) / renderer.zoom / gridSize) * gridSize;
-      const endY = Math.ceil((height - renderer.offsetY) / renderer.zoom / gridSize) * gridSize;
+      const startX = Math.floor(-renderer.offsetX / zoom / step) * step;
+      const startY = Math.floor(-renderer.offsetY / zoom / step) * step;
+      const endX = Math.ceil((width - renderer.offsetX) / zoom / step) * step;
+      const endY = Math.ceil((height - renderer.offsetY) / zoom / step) * step;
 
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 1 / renderer.zoom;
+      ctx.strokeStyle = this.color;
+      ctx.lineWidth = 1 / zoom;
       ctx.beginPath();
 
-      for (let x = startX; x <= endX; x += gridSize) {
+      for (let x = startX; x <= endX; x += step) {
         ctx.moveTo(x, startY);
         ctx.lineTo(x, endY);
       }
 
-      for (let y = startY; y <= endY; y += gridSize) {
+      for (let y = startY; y <= endY; y += step) {
         ctx.moveTo(startX, y);
         ctx.lineTo(endX, y);
       }

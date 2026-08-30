@@ -36,6 +36,15 @@ type MiniMapDragPayload =
 
 export class MiniMap extends BaseOverlay {
   private readonly options: Required<Omit<MiniMapOptions, 'enabled'>>;
+  /**
+   * Cached raster of node boxes. Rebuilt only when {@link DiagramRenderer.getContentRevision}
+   * or the map projection key changes — not on every pan.
+   */
+  private contentBake: {
+    revision: number;
+    projectionKey: string;
+    canvas: HTMLCanvasElement;
+  } | null = null;
 
   constructor(options: MiniMapOptions = {}) {
     super(options.enabled ?? true);
@@ -51,16 +60,20 @@ export class MiniMap extends BaseOverlay {
     };
   }
 
+  /** Cached bake projection; stable across pan if only the viewport moved. */
+  getContentBakeProjectionKey(): string | null {
+    return this.contentBake?.projectionKey ?? null;
+  }
+
   install(renderer: DiagramRenderer): void {
     this.removeOverlay = renderer.addTopOverlayRenderer((ctx) => {
       if (!this.enabled) return;
       const layout = this.computeLayout(renderer);
       if (!layout) return;
-      const { x, y, width, height, bounds, scale, mapOffsetX, mapOffsetY, viewRect } = layout;
+      const { x, y, width, height, viewRect } = layout;
 
       ctx.save();
       ctx.setTransform(renderer.pixelRatio, 0, 0, renderer.pixelRatio, 0, 0);
-      // MiniMap frame must remain solid even if main canvas rendered dashed edges before.
       ctx.setLineDash([]);
       ctx.lineDashOffset = 0;
 
@@ -70,50 +83,75 @@ export class MiniMap extends BaseOverlay {
       ctx.lineWidth = 1;
       ctx.strokeRect(x, y, width, height);
 
-      ctx.save();
-      ctx.translate(mapOffsetX, mapOffsetY);
-      ctx.scale(scale, scale);
-      ctx.translate(-bounds.x, -bounds.y);
-      ctx.setLineDash([]);
-      ctx.lineDashOffset = 0;
+      const bake = this.ensureContentBake(renderer, layout);
+      ctx.drawImage(bake, x, y, width, height);
 
-      ctx.strokeStyle = '#94a3b8';
-      ctx.lineWidth = 1 / scale;
-
-      for (const edge of renderer.edges.values()) {
-        if (!edge.visible) continue;
-        const path = edge.path;
-        if (path.length < 2) continue;
-        ctx.beginPath();
-        ctx.moveTo(path[0]!.x, path[0]!.y);
-        for (let i = 1; i < path.length; i++) {
-          ctx.lineTo(path[i]!.x, path[i]!.y);
-        }
-        ctx.stroke();
+      if (viewRect.width >= 0 && viewRect.height >= 0) {
+        ctx.strokeStyle = this.options.viewportColor;
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([]);
+        ctx.lineDashOffset = 0;
+        ctx.strokeRect(viewRect.x, viewRect.y, viewRect.width, viewRect.height);
       }
-
-      for (const node of renderer.nodes.values()) {
-        if (!node.visible) continue;
-        const b = node.getBounds();
-        ctx.fillStyle = '#e2e8f0';
-        ctx.fillRect(b.x, b.y, b.width, b.height);
-      }
-
-      ctx.restore();
-
-      if (viewRect.width < 0 || viewRect.height < 0) {
-        ctx.restore();
-        return;
-      }
-
-      ctx.strokeStyle = this.options.viewportColor;
-      ctx.lineWidth = 1.5;
-      ctx.setLineDash([]);
-      ctx.lineDashOffset = 0;
-      ctx.strokeRect(viewRect.x, viewRect.y, viewRect.width, viewRect.height);
 
       ctx.restore();
     });
+  }
+
+  private ensureContentBake(
+    renderer: DiagramRenderer,
+    layout: MiniMapLayout
+  ): HTMLCanvasElement {
+    const { x, y, width, height, bounds, scale, mapOffsetX, mapOffsetY } = layout;
+    const revision = renderer.getContentRevision();
+    const projectionKey = [
+      width,
+      height,
+      Math.round(bounds.x),
+      Math.round(bounds.y),
+      Math.round(bounds.width),
+      Math.round(bounds.height),
+      scale.toFixed(5),
+      Math.round(mapOffsetX),
+      Math.round(mapOffsetY),
+    ].join('|');
+
+    if (
+      this.contentBake !== null &&
+      this.contentBake.revision === revision &&
+      this.contentBake.projectionKey === projectionKey
+    ) {
+      return this.contentBake.canvas;
+    }
+
+    const canvas = this.contentBake?.canvas ?? document.createElement('canvas');
+    const pixelRatio = Math.max(1, Math.min(2, renderer.pixelRatio));
+    canvas.width = Math.max(1, Math.ceil(width * pixelRatio));
+    canvas.height = Math.max(1, Math.ceil(height * pixelRatio));
+    const ctx = canvas.getContext('2d');
+    if (ctx === null) {
+      return canvas;
+    }
+
+    ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+    ctx.clearRect(0, 0, width, height);
+    ctx.save();
+    ctx.translate(mapOffsetX - x, mapOffsetY - y);
+    ctx.scale(scale, scale);
+    ctx.translate(-bounds.x, -bounds.y);
+    ctx.setLineDash([]);
+    ctx.lineDashOffset = 0;
+
+    for (const node of renderer.nodes.values()) {
+      if (!node.visible) continue;
+      const b = node.getBounds();
+      ctx.fillStyle = '#e2e8f0';
+      ctx.fillRect(b.x, b.y, b.width, b.height);
+    }
+
+    ctx.restore();
+    this.contentBake = { revision, projectionKey, canvas };
+    return canvas;
   }
 
   beginOverlayDrag(
@@ -242,7 +280,6 @@ export class MiniMap extends BaseOverlay {
   private computeLayout(renderer: DiagramRenderer): MiniMapLayout | null {
     const rawBounds = getContentBounds({
       nodes: renderer.nodes.values(),
-      edges: renderer.edges.values(),
       groups: renderer.groups.values(),
     });
     if (!rawBounds) {
@@ -250,7 +287,7 @@ export class MiniMap extends BaseOverlay {
     }
 
     const margin = this.options.contentMargin;
-    const expandedContentBounds = {
+    const bounds = {
       x: rawBounds.x - margin,
       y: rawBounds.y - margin,
       width: rawBounds.width + 2 * margin,
@@ -264,24 +301,10 @@ export class MiniMap extends BaseOverlay {
       anchor === 'top-left' || anchor === 'top-right' ? padding : renderer.height - height - padding;
 
     const viewportBounds = this.getViewportBounds(renderer);
-    const unionMinX = Math.min(expandedContentBounds.x, viewportBounds.x);
-    const unionMinY = Math.min(expandedContentBounds.y, viewportBounds.y);
-    const unionMaxX = Math.max(
-      expandedContentBounds.x + expandedContentBounds.width,
-      viewportBounds.x + viewportBounds.width
+    const scale = Math.min(
+      width / Math.max(bounds.width, 1),
+      height / Math.max(bounds.height, 1)
     );
-    const unionMaxY = Math.max(
-      expandedContentBounds.y + expandedContentBounds.height,
-      viewportBounds.y + viewportBounds.height
-    );
-    const bounds = {
-      x: unionMinX,
-      y: unionMinY,
-      width: unionMaxX - unionMinX,
-      height: unionMaxY - unionMinY,
-    };
-
-    const scale = Math.min(width / bounds.width, height / bounds.height);
     const mapOffsetX = x + (width - bounds.width * scale) / 2;
     const mapOffsetY = y + (height - bounds.height * scale) / 2;
 

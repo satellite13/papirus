@@ -23,6 +23,21 @@ function createRenderer(withContent = true): {
         ],
       ])
     : new Map();
+  const edges = withContent
+    ? new Map([
+        [
+          'edge',
+          {
+            visible: true,
+            path: [
+              { x: 100, y: 140 },
+              { x: 200, y: 160 },
+            ],
+            getBounds: () => ({ x: 100, y: 140, width: 100, height: 20 }),
+          },
+        ],
+      ])
+    : new Map();
   const renderer = {
     width: 400,
     height: 300,
@@ -31,8 +46,9 @@ function createRenderer(withContent = true): {
     offsetY: 0,
     pixelRatio: 1,
     nodes,
-    edges: new Map(),
+    edges,
     groups: new Map(),
+    getContentRevision: () => 1,
     screenToCanvas: (x: number, y: number) => ({ x, y }),
     addTopOverlayRenderer: vi.fn((next: OverlayRenderer) => {
       callback = next;
@@ -63,9 +79,8 @@ describe('MiniMap', () => {
 
     expect((renderer.addTopOverlayRenderer as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(1);
     expect(ctx.fillRect).toHaveBeenCalledWith(290, 210, 100, 80);
-    expect(ctx.translate).toHaveBeenCalledWith(290, 212.5);
-    expect(ctx.scale).toHaveBeenCalledWith(0.25, 0.25);
-    expect(ctx.strokeRect).toHaveBeenCalledWith(290, 212.5, 100, 75);
+    expect(ctx.drawImage).toHaveBeenCalled();
+    expect(ctx.strokeRect).toHaveBeenCalledWith(290, 210, 100, 80);
 
     miniMap.destroy();
     expect(remove).toHaveBeenCalledTimes(1);
@@ -99,5 +114,44 @@ describe('MiniMap', () => {
     const { renderer: emptyRenderer } = createRenderer(false);
     miniMap.setEnabled(true);
     expect(miniMap.blocksDiagramPointerAtScreen(emptyRenderer, 300, 220)).toBe(false);
+  });
+
+  it('bakes only node boxes and skips edges', () => {
+    const { renderer, getCallback } = createRenderer();
+    const miniMap = new MiniMap({ width: 100, height: 80, padding: 10 });
+    const ctx = document.createElement('canvas').getContext('2d')!;
+
+    miniMap.install(renderer);
+    getCallback()(ctx);
+
+    expect(ctx.fillRect).toHaveBeenCalledWith(100, 100, 100, 100);
+    expect(ctx.beginPath).not.toHaveBeenCalled();
+    expect(ctx.lineTo).not.toHaveBeenCalled();
+    expect(ctx.moveTo).not.toHaveBeenCalled();
+  });
+
+  it('reuses the content bake on pan and only redraws the live viewport rect', () => {
+    const { renderer, getCallback } = createRenderer();
+    const miniMap = new MiniMap({ width: 100, height: 80, padding: 10 });
+    const ctx = document.createElement('canvas').getContext('2d')!;
+
+    miniMap.install(renderer);
+    getCallback()(ctx);
+    const bakeKey = miniMap.getContentBakeProjectionKey();
+    expect(bakeKey).not.toBeNull();
+
+    renderer.offsetX = 40;
+    vi.mocked(ctx.beginPath).mockClear();
+    vi.mocked(ctx.lineTo).mockClear();
+    vi.mocked(ctx.drawImage).mockClear();
+    vi.mocked(ctx.strokeRect).mockClear();
+
+    getCallback()(ctx);
+
+    expect(miniMap.getContentBakeProjectionKey()).toBe(bakeKey);
+    expect(ctx.beginPath).not.toHaveBeenCalled();
+    expect(ctx.lineTo).not.toHaveBeenCalled();
+    expect(ctx.drawImage).toHaveBeenCalled();
+    expect(ctx.strokeRect).toHaveBeenCalled();
   });
 });

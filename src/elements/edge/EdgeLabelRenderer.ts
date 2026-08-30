@@ -1,6 +1,7 @@
 import { EDGE_LABEL_BACKGROUND_RADIUS } from '@/constants';
 import type { EdgeLabelBackground, EdgePathType, Point } from '@/types';
 import { getPathPointAt } from '@/utils/edgePath';
+import { isScreenFontReadable } from '@/utils/screenText';
 import { drawRoundedRectPath } from '@/utils/geometry';
 import type { TextLabel } from '../TextLabel';
 
@@ -23,6 +24,9 @@ export function renderEdgeLabel(
 ): void {
   const { label, path, background } = options;
   if (!label || path.length < 2) {
+    return;
+  }
+  if (!isScreenFontReadable(ctx, label.style.fontSize ?? 14)) {
     return;
   }
 

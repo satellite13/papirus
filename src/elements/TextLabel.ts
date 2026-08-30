@@ -2,6 +2,7 @@ import type { Bounds, ContentInsetSides, Point, TextStyle } from '@/types';
 import type { StyleManager } from '@/styles/StyleManager';
 import { canvasFontFromTextStyle, shallowEqual } from '@/utils/style';
 import { measureTextLines, wrapMeasuredText } from '@/utils/textMeasurer';
+import { isScreenFontReadable } from '@/utils/screenText';
 
 const DEFAULT_INSET = 8;
 
@@ -338,11 +339,14 @@ export class TextLabel {
     }
 
     ctx.fillStyle = this._style.color ?? '#000000';
+    const fontSize = this._style.fontSize ?? 14;
+    if (!isScreenFontReadable(ctx, fontSize)) {
+      return;
+    }
 
     for (let i = 0; i < this._lines.length; i++) {
-      const line = this._lines[i]!;
       const y = startY + i * lineHeight;
-      ctx.fillText(line, x, y);
+      ctx.fillText(this._lines[i]!, x, y);
     }
   }
 

@@ -73,11 +73,10 @@ describe('RulersOverlay', () => {
     expect(ctx.fillRect).toHaveBeenCalledWith(0, 0, 24, 120);
     expect(ctx.strokeStyle).toBe('#333333');
     expect(ctx.fillStyle).toBe('#222222');
-    expect(ctx.moveTo).toHaveBeenCalledWith(100, 24);
-    expect(ctx.lineTo).toHaveBeenCalledWith(100, 18);
-    expect(ctx.fillText).toHaveBeenCalledWith('100', 102, 2);
+    expect(ctx.fillText).toHaveBeenCalledWith('100', expect.any(Number), 2);
     expect(ctx.rotate).toHaveBeenCalledWith(-Math.PI / 2);
-    expect(ctx.stroke).toHaveBeenCalledTimes(1);
+    expect(ctx.drawImage).toHaveBeenCalled();
+    expect(overlay.getTickBakeGeneration()).toBe(1);
 
     overlay.destroy();
     expect(remove).toHaveBeenCalledTimes(1);
@@ -99,7 +98,29 @@ describe('RulersOverlay', () => {
     const labelsAtZoomOne = renderHorizontalLabels(1);
     const labelsAtZoomTwo = renderHorizontalLabels(2);
 
-    expect(labelsAtZoomOne).toEqual(['0', '100', '200']);
-    expect(labelsAtZoomTwo).toEqual(['0', '50', '100']);
+    expect(labelsAtZoomOne).toEqual(expect.arrayContaining(['0', '100', '200']));
+    expect(labelsAtZoomTwo).toEqual(expect.arrayContaining(['0', '50', '100']));
+  });
+
+  it('does not rebuild tick labels on pan while zoom stays the same', () => {
+    const { renderer, getCallback } = createRenderer();
+    const overlay = new RulersOverlay();
+    const ctx = document.createElement('canvas').getContext('2d')!;
+
+    overlay.install(renderer);
+    getCallback()(ctx);
+    expect(overlay.getTickBakeGeneration()).toBe(1);
+
+    renderer.offsetX = 24;
+    renderer.offsetY = 16;
+    vi.mocked(ctx.fillText).mockClear();
+    getCallback()(ctx);
+
+    expect(overlay.getTickBakeGeneration()).toBe(1);
+    expect(ctx.fillText).not.toHaveBeenCalled();
+
+    renderer.zoom = 2;
+    getCallback()(ctx);
+    expect(overlay.getTickBakeGeneration()).toBe(2);
   });
 });
