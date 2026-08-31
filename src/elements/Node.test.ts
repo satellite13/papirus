@@ -198,6 +198,39 @@ describe('Node', () => {
     expect(diamond.height).toBeGreaterThan(120);
   });
 
+  it('applies content inset before calculating circle and diamond label bounds', () => {
+    const ctx = mockCanvasContext();
+    const circle = new CircleNode({
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      label: 'Circle',
+      contentInset: 10,
+    });
+    const diamond = new DiamondNode({
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      label: 'Diamond',
+      contentInset: 10,
+    });
+
+    const circleBounds = circle.getLabelBoundsForExport(ctx)?.bounds;
+    expect(circleBounds?.x).toBeCloseTo(21.7157);
+    expect(circleBounds?.y).toBeCloseTo(21.7157);
+    expect(circleBounds?.width).toBeCloseTo(80 / Math.SQRT2);
+    expect(circleBounds?.height).toBeCloseTo(80 / Math.SQRT2);
+
+    expect(diamond.getLabelBoundsForExport(ctx)?.bounds).toEqual({
+      x: 30,
+      y: 30,
+      width: 40,
+      height: 40,
+    });
+  });
+
   it('getConnectionPointAtOutlineParam and getClosestPointOnOutline work for rectangle', () => {
     const node = new RectangleNode({ x: 10, y: 20, width: 100, height: 60 });
 

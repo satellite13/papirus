@@ -57,4 +57,19 @@ describe('BezierPathStrategy', () => {
     expect(strategy.hitTest({ x: 50, y: 30 }, path, 2)).toBe(false);
     expect(strategy.hitTest({ x: 0, y: 0 }, path.slice(0, 3), 2)).toBe(false);
   });
+
+  it('hit-tests every segment of a multi-segment cubic path', () => {
+    const path = [
+      { x: 0, y: 0 },
+      { x: 30, y: 0 },
+      { x: 70, y: 0 },
+      { x: 100, y: 0 },
+      { x: 130, y: 100 },
+      { x: 170, y: 100 },
+      { x: 200, y: 0 },
+    ];
+
+    expect(strategy.hitTest({ x: 150, y: 75 }, path, 2)).toBe(true);
+    expect(strategy.hitTest({ x: 150, y: 30 }, path, 2)).toBe(false);
+  });
 });

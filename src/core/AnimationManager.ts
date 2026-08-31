@@ -71,6 +71,16 @@ export class AnimationManager {
     return this.enter.size > 0 || this.exit.size > 0 || this.highlight.size > 0;
   }
 
+  /**
+   * Drop all in-flight enter/exit/highlight timers without running exit callbacks.
+   * Used by {@link DiagramRenderer.clear} so removed ids do not keep the render loop dirty.
+   */
+  clear(): void {
+    this.enter.clear();
+    this.exit.clear();
+    this.highlight.clear();
+  }
+
   update(now = performance.now()): boolean {
     if (!this.options.enabled) {
       return false;

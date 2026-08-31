@@ -120,11 +120,12 @@ export class DiamondNode extends Node {
   }
 
   protected override getLabelContainerBounds(bounds: Bounds): Bounds {
-    const width = bounds.width / 2;
-    const height = bounds.height / 2;
+    const insetBounds = super.getLabelContainerBounds(bounds);
+    const width = insetBounds.width / 2;
+    const height = insetBounds.height / 2;
     return {
-      x: bounds.x + (bounds.width - width) / 2,
-      y: bounds.y + (bounds.height - height) / 2,
+      x: insetBounds.x + (insetBounds.width - width) / 2,
+      y: insetBounds.y + (insetBounds.height - height) / 2,
       width,
       height,
     };

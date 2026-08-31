@@ -84,13 +84,59 @@ describe('SvgExporter', () => {
     renderer.destroy();
   });
 
+  it('escapes colors interpolated into SVG attributes', () => {
+    const canvas = document.createElement('canvas');
+    const renderer = new DiagramRenderer(canvas, {
+      width: 300,
+      height: 200,
+      retina: false,
+    });
+    const a = new RectangleNode({
+      x: 0,
+      y: 0,
+      width: 40,
+      height: 40,
+      style: { fillColor: 'red" onload="alert(1)' },
+      label: {
+        text: 'A',
+        style: { color: 'black" onclick="alert(2)' },
+      },
+    });
+    const b = new RectangleNode({ x: 200, y: 0, width: 40, height: 40 });
+    renderer.addNode(a);
+    renderer.addNode(b);
+
+    const edge = new Edge({
+      from: { nodeId: a.id },
+      to: { nodeId: b.id },
+      style: { strokeColor: 'blue" onmouseover="alert(3)' },
+      endMarker: { type: 'arrow', fillColor: 'green" onfocus="alert(4)' },
+      label: 'Flow',
+      labelBackground: { color: 'white" onmouseup="alert(5)' },
+    });
+    edge.updateEndpoints({ x: 40, y: 20 }, { x: 200, y: 20 });
+    renderer.addEdge(edge);
+
+    const svg = new SvgExporter(renderer).exportSVG({
+      backgroundColor: 'white" onerror="alert(6)',
+    });
+
+    expect(svg).toContain('&quot;');
+    expect(svg).not.toMatch(/\son(?:load|click|mouseover|focus|mouseup|error)="/);
+
+    renderer.destroy();
+  });
+
   it('exports CompositeNode with content tree', () => {
     vi.stubGlobal('Image', FakeImage);
     const canvas = document.createElement('canvas');
     const renderer = new DiagramRenderer(canvas, { width: 400, height: 300, retina: false });
 
     const node = new CompositeNode({
-      x: 10, y: 10, width: 200, height: 100,
+      x: 10,
+      y: 10,
+      width: 200,
+      height: 100,
       shapeType: 'rectangle',
       cornerRadius: 4,
       content: container({
@@ -125,7 +171,10 @@ describe('SvgExporter', () => {
     const renderer = new DiagramRenderer(canvas, { width: 400, height: 300, retina: false });
 
     const node = new CompositeNode({
-      x: 10, y: 10, width: 100, height: 100,
+      x: 10,
+      y: 10,
+      width: 100,
+      height: 100,
       shapeType: 'circle',
       content: container({
         children: [text({ text: 'Center' })],
@@ -290,7 +339,12 @@ describe('SvgExporter', () => {
         shapeType: 'circle',
         content: container({
           children: [
-            text({ text: 'Start', color: '#cc2244', fontStyle: 'italic', bindToProperty: '__name__' }),
+            text({
+              text: 'Start',
+              color: '#cc2244',
+              fontStyle: 'italic',
+              bindToProperty: '__name__',
+            }),
           ],
         }),
       })

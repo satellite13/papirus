@@ -86,6 +86,18 @@ describe('EventEmitter', () => {
     expect(listener).toHaveBeenCalledWith('first');
   });
 
+  it('should remove once() listener with off(original)', () => {
+    const emitter = new EventEmitter<TestEvents>();
+    const listener = vi.fn();
+
+    emitter.once('test', listener);
+    emitter.off('test', listener);
+    emitter.emit('test', 'hello');
+
+    expect(listener).not.toHaveBeenCalled();
+    expect(emitter.listenerCount('test')).toBe(0);
+  });
+
   it('should return unsubscribe function from once()', () => {
     const emitter = new EventEmitter<TestEvents>();
     const listener = vi.fn();
@@ -95,6 +107,19 @@ describe('EventEmitter', () => {
     emitter.emit('test', 'hello');
 
     expect(listener).not.toHaveBeenCalled();
+  });
+
+  it('should remove once() wrappers when off() receives the original listener', () => {
+    const emitter = new EventEmitter<TestEvents>();
+    const listener = vi.fn();
+
+    emitter.once('test', listener);
+    emitter.once('test', listener);
+    emitter.off('test', listener);
+    emitter.emit('test', 'hello');
+
+    expect(listener).not.toHaveBeenCalled();
+    expect(emitter.listenerCount('test')).toBe(0);
   });
 
   it('should remove all listeners for specific event', () => {

@@ -66,6 +66,9 @@ export class SearchManager {
   }
 
   destroy(): void {
+    if (this.filterActive) {
+      this.clearFilter();
+    }
     this.overlayCleanup?.();
     this.overlayCleanup = null;
     this.highlightIds.clear();

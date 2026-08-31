@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { DiagramRenderer } from '../core/DiagramRenderer';
 import { RectangleNode } from '../elements/nodes/RectangleNode';
 import { Edge } from '../elements/Edge';
+import { Group } from '../elements/Group';
 import { StyleManager } from '../styles/StyleManager';
 import { Serializer, SerializerValidationError } from './Serializer';
 import { stubAnimationFrame, stubCanvasContext } from '../test/testUtils';
@@ -32,7 +33,11 @@ describe('Serializer', () => {
     renderer.addNode(nodeA);
     renderer.addNode(nodeB);
 
-    const edge = new Edge({ from: { nodeId: nodeA.id }, to: { nodeId: nodeB.id }, type: 'straight' });
+    const edge = new Edge({
+      from: { nodeId: nodeA.id },
+      to: { nodeId: nodeB.id },
+      type: 'straight',
+    });
     renderer.addEdge(edge);
 
     const serializer = new Serializer(renderer, {
@@ -45,6 +50,208 @@ describe('Serializer', () => {
     expect(data.styleClasses?.length).toBe(1);
 
     renderer.destroy();
+  });
+
+  it('round-trips local style overrides without baking theme or selected styles', () => {
+    const sourceCanvas = document.createElement('canvas');
+    const source = new DiagramRenderer(sourceCanvas, { width: 300, height: 200 });
+    const styles = new StyleManager();
+    styles.registerClass({
+      name: 'warning',
+      node: { fillColor: '#fef3c7' },
+      edge: { strokeColor: '#d97706' },
+      text: { color: '#92400e' },
+      group: { fillColor: '#fffbeb' },
+    });
+    source.setStyleManager(styles);
+
+    const nodeA = new RectangleNode({
+      id: 'node-a',
+      x: 10,
+      y: 10,
+      width: 50,
+      height: 40,
+      style: { opacity: 0.75 },
+      styleClass: 'warning',
+      label: {
+        text: 'Node A',
+        style: { fontWeight: 'bold' },
+        styleClass: 'warning',
+      },
+    });
+    const nodeB = new RectangleNode({
+      id: 'node-b',
+      x: 200,
+      y: 100,
+      width: 50,
+      height: 40,
+    });
+    const edge = new Edge({
+      id: 'edge-a',
+      from: { nodeId: nodeA.id },
+      to: { nodeId: nodeB.id },
+      style: { lineDash: [3, 2] },
+      styleClass: 'warning',
+      label: {
+        text: 'Edge A',
+        style: { fontStyle: 'italic' },
+        styleClass: 'warning',
+      },
+    });
+    const group = new Group({
+      id: 'group-a',
+      style: { opacity: 0.4 },
+      styleClass: 'warning',
+    });
+    group.addChild(nodeA);
+    source.addNode(nodeA);
+    source.addNode(nodeB);
+    source.addEdge(edge);
+    source.addGroup(group);
+
+    nodeA.state = 'selected';
+    edge.state = 'selected';
+    nodeA.applyStyleManager(styles);
+    edge.applyStyleManager(styles);
+    group.applyStyleManager(styles);
+    expect(nodeA.style.fillColor).toBe('#fef3c7');
+    expect(nodeA.label?.style.color).toBe('#92400e');
+    expect(edge.style.strokeColor).toBe('#d97706');
+    expect(group.style.fillColor).toBe('#fffbeb');
+
+    const sourceSerializer = new Serializer(source, {
+      nodeFactory: (data) => new RectangleNode(data),
+      edgeFactory: (data) => new Edge(data),
+      groupFactory: (data) => new Group(data),
+    });
+    const data = sourceSerializer.serialize();
+
+    expect(data.nodes[0]?.style).toEqual({ opacity: 0.75 });
+    expect(data.nodes[0]?.label).toEqual({
+      text: 'Node A',
+      style: { fontWeight: 'bold' },
+      styleClass: 'warning',
+    });
+    expect(data.edges[0]?.style).toEqual({ lineDash: [3, 2] });
+    expect(data.edges[0]?.label).toEqual({
+      text: 'Edge A',
+      style: { fontStyle: 'italic' },
+      styleClass: 'warning',
+    });
+    expect(data.groups[0]?.style).toEqual({ opacity: 0.4 });
+
+    const targetCanvas = document.createElement('canvas');
+    const target = new DiagramRenderer(targetCanvas, { width: 300, height: 200 });
+    const targetSerializer = new Serializer(target, {
+      nodeFactory: (serialized) => new RectangleNode(serialized),
+      edgeFactory: (serialized) => new Edge(serialized),
+      groupFactory: (serialized) => new Group(serialized),
+    });
+    targetSerializer.deserialize(data);
+
+    expect(target.nodes.get('node-a')?.styleOverrides).toEqual({ opacity: 0.75 });
+    expect(target.nodes.get('node-a')?.label?.styleOverrides).toEqual({
+      fontWeight: 'bold',
+    });
+    expect(target.edges.get('edge-a')?.styleOverrides).toEqual({ lineDash: [3, 2] });
+    expect(target.edges.get('edge-a')?.label?.styleOverrides).toEqual({
+      fontStyle: 'italic',
+    });
+    expect(target.groups.get('group-a')?.styleOverrides).toEqual({ opacity: 0.4 });
+
+    source.destroy();
+    target.destroy();
+  });
+
+  it('round-trips badges, proportional content insets, edge anchors, labels, and padding', () => {
+    const sourceCanvas = document.createElement('canvas');
+    const source = new DiagramRenderer(sourceCanvas, { width: 300, height: 200 });
+    const nodeA = new RectangleNode({
+      id: 'node-a',
+      x: 10,
+      y: 10,
+      width: 100,
+      height: 80,
+      contentInset: { top: 8, right: 4, bottom: 8, left: 4 },
+      contentInsetScale: { top: true, left: true },
+      contentInsetBaseSize: { width: 100, height: 80 },
+      badges: [{ id: 'details', iconUrl: '/details.svg' }],
+    });
+    const nodeB = new RectangleNode({
+      id: 'node-b',
+      x: 200,
+      y: 100,
+      width: 50,
+      height: 40,
+    });
+    const edge = new Edge({
+      id: 'edge-a',
+      from: { nodeId: nodeA.id },
+      to: { nodeId: nodeB.id },
+      lockAnchors: false,
+      label: {
+        text: 'Detailed edge',
+        style: { color: '#123456' },
+        maxWidth: 88,
+        inset: 3,
+        styleClass: 'caption',
+      },
+    });
+    const group = new Group({ id: 'group-a', padding: 7 });
+    group.addChild(nodeA);
+    source.addNode(nodeA);
+    source.addNode(nodeB);
+    source.addEdge(edge);
+    source.addGroup(group);
+
+    const sourceSerializer = new Serializer(source, {
+      nodeFactory: (data) => new RectangleNode(data),
+      edgeFactory: (data) => new Edge(data),
+      groupFactory: (data) => new Group(data),
+    });
+    const data = sourceSerializer.serialize();
+
+    expect(data.nodes[0]?.badges).toEqual([{ id: 'details', iconUrl: '/details.svg' }]);
+    expect(data.nodes[0]?.contentInsetScale).toEqual({ top: true, left: true });
+    expect(data.nodes[0]?.contentInsetBaseSize).toEqual({ width: 100, height: 80 });
+    expect(data.edges[0]?.lockAnchors).toBe(false);
+    expect(data.edges[0]?.label).toEqual({
+      text: 'Detailed edge',
+      style: { color: '#123456' },
+      maxWidth: 88,
+      inset: 3,
+      styleClass: 'caption',
+    });
+    expect(data.groups[0]?.padding).toBe(7);
+
+    const targetCanvas = document.createElement('canvas');
+    const target = new DiagramRenderer(targetCanvas, { width: 300, height: 200 });
+    const targetSerializer = new Serializer(target, {
+      nodeFactory: (serialized) => new RectangleNode(serialized),
+      edgeFactory: (serialized) => new Edge(serialized),
+      groupFactory: (serialized) => new Group(serialized),
+    });
+    targetSerializer.deserialize(data);
+
+    expect(target.nodes.get('node-a')?.badges).toEqual([
+      { id: 'details', iconUrl: '/details.svg' },
+    ]);
+    expect(target.nodes.get('node-a')?.contentInsetScale).toEqual({
+      top: true,
+      left: true,
+    });
+    expect(target.nodes.get('node-a')?.contentInsetBaseSize).toEqual({
+      width: 100,
+      height: 80,
+    });
+    expect(target.edges.get('edge-a')?.lockAnchors).toBe(false);
+    expect(target.edges.get('edge-a')?.label?.styleOverrides).toEqual({
+      color: '#123456',
+    });
+    expect(target.groups.get('group-a')?.padding).toBe(7);
+
+    source.destroy();
+    target.destroy();
   });
 
   describe('node icon serialization', () => {
@@ -210,7 +417,10 @@ describe('Serializer', () => {
       const renderer = new DiagramRenderer(canvas, { width: 300, height: 200 });
 
       const node = new CompositeNode({
-        x: 10, y: 20, width: 200, height: 100,
+        x: 10,
+        y: 20,
+        width: 200,
+        height: 100,
         shapeType: 'rectangle',
         cornerRadius: 8,
         content: container({
@@ -288,7 +498,12 @@ describe('Serializer', () => {
         edgeFactory: (data) => new Edge(data),
       });
 
-      const invalidData = { nodes: [], edges: [], groups: [], viewport: { zoom: 1, offsetX: 0, offsetY: 0 } };
+      const invalidData = {
+        nodes: [],
+        edges: [],
+        groups: [],
+        viewport: { zoom: 1, offsetX: 0, offsetY: 0 },
+      };
 
       expect(() => serializer.deserialize(invalidData as never)).toThrow(SerializerValidationError);
       expect(() => serializer.deserialize(invalidData as never)).toThrow('Missing version field');
@@ -308,13 +523,22 @@ describe('Serializer', () => {
       const invalidData = {
         version: '1.1',
         nodes: [{ id: 'node1', type: 'rectangle', x: 0, y: 0, width: 50, height: 50 }],
-        edges: [{ id: 'edge1', from: { nodeId: 'node1' }, to: { nodeId: 'nonexistent' }, type: 'straight' }],
+        edges: [
+          {
+            id: 'edge1',
+            from: { nodeId: 'node1' },
+            to: { nodeId: 'nonexistent' },
+            type: 'straight',
+          },
+        ],
         groups: [],
         viewport: { zoom: 1, offsetX: 0, offsetY: 0 },
       };
 
       expect(() => serializer.deserialize(invalidData as never)).toThrow(SerializerValidationError);
-      expect(() => serializer.deserialize(invalidData as never)).toThrow('non-existent target node');
+      expect(() => serializer.deserialize(invalidData as never)).toThrow(
+        'non-existent target node'
+      );
 
       renderer.destroy();
     });

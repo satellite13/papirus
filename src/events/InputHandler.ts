@@ -73,6 +73,10 @@ export class InputHandler extends EventEmitter<InputEvents> {
   private boundHandlers = new Map<string, EventListener>();
   private lastTouchDistance: number | null = null;
   private lastTouchCenter: Point | null = null;
+  /** After mousedown, move/up are tracked on window so gestures survive leaving the canvas. */
+  private windowPointerActive = false;
+  private readonly boundWindowMouseMove = (e: Event): void => this.handleWindowMouseMove(e);
+  private readonly boundWindowMouseUp = (e: Event): void => this.handleWindowMouseUp(e);
 
   constructor(options: InputHandlerOptions) {
     super();
@@ -92,6 +96,7 @@ export class InputHandler extends EventEmitter<InputEvents> {
    * Clean up event listeners
    */
   destroy(): void {
+    this.teardownWindowPointerListeners();
     for (const [eventName, handler] of this.boundHandlers) {
       if (eventName.startsWith('key')) {
         window.removeEventListener(eventName, handler);
@@ -108,8 +113,8 @@ export class InputHandler extends EventEmitter<InputEvents> {
     this.addCanvasListener('click', this.handleClick.bind(this));
     this.addCanvasListener('dblclick', this.handleDblClick.bind(this));
     this.addCanvasListener('mousedown', this.handleMouseDown.bind(this));
-    this.addCanvasListener('mouseup', this.handleMouseUp.bind(this));
-    this.addCanvasListener('mousemove', this.handleMouseMove.bind(this));
+    this.addCanvasListener('mouseup', this.handleCanvasMouseUp.bind(this));
+    this.addCanvasListener('mousemove', this.handleCanvasMouseMove.bind(this));
     this.addCanvasListener('wheel', this.handleWheel.bind(this), { passive: false });
 
     // Touch events
@@ -139,6 +144,24 @@ export class InputHandler extends EventEmitter<InputEvents> {
     this.boundHandlers.set(eventName, handler);
   }
 
+  private ensureWindowPointerListeners(): void {
+    if (this.windowPointerActive) {
+      return;
+    }
+    this.windowPointerActive = true;
+    window.addEventListener('mousemove', this.boundWindowMouseMove);
+    window.addEventListener('mouseup', this.boundWindowMouseUp);
+  }
+
+  private teardownWindowPointerListeners(): void {
+    if (!this.windowPointerActive) {
+      return;
+    }
+    this.windowPointerActive = false;
+    window.removeEventListener('mousemove', this.boundWindowMouseMove);
+    window.removeEventListener('mouseup', this.boundWindowMouseUp);
+  }
+
   private handleClick(e: Event): void {
     const event = this.normalizeMouseEvent(e as MouseEvent);
     this.emit('click', event);
@@ -151,17 +174,40 @@ export class InputHandler extends EventEmitter<InputEvents> {
 
   private handleMouseDown(e: Event): void {
     const event = this.normalizeMouseEvent(e as MouseEvent);
+    this.ensureWindowPointerListeners();
     this.emit('mousedown', event);
   }
 
-  private handleMouseUp(e: Event): void {
-    const event = this.normalizeMouseEvent(e as MouseEvent);
-    this.emit('mouseup', event);
-  }
-
-  private handleMouseMove(e: Event): void {
+  private handleCanvasMouseMove(e: Event): void {
     const event = this.normalizeMouseEvent(e as MouseEvent);
     this.emit('mousemove', event);
+  }
+
+  private handleWindowMouseMove(e: Event): void {
+    // Canvas already handled moves that happen over it (target phase before bubble).
+    if (e.target === this.canvas || this.canvas.contains(e.target as Node)) {
+      return;
+    }
+    const event = this.normalizeMouseEvent(e as MouseEvent);
+    this.emit('mousemove', event);
+  }
+
+  private handleCanvasMouseUp(e: Event): void {
+    this.finishPointerUp(e as MouseEvent);
+  }
+
+  private handleWindowMouseUp(e: Event): void {
+    // Prefer the canvas handler when the release is still over the canvas.
+    if (e.target === this.canvas || this.canvas.contains(e.target as Node)) {
+      return;
+    }
+    this.finishPointerUp(e as MouseEvent);
+  }
+
+  private finishPointerUp(mouseEvent: MouseEvent): void {
+    const event = this.normalizeMouseEvent(mouseEvent);
+    this.teardownWindowPointerListeners();
+    this.emit('mouseup', event);
   }
 
   private handleWheel(e: Event): void {

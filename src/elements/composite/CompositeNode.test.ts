@@ -110,6 +110,40 @@ describe('CompositeNode', () => {
       expect(ctx.arcTo).toHaveBeenCalled();
     });
 
+    it('applies fill and stroke opacity to a translated custom path', () => {
+      const path = {} as Path2D;
+      const fillAlphas: number[] = [];
+      const strokeAlphas: number[] = [];
+      vi.mocked(ctx.fill).mockImplementation(() => {
+        fillAlphas.push(ctx.globalAlpha);
+      });
+      vi.mocked(ctx.stroke).mockImplementation(() => {
+        strokeAlphas.push(ctx.globalAlpha);
+      });
+      const node = new CompositeNode({
+        x: 10,
+        y: 20,
+        width: 100,
+        height: 80,
+        content: container(),
+        shapeType: 'custom',
+        pathFactory: () => path,
+        style: {
+          opacity: 0.5,
+          fillOpacity: 0.4,
+          strokeOpacity: 0.6,
+        },
+      });
+
+      node.render(ctx);
+
+      expect(ctx.translate).toHaveBeenCalledWith(10, 20);
+      expect(ctx.fill).toHaveBeenCalledWith(path);
+      expect(ctx.stroke).toHaveBeenCalledWith(path);
+      expect(fillAlphas[0]).toBeCloseTo(0.2);
+      expect(strokeAlphas[0]).toBeCloseTo(0.3);
+    });
+
     it('draws Node.label outside and skips the bound name CText', () => {
       ctx.measureText = ((value: string) => ({
         width: value.length * 8,
@@ -232,6 +266,61 @@ describe('CompositeNode', () => {
       node.render(ctx);
       expect(node.width).toBe(50);
       expect(node.height).toBe(30);
+    });
+
+    it('uses resolved proportional content insets when auto-sizing', () => {
+      const node = new CompositeNode({
+        x: 0,
+        y: 0,
+        width: 50,
+        height: 50,
+        content: container({ padding: 10 }),
+        autoSize: true,
+        contentInset: 20,
+        contentInsetScale: { top: true, right: true, bottom: true, left: true },
+        contentInsetBaseSize: { width: 100, height: 100 },
+      });
+
+      node.render(ctx);
+
+      expect(node.width).toBe(50);
+      expect(node.height).toBe(50);
+    });
+  });
+
+  describe('content bounds', () => {
+    it('applies content inset before calculating inscribed shape bounds', () => {
+      const circle = new CompositeNode({
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 100,
+        content: container(),
+        contentInset: 10,
+        shapeType: 'circle',
+      });
+      const diamond = new CompositeNode({
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 100,
+        content: container(),
+        contentInset: 10,
+        shapeType: 'diamond',
+      });
+
+      const circleBounds = circle.getLabelContainerBounds(circle.getBounds());
+      expect(circleBounds.x).toBeCloseTo(21.7157);
+      expect(circleBounds.y).toBeCloseTo(21.7157);
+      expect(circleBounds.width).toBeCloseTo(80 / Math.SQRT2);
+      expect(circleBounds.height).toBeCloseTo(80 / Math.SQRT2);
+
+      expect(diamond.getLabelContainerBounds(diamond.getBounds())).toEqual({
+        x: 30,
+        y: 30,
+        width: 40,
+        height: 40,
+      });
     });
   });
 

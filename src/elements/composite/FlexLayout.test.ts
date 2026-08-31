@@ -266,9 +266,21 @@ describe('FlexLayout', () => {
         child(80, 30, { flexShrink: 1, minSize: { width: 70, height: 0 } }),
         child(80, 30, { flexShrink: 1 }),
       ]);
-      // child0 can only shrink to 70, child1 absorbs more
+      // child0 can only shrink to 70, so child1 absorbs the remaining deficit
       expect(result.childBounds[0]!.width).toBe(70);
-      expect(result.childBounds[1]!.width).toBe(50);
+      expect(result.childBounds[1]!.width).toBe(30);
+    });
+
+    it('iteratively redistributes shrink after multiple items reach minSize', () => {
+      const result = flexLayout({ width: 180, height: 50 }, baseConfig, [
+        child(100, 30, { minSize: { width: 90, height: 0 } }),
+        child(100, 30, { minSize: { width: 70, height: 0 } }),
+        child(100, 30),
+      ]);
+
+      expect(result.childBounds[0]!.width).toBe(90);
+      expect(result.childBounds[1]!.width).toBe(70);
+      expect(result.childBounds[2]!.width).toBe(20);
     });
   });
 

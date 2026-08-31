@@ -333,6 +333,13 @@ export class InteractionManager {
 
   destroy(): void {
     this.labelEditor.finish(false);
+    this.propertyChangeBatcher.flush();
+    this.dragManager.cancelDrag();
+    this.resizeManager.cancelResize();
+    this.connectionManager.cancelAll();
+    this.selectionManager.cancelSelectionRect();
+    this.navigationManager.destroy();
+    this.resumeEditHover();
     if (this.overlayDragSession) {
       this.renderer.endOverlayDrag(this.overlayDragSession);
       this.overlayDragSession = null;

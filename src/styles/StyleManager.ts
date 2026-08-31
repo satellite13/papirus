@@ -209,6 +209,10 @@ const DARK_THEME: Theme = {
   },
 };
 
+function cloneTheme(theme: Theme): Theme {
+  return structuredClone(theme);
+}
+
 /**
  * Manages styles and themes
  */
@@ -216,17 +220,20 @@ export class StyleManager {
   private _theme: Theme;
   private _classes = new Map<string, StyleClass>();
   private _builtInThemes = new Map<string, Theme>([
-    ['default', DEFAULT_THEME],
-    ['dark', DARK_THEME],
+    ['default', cloneTheme(DEFAULT_THEME)],
+    ['dark', cloneTheme(DARK_THEME)],
   ]);
 
   constructor(theme?: Theme | string) {
-    if (theme === undefined) {
-      this._theme = DEFAULT_THEME;
-    } else if (typeof theme === 'string') {
-      this._theme = this._builtInThemes.get(theme) ?? DEFAULT_THEME;
+    const initialTheme = theme ?? 'default';
+    if (typeof initialTheme === 'string') {
+      const registeredTheme = this._builtInThemes.get(initialTheme);
+      if (registeredTheme === undefined) {
+        throw new Error(`Unknown theme: ${initialTheme}`);
+      }
+      this._theme = cloneTheme(registeredTheme);
     } else {
-      this._theme = theme;
+      this._theme = cloneTheme(initialTheme);
     }
   }
 
@@ -243,11 +250,12 @@ export class StyleManager {
   setTheme(theme: Theme | string): void {
     if (typeof theme === 'string') {
       const builtIn = this._builtInThemes.get(theme);
-      if (builtIn !== undefined) {
-        this._theme = builtIn;
+      if (builtIn === undefined) {
+        throw new Error(`Unknown theme: ${theme}`);
       }
+      this._theme = cloneTheme(builtIn);
     } else {
-      this._theme = theme;
+      this._theme = cloneTheme(theme);
     }
   }
 
@@ -255,7 +263,7 @@ export class StyleManager {
    * Register a custom theme
    */
   registerTheme(theme: Theme): void {
-    this._builtInThemes.set(theme.name, theme);
+    this._builtInThemes.set(theme.name, cloneTheme(theme));
   }
 
   /**
@@ -381,13 +389,14 @@ export class StyleManager {
   }
 
   private getBaseEdgeStyle(state: ElementState): EdgeStyle {
+    const defaultStyle = this._theme.edge.default;
     switch (state) {
       case 'hover':
-        return this._theme.edge.hover;
+        return { ...defaultStyle, ...this._theme.edge.hover };
       case 'selected':
-        return this._theme.edge.selected;
+        return { ...defaultStyle, ...this._theme.edge.selected };
       default:
-        return this._theme.edge.default;
+        return defaultStyle;
     }
   }
 }

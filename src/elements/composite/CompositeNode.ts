@@ -3,6 +3,7 @@ import type { Bounds, Point, Size } from '@/types';
 import { NODE_HITBOX_PADDING } from '@/constants';
 import type { CComponent } from './CComponent';
 import type { CContainer } from './CContainer';
+import { resolveContentInset } from '@/utils/resolveContentInset';
 
 export type CompositeShapeType = 'rectangle' | 'circle' | 'diamond' | 'custom';
 
@@ -205,14 +206,24 @@ export class CompositeNode extends Node {
     this.applyStyle(ctx);
 
     // Draw outer shape
-    ctx.beginPath();
-    this.buildShapePath(ctx, x, y, width, height);
-    ctx.closePath();
-
-    ctx.globalAlpha = baseOpacity * fillOpacity;
-    ctx.fill();
-    ctx.globalAlpha = baseOpacity * strokeOpacity;
-    ctx.stroke();
+    if (this._shapeType === 'custom' && this._pathFactory) {
+      const path = this._pathFactory(width, height);
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.globalAlpha = baseOpacity * fillOpacity;
+      ctx.fill(path);
+      ctx.globalAlpha = baseOpacity * strokeOpacity;
+      ctx.stroke(path);
+      ctx.restore();
+    } else {
+      ctx.beginPath();
+      this.buildShapePath(ctx, x, y, width, height);
+      ctx.closePath();
+      ctx.globalAlpha = baseOpacity * fillOpacity;
+      ctx.fill();
+      ctx.globalAlpha = baseOpacity * strokeOpacity;
+      ctx.stroke();
+    }
     ctx.globalAlpha = 1;
 
     this.renderContents(ctx);
@@ -242,17 +253,8 @@ export class CompositeNode extends Node {
         break;
       }
       case 'custom': {
-        if (this._pathFactory) {
-          const path = this._pathFactory(w, h);
-          // Save/restore to translate path to position
-          ctx.save();
-          ctx.translate(x, y);
-          ctx.fill(path);
-          ctx.stroke(path);
-          ctx.restore();
-          return; // path already filled/stroked
-        }
-        // Fallback to rectangle
+        // Custom Path2D shapes are rendered directly by render(); without a
+        // factory, fall back to a rectangle.
         this.buildRectPath(ctx, x, y, w, h);
         break;
       }
@@ -310,7 +312,13 @@ export class CompositeNode extends Node {
 
   private applyAutoSize(ctx: CanvasRenderingContext2D): void {
     const contentSize = this._content.measure(ctx);
-    const inset = this.contentInset;
+    const bounds = this.getBounds();
+    const inset = resolveContentInset(
+      this.contentInset,
+      this.contentInsetScale,
+      { width: bounds.width, height: bounds.height },
+      this.contentInsetBaseSize
+    );
 
     const neededWidth = Math.max(
       this._minWidth,
@@ -334,31 +342,32 @@ export class CompositeNode extends Node {
   // --- Outline methods for connections (delegate based on shapeType) ---
 
   override getLabelContainerBounds(bounds: Bounds): Bounds {
+    const insetBounds = super.getLabelContainerBounds(bounds);
     if (this._shapeType === 'circle') {
       // Inscribed rectangle in ellipse
       const factor = 1 / Math.SQRT2;
-      const w = bounds.width * factor;
-      const h = bounds.height * factor;
+      const w = insetBounds.width * factor;
+      const h = insetBounds.height * factor;
       return {
-        x: bounds.x + (bounds.width - w) / 2,
-        y: bounds.y + (bounds.height - h) / 2,
+        x: insetBounds.x + (insetBounds.width - w) / 2,
+        y: insetBounds.y + (insetBounds.height - h) / 2,
         width: w,
         height: h,
       };
     }
     if (this._shapeType === 'diamond') {
       // Inscribed rectangle in diamond (half size)
-      const w = bounds.width / 2;
-      const h = bounds.height / 2;
+      const w = insetBounds.width / 2;
+      const h = insetBounds.height / 2;
       return {
-        x: bounds.x + (bounds.width - w) / 2,
-        y: bounds.y + (bounds.height - h) / 2,
+        x: insetBounds.x + (insetBounds.width - w) / 2,
+        y: insetBounds.y + (insetBounds.height - h) / 2,
         width: w,
         height: h,
       };
     }
 
-    return super.getLabelContainerBounds(bounds);
+    return insetBounds;
   }
 
   /**

@@ -120,19 +120,46 @@ export function flexLayout(
       }
     }
   } else if (remaining < 0) {
-    // Shrink by flexShrink, clamped to minSize
-    let totalShrink = 0;
+    // Shrink by flexShrink. Items that reach minSize are frozen and their
+    // unfulfilled share is redistributed among the remaining shrinkable items.
+    const active = new Set<number>();
     for (let i = 0; i < children.length; i++) {
-      totalShrink += children[i]!.flexShrink * baseSizes[i]!;
+      const child = children[i]!;
+      const minMain = isRow ? child.minSize.width : child.minSize.height;
+      if (child.flexShrink > 0 && finalSizes[i]! > minMain) {
+        active.add(i);
+      }
     }
-    if (totalShrink > 0) {
-      const deficit = -remaining;
-      for (let i = 0; i < children.length; i++) {
+    let deficit = -remaining;
+    const epsilon = 1e-9;
+
+    while (deficit > epsilon && active.size > 0) {
+      let totalShrink = 0;
+      for (const i of active) {
+        totalShrink += children[i]!.flexShrink * baseSizes[i]!;
+      }
+      if (totalShrink <= 0) {
+        break;
+      }
+
+      let distributed = 0;
+      for (const i of active) {
         const child = children[i]!;
         const shrinkRatio = (child.flexShrink * baseSizes[i]!) / totalShrink;
         const minMain = isRow ? child.minSize.width : child.minSize.height;
-        finalSizes[i] = Math.max(minMain, finalSizes[i]! - deficit * shrinkRatio);
+        const shrink = Math.min(deficit * shrinkRatio, finalSizes[i]! - minMain);
+        finalSizes[i] = finalSizes[i]! - shrink;
+        distributed += shrink;
+        if (finalSizes[i] - minMain <= epsilon) {
+          finalSizes[i] = minMain;
+          active.delete(i);
+        }
       }
+
+      if (distributed <= epsilon) {
+        break;
+      }
+      deficit -= distributed;
     }
   }
 

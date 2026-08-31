@@ -43,7 +43,8 @@ describe('StyleManager', () => {
     styles.setTheme('ocean');
 
     expect(styles.getThemeNames()).toEqual(expect.arrayContaining(['default', 'dark', 'ocean']));
-    expect(styles.theme).toBe(OCEAN_THEME);
+    expect(styles.theme).not.toBe(OCEAN_THEME);
+    expect(styles.theme).toEqual(OCEAN_THEME);
     expect(styles.getNodeStyle('normal')).toMatchObject({
       fillColor: '#dbeafe',
       strokeColor: '#1d4ed8',
@@ -53,7 +54,8 @@ describe('StyleManager', () => {
   it('uses dark theme state styles', () => {
     const styles = new StyleManager('dark');
 
-    expect(styles.theme).toBe(DARK_THEME);
+    expect(styles.theme).not.toBe(DARK_THEME);
+    expect(styles.theme).toEqual(DARK_THEME);
     expect(styles.getNodeStyle('dragging')).toMatchObject({
       fillColor: '#404040',
       opacity: 0.8,
@@ -83,6 +85,60 @@ describe('StyleManager', () => {
       strokeWidth: 3,
       lineDash: [4, 2],
     });
+  });
+
+  it('merges default edge properties into sparse state styles', () => {
+    const styles = new StyleManager({
+      ...OCEAN_THEME,
+      edge: {
+        default: {
+          strokeColor: '#0284c7',
+          strokeWidth: 5,
+          opacity: 0.4,
+          lineDash: [8, 2],
+        },
+        hover: { strokeColor: '#f97316' },
+        selected: { strokeColor: '#db2777' },
+      },
+    });
+
+    expect(styles.getEdgeStyle('selected')).toEqual({
+      strokeColor: '#db2777',
+      strokeWidth: 5,
+      opacity: 0.4,
+      lineDash: [8, 2],
+    });
+  });
+
+  it('isolates built-in themes between manager instances', () => {
+    const first = new StyleManager();
+    const second = new StyleManager();
+
+    first.theme.node.default.fillColor = '#ff0000';
+
+    expect(second.theme.node.default.fillColor).toBe(DEFAULT_THEME.node.default.fillColor);
+    expect(DEFAULT_THEME.node.default.fillColor).toBe('#ffffff');
+  });
+
+  it('clones custom themes when registering and setting them', () => {
+    const registeredTheme = structuredClone(OCEAN_THEME);
+    const directlySetTheme = structuredClone(OCEAN_THEME);
+    const styles = new StyleManager();
+
+    styles.registerTheme(registeredTheme);
+    registeredTheme.node.default.fillColor = '#ff0000';
+    styles.setTheme('ocean');
+    expect(styles.theme.node.default.fillColor).toBe('#dbeafe');
+
+    styles.setTheme(directlySetTheme);
+    directlySetTheme.node.default.fillColor = '#00ff00';
+    expect(styles.theme.node.default.fillColor).toBe('#dbeafe');
+  });
+
+  it('throws when setting an unknown theme name', () => {
+    const styles = new StyleManager();
+
+    expect(() => styles.setTheme('missing')).toThrow('Unknown theme: missing');
   });
 
   it('lets node and edge element overrides win over class and state styles', () => {
