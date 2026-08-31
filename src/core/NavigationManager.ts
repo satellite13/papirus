@@ -36,12 +36,33 @@ export class NavigationManager extends EventEmitter<NavigationEvents> {
   private isPanning = false;
   private panStart: Point | null = null;
   private spacePressed = false;
+  private readonly boundBlur = (): void => this.handleWindowBlur();
 
   constructor(options: NavigationManagerOptions) {
     super();
     this.renderer = options.renderer;
     this.zoomSensitivity = options.zoomSensitivity ?? 0.001;
     this.panButton = options.panButton ?? 1; // Middle mouse button
+    window.addEventListener('blur', this.boundBlur);
+    document.addEventListener('visibilitychange', this.boundVisibilityChange);
+  }
+
+  private readonly boundVisibilityChange = (): void => {
+    if (document.visibilityState === 'hidden') {
+      this.handleWindowBlur();
+    }
+  };
+
+  destroy(): void {
+    window.removeEventListener('blur', this.boundBlur);
+    document.removeEventListener('visibilitychange', this.boundVisibilityChange);
+  }
+
+  private handleWindowBlur(): void {
+    this.spacePressed = false;
+    if (this.isPanning) {
+      this.endPan();
+    }
   }
 
   /**
@@ -195,7 +216,7 @@ export class NavigationManager extends EventEmitter<NavigationEvents> {
     this.renderer.offsetX = oldOffsetX + worldPos.x * (oldZoom - actualNewZoom);
     this.renderer.offsetY = oldOffsetY + worldPos.y * (oldZoom - actualNewZoom);
 
-    this.emit('zoomChange', this.renderer.zoom, centerPoint);
+    this.emit('zoomChange', this.renderer.zoom, worldPos);
   }
 
   /**
@@ -217,6 +238,10 @@ export class NavigationManager extends EventEmitter<NavigationEvents> {
    * Zoom to fit a specific rectangle
    */
   zoomToRect(rect: Bounds, padding = 50): void {
+    if (rect.width <= 0 || rect.height <= 0) {
+      return;
+    }
+
     const viewWidth = this.renderer.width - padding * 2;
     const viewHeight = this.renderer.height - padding * 2;
 

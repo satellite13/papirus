@@ -93,7 +93,7 @@ export class Group extends Element {
   }
 
   applyStyleManager(styleManager: StyleManager): void {
-    const baseStyle = styleManager.getGroupStyle(false, this._styleClass);
+    const baseStyle = styleManager.getGroupStyle(this._state === 'selected', this._styleClass);
     const mergedStyle = { ...baseStyle, ...this._style };
     if (!shallowEqual(this._groupStyle, mergedStyle)) {
       this._groupStyle = mergedStyle;
@@ -243,13 +243,6 @@ export class Group extends Element {
     }
 
     ctx.globalAlpha = 1;
-
-    // Render children
-    for (const child of this._children) {
-      if (child.visible) {
-        child.render(ctx);
-      }
-    }
   }
 
   override getBounds(): Bounds {

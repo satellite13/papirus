@@ -82,7 +82,14 @@ export type ArrowType = 'none' | 'single' | 'double';
 /**
  * Arrow marker type
  */
-export type ArrowMarkerType = 'none' | 'arrow' | 'open' | 'diamond' | 'circle' | 'square' | 'stealth';
+export type ArrowMarkerType =
+  | 'none'
+  | 'arrow'
+  | 'open'
+  | 'diamond'
+  | 'circle'
+  | 'square'
+  | 'stealth';
 
 /**
  * Arrow marker configuration
@@ -254,7 +261,16 @@ export interface SerializedNodeIcon {
   width?: number;
   height?: number;
   fit?: 'contain' | 'cover' | 'stretch' | 'none';
-  placement?: 'center' | 'top' | 'bottom' | 'left' | 'right' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+  placement?:
+    | 'center'
+    | 'top'
+    | 'bottom'
+    | 'left'
+    | 'right'
+    | 'top-left'
+    | 'top-right'
+    | 'bottom-left'
+    | 'bottom-right';
   scaleWithBounds?: boolean;
   /** Single inset from edge of icon zone to image. When reading: inset ?? margin ?? padding ?? gap ?? 6 */
   inset?: number;
@@ -315,6 +331,17 @@ export interface SerializedNode {
   icon?: SerializedNodeIcon;
   /** Content area insets per side (default 0 = full bounds) */
   contentInset?: number | ContentInsetSides;
+  /** Per-side flags for content insets that scale with node size. */
+  contentInsetScale?: {
+    top?: boolean;
+    right?: boolean;
+    bottom?: boolean;
+    left?: boolean;
+  };
+  /** Reference size used for proportional content insets. */
+  contentInsetBaseSize?: Size;
+  /** Optional badges drawn in the node's content area. */
+  badges?: Array<{ id: string; iconUrl: string }>;
   anchorPoints?: SerializedAnchorPoints;
   ports?: SerializedPort[];
   data?: Record<string, unknown>;
@@ -344,12 +371,13 @@ export interface SerializedEdge {
   endMarker?: ArrowMarkerConfig;
   style?: EdgeStyle;
   styleClass?: string;
-  label?: string;
+  label?: string | SerializedTextLabel;
   labelStyleClass?: string;
   labelOffset?: number;
   labelPosition?: number;
   labelFollowPath?: boolean;
   labelBackground?: EdgeLabelBackground;
+  lockAnchors?: boolean;
   labelLineGap?: boolean;
   data?: Record<string, unknown>;
 }
@@ -363,6 +391,7 @@ export interface SerializedGroup {
   style?: ElementStyle;
   styleClass?: string;
   label?: string;
+  padding?: number;
   data?: Record<string, unknown>;
 }
 

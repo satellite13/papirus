@@ -65,7 +65,11 @@ export class ImageExporter {
     const quality = options.quality ?? 0.92;
 
     // Calculate content bounds
-    const bounds = getContentBounds({ nodes: this.renderer.nodes.values() });
+    const bounds = getContentBounds({
+      nodes: this.renderer.nodes.values(),
+      edges: this.renderer.edges.values(),
+      groups: this.renderer.groups.values(),
+    });
     if (bounds === null) {
       // Empty diagram, return small blank image
       return this.createBlankImage(100, 100, backgroundColor, format, quality);
@@ -153,5 +157,4 @@ export class ImageExporter {
       );
     });
   }
-
 }

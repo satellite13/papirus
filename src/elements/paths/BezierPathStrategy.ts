@@ -225,18 +225,21 @@ export class BezierPathStrategy implements PathStrategy {
       return false;
     }
 
-    // Sample bezier curve and check distance to segments
+    // Sample every cubic segment and check distance to the sampled line segments.
     const samples = 20;
-    const points: Point[] = [];
+    for (let i = 1; i + 2 < path.length; i += 3) {
+      const start = path[i - 1]!;
+      const control1 = path[i]!;
+      const control2 = path[i + 1]!;
+      const end = path[i + 2]!;
+      let previous = start;
 
-    for (let i = 0; i <= samples; i++) {
-      const t = i / samples;
-      points.push(bezierPoint(path[0]!, path[1]!, path[2]!, path[3]!, t));
-    }
-
-    for (let i = 1; i < points.length; i++) {
-      if (distanceToSegment(point, points[i - 1]!, points[i]!) <= tolerance) {
-        return true;
+      for (let sample = 1; sample <= samples; sample++) {
+        const current = bezierPoint(start, control1, control2, end, sample / samples);
+        if (distanceToSegment(point, previous, current) <= tolerance) {
+          return true;
+        }
+        previous = current;
       }
     }
 

@@ -39,6 +39,7 @@ export class SvgExporter {
     const padding = options.padding ?? 20;
     const includeBackground = options.includeBackground ?? true;
     const backgroundColor = options.backgroundColor ?? '#ffffff';
+    const escapedBackgroundColor = this.escapeAttribute(backgroundColor);
     const edgeLabelOffset = options.edgeLabelOffset;
 
     const bounds = getContentBounds({
@@ -73,7 +74,7 @@ export class SvgExporter {
       }
     }
     if (includeBackground) {
-      parts.push(`<rect width="100%" height="100%" fill="${backgroundColor}"/>`);
+      parts.push(`<rect width="100%" height="100%" fill="${escapedBackgroundColor}"/>`);
     }
     parts.push(`<g transform="translate(${offsetX}, ${offsetY})">`);
 
@@ -111,8 +112,8 @@ export class SvgExporter {
   private renderGroup(group: Group): string {
     const bounds = group.getBounds();
     const style = group.style;
-    const fill = style.fillColor ?? 'rgba(200, 200, 200, 0.2)';
-    const stroke = style.strokeColor ?? '#999999';
+    const fill = this.escapeAttribute(style.fillColor ?? 'rgba(200, 200, 200, 0.2)');
+    const stroke = this.escapeAttribute(style.strokeColor ?? '#999999');
     const strokeWidth = style.strokeWidth ?? 1;
     const opacity = style.opacity ?? 1;
 
@@ -133,8 +134,8 @@ export class SvgExporter {
   private renderNode(node: Node): string {
     const bounds = node.getBounds();
     const style = node.style;
-    const fill = style.fillColor ?? '#ffffff';
-    const stroke = style.strokeColor ?? '#333333';
+    const fill = this.escapeAttribute(style.fillColor ?? '#ffffff');
+    const stroke = this.escapeAttribute(style.strokeColor ?? '#333333');
     const strokeWidth = style.strokeWidth ?? 2;
     const baseOpacity = style.opacity ?? 1;
     const fillOpacity = (style.fillOpacity ?? 1) * baseOpacity;
@@ -253,10 +254,13 @@ export class SvgExporter {
 
     const style = edge.style;
     const stroke = style.strokeColor ?? '#666666';
+    const escapedStroke = this.escapeAttribute(stroke);
     const strokeWidth = style.strokeWidth ?? 2;
     const strokeOpacity = (style.strokeOpacity ?? 1) * (style.opacity ?? 1);
-    const lineCap = style.lineCap ? ` stroke-linecap="${style.lineCap}"` : '';
-    const lineJoin = style.lineJoin ? ` stroke-linejoin="${style.lineJoin}"` : '';
+    const lineCap = style.lineCap ? ` stroke-linecap="${this.escapeAttribute(style.lineCap)}"` : '';
+    const lineJoin = style.lineJoin
+      ? ` stroke-linejoin="${this.escapeAttribute(style.lineJoin)}"`
+      : '';
     const dashValues = style.flowDash ?? style.lineDash;
     const dash = dashValues ? ` stroke-dasharray="${dashValues.join(' ')}"` : '';
     const dashOffset =
@@ -266,7 +270,7 @@ export class SvgExporter {
     const markerShapes = this.renderEdgeMarkers(edge, stroke);
     const label = this.renderEdgeLabel(edge, edgeLabelOffset);
 
-    return `<path d="${d}" fill="none" stroke="${stroke}" stroke-width="${strokeWidth}" stroke-opacity="${strokeOpacity}" color="${stroke}"${lineCap}${lineJoin}${dash}${dashOffset}/>${markerShapes}${label}`;
+    return `<path d="${d}" fill="none" stroke="${escapedStroke}" stroke-width="${strokeWidth}" stroke-opacity="${strokeOpacity}" color="${escapedStroke}"${lineCap}${lineJoin}${dash}${dashOffset}/>${markerShapes}${label}`;
   }
 
   private renderEdgeLabel(edge: Edge, edgeLabelOffset?: number): string {
@@ -278,7 +282,12 @@ export class SvgExporter {
     if (!labelState) {
       return '';
     }
-    const text = this.renderTextLabel(edge.label.text, labelState.point, edge.label.style, labelState.rotation);
+    const text = this.renderTextLabel(
+      edge.label.text,
+      labelState.point,
+      edge.label.style,
+      labelState.rotation
+    );
     const bg = this.renderEdgeLabelBackground(edge, labelState.point, labelState.rotation);
     return `${bg}${text}`;
   }
@@ -289,7 +298,7 @@ export class SvgExporter {
     }
 
     const metrics = this.measureTextLabel(edge.label.text, edge.label.style, edge.label.inset);
-    const bgColor = edge.labelBackground?.color ?? '#ffffff';
+    const bgColor = this.escapeAttribute(edge.labelBackground?.color ?? '#ffffff');
     const bgOpacity = edge.labelBackground?.opacity ?? 1;
     const bgRadius = edge.labelBackground?.borderRadius ?? EDGE_LABEL_BACKGROUND_RADIUS;
 
@@ -299,7 +308,10 @@ export class SvgExporter {
     const height = metrics.height;
     const radius = Math.max(0, Math.min(bgRadius, width / 2, height / 2));
 
-    const transform = rotation !== 0 ? ` transform="rotate(${(rotation * 180) / Math.PI} ${point.x} ${point.y})"` : '';
+    const transform =
+      rotation !== 0
+        ? ` transform="rotate(${(rotation * 180) / Math.PI} ${point.x} ${point.y})"`
+        : '';
 
     if (radius <= 0) {
       return `<rect x="${x}" y="${y}" width="${width}" height="${height}" fill="${bgColor}" fill-opacity="${bgOpacity}"${transform}/>`;
@@ -399,7 +411,10 @@ export class SvgExporter {
     return parts.join('');
   }
 
-  private getMarkerPoints(edge: Edge, position: 'start' | 'end'): { from: Point; to: Point } | null {
+  private getMarkerPoints(
+    edge: Edge,
+    position: 'start' | 'end'
+  ): { from: Point; to: Point } | null {
     return calculateMarkerPoints(edge.path, position, edge.type);
   }
 
@@ -409,7 +424,14 @@ export class SvgExporter {
     to: Point,
     edgeStroke: string
   ): string {
-    return generateSvgMarker(marker, from, to, edgeStroke);
+    const escapedMarker: ArrowMarkerConfig = {
+      ...marker,
+      strokeColor:
+        marker.strokeColor !== undefined ? this.escapeAttribute(marker.strokeColor) : undefined,
+      fillColor:
+        marker.fillColor !== undefined ? this.escapeAttribute(marker.fillColor) : undefined,
+    };
+    return generateSvgMarker(escapedMarker, from, to, this.escapeAttribute(edgeStroke));
   }
 
   private buildPath(edge: Edge): string {
@@ -504,11 +526,11 @@ export class SvgExporter {
   }
 
   private renderTextLabel(text: string, point: Point, style: TextStyle = {}, rotation = 0): string {
-    const fill = style.color ?? '#000000';
+    const fill = this.escapeAttribute(style.color ?? '#000000');
     const fontSize = style.fontSize ?? 14;
-    const fontFamily = style.fontFamily ?? 'sans-serif';
-    const fontWeight = style.fontWeight ?? 'normal';
-    const fontStyle = style.fontStyle ?? 'normal';
+    const fontFamily = this.escapeAttribute(style.fontFamily ?? 'sans-serif');
+    const fontWeight = this.escapeAttribute(style.fontWeight ?? 'normal');
+    const fontStyle = this.escapeAttribute(style.fontStyle ?? 'normal');
     const fontStyleAttr = fontStyle !== 'normal' ? ` font-style="${fontStyle}"` : '';
     const opacity = style.opacity ?? 1;
     const anchor = style.align === 'left' ? 'start' : style.align === 'right' ? 'end' : 'middle';
@@ -516,10 +538,13 @@ export class SvgExporter {
       style.baseline === 'top'
         ? 'text-before-edge'
         : style.baseline === 'bottom'
-        ? 'text-after-edge'
-        : 'middle';
+          ? 'text-after-edge'
+          : 'middle';
 
-    const transform = rotation !== 0 ? ` transform="rotate(${(rotation * 180) / Math.PI} ${point.x} ${point.y})"` : '';
+    const transform =
+      rotation !== 0
+        ? ` transform="rotate(${(rotation * 180) / Math.PI} ${point.x} ${point.y})"`
+        : '';
 
     const lines = text.split('\n');
     if (lines.length <= 1) {
@@ -531,7 +556,10 @@ export class SvgExporter {
     const lineHeight = fontSize * 1.2;
     const startY = point.y - ((lines.length - 1) * lineHeight) / 2;
     const tspans = lines
-      .map((line, index) => `<tspan x="${point.x}" y="${startY + index * lineHeight}">${this.escapeText(line)}</tspan>`)
+      .map(
+        (line, index) =>
+          `<tspan x="${point.x}" y="${startY + index * lineHeight}">${this.escapeText(line)}</tspan>`
+      )
       .join('');
     return `<text x="${point.x}" y="${point.y}" fill="${fill}" fill-opacity="${opacity}" font-size="${fontSize}" font-family="${fontFamily}" font-weight="${fontWeight}"${fontStyleAttr} text-anchor="${anchor}" dominant-baseline="${baseline}"${transform}>${tspans}</text>`;
   }
@@ -648,7 +676,9 @@ export class SvgExporter {
         entered = true;
 
         const exitOnSameSegment =
-          currentIntersections.length > 1 ? currentIntersections[currentIntersections.length - 1]! : undefined;
+          currentIntersections.length > 1
+            ? currentIntersections[currentIntersections.length - 1]!
+            : undefined;
         if (exitOnSameSegment) {
           current = [{ ...exitOnSameSegment.point }, { ...p1 }];
           exited = true;
@@ -699,7 +729,10 @@ export class SvgExporter {
     return canvas.getContext('2d');
   }
 
-  private renderNodeLabel(node: Node, nodeBounds: { x: number; y: number; width: number; height: number }): string {
+  private renderNodeLabel(
+    node: Node,
+    nodeBounds: { x: number; y: number; width: number; height: number }
+  ): string {
     const label = node.label;
     if (!label) {
       return '';
@@ -759,13 +792,17 @@ export class SvgExporter {
 
   private getNodeCornerRadius(node: Node, bounds: { width: number; height: number }): number {
     const rectangleRadius =
-      'cornerRadius' in node && typeof (node as { cornerRadius?: unknown }).cornerRadius === 'number'
+      'cornerRadius' in node &&
+      typeof (node as { cornerRadius?: unknown }).cornerRadius === 'number'
         ? ((node as { cornerRadius: number }).cornerRadius ?? 0)
-        : node.style.cornerRadius ?? 0;
+        : (node.style.cornerRadius ?? 0);
     return Math.max(0, Math.min(rectangleRadius, bounds.width / 2, bounds.height / 2));
   }
 
-  private renderNodeIcon(node: Node, nodeBounds: { x: number; y: number; width: number; height: number }): string {
+  private renderNodeIcon(
+    node: Node,
+    nodeBounds: { x: number; y: number; width: number; height: number }
+  ): string {
     const icon = node.icon;
     if (!icon) {
       return '';
@@ -826,10 +863,18 @@ export class SvgExporter {
       .replace(/>/g, '&gt;');
   }
 
-  private createEmptySvg(width: number, height: number, backgroundColor: string, includeBackground: boolean): string {
+  private createEmptySvg(
+    width: number,
+    height: number,
+    backgroundColor: string,
+    includeBackground: boolean
+  ): string {
+    const escapedBackgroundColor = this.escapeAttribute(backgroundColor);
     return [
       `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`,
-      includeBackground ? `<rect width="100%" height="100%" fill="${backgroundColor}"/>` : '',
+      includeBackground
+        ? `<rect width="100%" height="100%" fill="${escapedBackgroundColor}"/>`
+        : '',
       '</svg>',
     ].join('');
   }

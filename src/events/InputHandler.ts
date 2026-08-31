@@ -73,6 +73,10 @@ export class InputHandler extends EventEmitter<InputEvents> {
   private boundHandlers = new Map<string, EventListener>();
   private lastTouchDistance: number | null = null;
   private lastTouchCenter: Point | null = null;
+  /** After mousedown, move/up are tracked on window so gestures survive leaving the canvas. */
+  private windowPointerActive = false;
+  private readonly boundWindowMouseMove = (e: Event): void => this.handleWindowMouseMove(e);
+  private readonly boundWindowMouseUp = (e: Event): void => this.handleWindowMouseUp(e);
 
   constructor(options: InputHandlerOptions) {
     super();
@@ -92,6 +96,7 @@ export class InputHandler extends EventEmitter<InputEvents> {
    * Clean up event listeners
    */
   destroy(): void {
+    this.teardownWindowPointerListeners();
     for (const [eventName, handler] of this.boundHandlers) {
       if (eventName.startsWith('key')) {
         window.removeEventListener(eventName, handler);
@@ -108,8 +113,9 @@ export class InputHandler extends EventEmitter<InputEvents> {
     this.addCanvasListener('click', this.handleClick.bind(this));
     this.addCanvasListener('dblclick', this.handleDblClick.bind(this));
     this.addCanvasListener('mousedown', this.handleMouseDown.bind(this));
-    this.addCanvasListener('mouseup', this.handleMouseUp.bind(this));
-    this.addCanvasListener('mousemove', this.handleMouseMove.bind(this));
+    // mouseup/mousemove while pressed are on window (see ensureWindowPointerListeners).
+    // Canvas mousemove still handles hover when no button is down.
+    this.addCanvasListener('mousemove', this.handleCanvasMouseMove.bind(this));
     this.addCanvasListener('wheel', this.handleWheel.bind(this), { passive: false });
 
     // Touch events
@@ -139,6 +145,24 @@ export class InputHandler extends EventEmitter<InputEvents> {
     this.boundHandlers.set(eventName, handler);
   }
 
+  private ensureWindowPointerListeners(): void {
+    if (this.windowPointerActive) {
+      return;
+    }
+    this.windowPointerActive = true;
+    window.addEventListener('mousemove', this.boundWindowMouseMove);
+    window.addEventListener('mouseup', this.boundWindowMouseUp);
+  }
+
+  private teardownWindowPointerListeners(): void {
+    if (!this.windowPointerActive) {
+      return;
+    }
+    this.windowPointerActive = false;
+    window.removeEventListener('mousemove', this.boundWindowMouseMove);
+    window.removeEventListener('mouseup', this.boundWindowMouseUp);
+  }
+
   private handleClick(e: Event): void {
     const event = this.normalizeMouseEvent(e as MouseEvent);
     this.emit('click', event);
@@ -151,17 +175,27 @@ export class InputHandler extends EventEmitter<InputEvents> {
 
   private handleMouseDown(e: Event): void {
     const event = this.normalizeMouseEvent(e as MouseEvent);
+    this.ensureWindowPointerListeners();
     this.emit('mousedown', event);
   }
 
-  private handleMouseUp(e: Event): void {
-    const event = this.normalizeMouseEvent(e as MouseEvent);
-    this.emit('mouseup', event);
-  }
-
-  private handleMouseMove(e: Event): void {
+  private handleCanvasMouseMove(e: Event): void {
+    if (this.windowPointerActive) {
+      return;
+    }
     const event = this.normalizeMouseEvent(e as MouseEvent);
     this.emit('mousemove', event);
+  }
+
+  private handleWindowMouseMove(e: Event): void {
+    const event = this.normalizeMouseEvent(e as MouseEvent);
+    this.emit('mousemove', event);
+  }
+
+  private handleWindowMouseUp(e: Event): void {
+    const event = this.normalizeMouseEvent(e as MouseEvent);
+    this.teardownWindowPointerListeners();
+    this.emit('mouseup', event);
   }
 
   private handleWheel(e: Event): void {

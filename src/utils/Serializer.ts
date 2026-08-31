@@ -2,6 +2,7 @@ import type { DiagramRenderer } from '@/core/DiagramRenderer';
 import type { Node } from '@/elements/Node';
 import type { Edge } from '@/elements/Edge';
 import type { Group } from '@/elements/Group';
+import type { TextLabel } from '@/elements/TextLabel';
 import type {
   DiagramData,
   SerializedNode,
@@ -234,44 +235,7 @@ export class Serializer {
       styleClass: port.styleClass,
     }));
 
-    // Serialize label - full TextLabel if it has more than just text
-    let label: string | SerializedTextLabel | undefined;
-    if (node.label) {
-      const ins = node.label.inset;
-      const defaultInset = 8;
-      const insetAllDefault =
-        ins.top === defaultInset &&
-        ins.right === defaultInset &&
-        ins.bottom === defaultInset &&
-        ins.left === defaultInset;
-      const serializedInset = insetAllDefault
-        ? undefined
-        : ins.top === ins.right && ins.top === ins.bottom && ins.top === ins.left
-          ? ins.top
-          : { top: ins.top, right: ins.right, bottom: ins.bottom, left: ins.left };
-
-      const labelDefaults = { inset: undefined, style: {}, maxWidth: undefined, styleClass: undefined };
-      const labelData = {
-        text: node.label.text,
-        style: node.label.style,
-        maxWidth: node.label.maxWidth,
-        inset: serializedInset ?? undefined,
-        styleClass: node.label.styleClass,
-      };
-      const hasExtendedOptions = hasNonDefaultValues(labelData, labelDefaults);
-
-      if (hasExtendedOptions) {
-        label = omitEmptyValues({
-          text: node.label.text,
-          style: Object.keys(node.label.style).length > 0 ? node.label.style : undefined,
-          maxWidth: node.label.maxWidth,
-          inset: serializedInset,
-          styleClass: node.label.styleClass,
-        }) as SerializedTextLabel | undefined;
-      } else {
-        label = node.label.text;
-      }
-    }
+    const label = node.label ? this.serializeTextLabel(node.label) : undefined;
 
     // Serialize icon
     let icon: SerializedNodeIcon | undefined;
@@ -307,6 +271,8 @@ export class Serializer {
       contentInset.right !== 0 ||
       contentInset.bottom !== 0 ||
       contentInset.left !== 0;
+    const contentInsetScale = node.contentInsetScale;
+    const hasContentInsetScale = Object.keys(contentInsetScale).length > 0;
 
     const base = omitEmptyValues({
       id: node.id,
@@ -315,14 +281,16 @@ export class Serializer {
       y: node.y,
       width: node.width,
       height: node.height,
-      style: node.style,
+      style: { ...node.styleOverrides },
       styleClass: node.styleClass,
       label,
-      labelStyleClass: typeof label === 'string' ? node.label?.styleClass : undefined,
       labelPlacement: node.labelPlacement !== 'center' ? node.labelPlacement : undefined,
       labelGap: node.labelGap !== DEFAULT_LABEL_GAP ? node.labelGap : undefined,
       icon,
       contentInset: hasContentInset ? contentInset : undefined,
+      contentInsetScale: hasContentInsetScale ? contentInsetScale : undefined,
+      contentInsetBaseSize: node.contentInsetBaseSize,
+      badges: node.badges.length > 0 ? node.badges.map((badge) => ({ ...badge })) : undefined,
       anchorPoints,
       ports: ports.length > 0 ? ports : undefined,
       data: Object.keys(node.data).length > 0 ? node.data : undefined,
@@ -353,14 +321,14 @@ export class Serializer {
       arrowType: edge.arrowType,
       startMarker: edge.startMarker,
       endMarker: edge.endMarker,
-      style: edge.style,
+      style: { ...edge.styleOverrides },
       styleClass: edge.styleClass,
-      label: edge.label?.text,
-      labelStyleClass: edge.label?.styleClass,
+      label: edge.label ? this.serializeTextLabel(edge.label) : undefined,
       labelOffset: edge.labelOffset !== 0 ? edge.labelOffset : undefined,
       labelPosition: edge.labelPosition !== 0.5 ? edge.labelPosition : undefined,
       labelFollowPath: edge.labelFollowPath ? true : undefined,
       labelBackground: edge.labelBackground,
+      lockAnchors: edge.lockAnchors ? undefined : false,
       labelLineGap: edge.labelLineGap ? true : undefined,
       data: Object.keys(edge.data).length > 0 ? edge.data : undefined,
     };
@@ -370,10 +338,40 @@ export class Serializer {
     return {
       id: group.id,
       childIds: group.children.map((c) => c.id),
-      style: group.style,
+      style: { ...group.styleOverrides },
       styleClass: group.styleClass,
       label: group.label,
+      padding: group.padding !== 20 ? group.padding : undefined,
       data: Object.keys(group.data).length > 0 ? group.data : undefined,
     };
+  }
+
+  private serializeTextLabel(label: TextLabel): string | SerializedTextLabel {
+    const inset = label.inset;
+    const insetAllDefault =
+      inset.top === 8 && inset.right === 8 && inset.bottom === 8 && inset.left === 8;
+    const serializedInset = insetAllDefault
+      ? undefined
+      : inset.top === inset.right && inset.top === inset.bottom && inset.top === inset.left
+        ? inset.top
+        : { top: inset.top, right: inset.right, bottom: inset.bottom, left: inset.left };
+    const style = label.styleOverrides;
+    const hasExtendedOptions =
+      Object.keys(style).length > 0 ||
+      label.maxWidth !== undefined ||
+      serializedInset !== undefined ||
+      label.styleClass !== undefined;
+
+    if (!hasExtendedOptions) {
+      return label.text;
+    }
+
+    return omitEmptyValues({
+      text: label.text,
+      style: Object.keys(style).length > 0 ? style : undefined,
+      maxWidth: label.maxWidth,
+      inset: serializedInset,
+      styleClass: label.styleClass,
+    }) as SerializedTextLabel;
   }
 }

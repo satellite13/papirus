@@ -538,4 +538,34 @@ describe('DiagramRenderer', () => {
 
     expect(dirtyRenderer._dirty).toBe(true);
   });
+
+  it('updates node-edge index when an edge is reconnected', () => {
+    const canvas = document.createElement('canvas');
+    const renderer = new DiagramRenderer(canvas, { width: 400, height: 300, retina: false });
+    const a = new RectangleNode({ id: 'a', x: 0, y: 0, width: 40, height: 30 });
+    const b = new RectangleNode({ id: 'b', x: 100, y: 0, width: 40, height: 30 });
+    const c = new RectangleNode({ id: 'c', x: 200, y: 0, width: 40, height: 30 });
+    renderer.addNode(a);
+    renderer.addNode(b);
+    renderer.addNode(c);
+
+    const edge = new Edge({
+      id: 'e1',
+      from: { nodeId: 'a' },
+      to: { nodeId: 'b' },
+      type: 'straight',
+    });
+    renderer.addEdge(edge);
+
+    edge.to = { nodeId: 'c' };
+
+    expect(renderer.removeNode('b')).toBe(true);
+    expect(renderer.getEdge('e1')).toBeDefined();
+    expect(renderer.getEdge('e1')?.to.nodeId).toBe('c');
+
+    expect(renderer.removeNode('c')).toBe(true);
+    expect(renderer.getEdge('e1')).toBeUndefined();
+
+    renderer.destroy();
+  });
 });

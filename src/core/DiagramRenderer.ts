@@ -115,6 +115,8 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> implements Diag
   /** Bumped in {@link markContentDirty}; MiniMap content bake key. */
   private _contentRevision = 0;
   private _contentBoundsCache: { revision: number; bounds: Bounds | null } | null = null;
+  /** Last indexed node ends per edge — kept in sync when from/to reconnect. */
+  private _edgeIndexEndpoints = new Map<string, { from?: string; to?: string }>();
   private _destroyed = false;
   /** Chrome may drop the accelerated 2D backing store; nothing can be painted until it returns. */
   private _contextLost = false;
@@ -557,11 +559,12 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> implements Diag
   addEdge(edge: Edge): void {
     // Style/label dirty → repaint only. Binding changes go through markContentDirty below.
     edge.setDirtyListener(() => this.markDirty());
-    edge.setBindingListener(() => this.markContentDirty());
+    edge.setBindingListener(() => {
+      this.syncEdgeNodeIndex(edge);
+      this.markContentDirty();
+    });
     this._edges.set(edge.id, edge);
-    // Update reverse index (node ends only; edge-attached ends use edgeId)
-    if (edge.from.nodeId) this._updateEdgeIndex(edge.id, edge.from.nodeId, true);
-    if (edge.to.nodeId) this._updateEdgeIndex(edge.id, edge.to.nodeId, true);
+    this.syncEdgeNodeIndex(edge);
     this.animationManager.registerEnter(edge.id);
     this.markContentDirty();
     this.emit('edgeAdd', edge);
@@ -584,6 +587,30 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> implements Diag
         this._nodeEdgeIndex.delete(nodeId);
       }
     }
+  }
+
+  /**
+   * Keep `_nodeEdgeIndex` accurate when an edge is added or its from/to node ids change.
+   */
+  private syncEdgeNodeIndex(edge: Edge): void {
+    const prev = this._edgeIndexEndpoints.get(edge.id);
+    const nextFrom = edge.from.nodeId;
+    const nextTo = edge.to.nodeId;
+
+    if (prev?.from !== undefined && prev.from !== nextFrom) {
+      this._updateEdgeIndex(edge.id, prev.from, false);
+    }
+    if (prev?.to !== undefined && prev.to !== nextTo) {
+      this._updateEdgeIndex(edge.id, prev.to, false);
+    }
+    if (nextFrom !== undefined && nextFrom !== prev?.from) {
+      this._updateEdgeIndex(edge.id, nextFrom, true);
+    }
+    if (nextTo !== undefined && nextTo !== prev?.to) {
+      this._updateEdgeIndex(edge.id, nextTo, true);
+    }
+
+    this._edgeIndexEndpoints.set(edge.id, { from: nextFrom, to: nextTo });
   }
 
   /**
@@ -651,9 +678,19 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> implements Diag
       this.removeEdgeImmediate(dependentId);
     }
 
-    // Clean up reverse index
-    if (edge.from.nodeId) this._updateEdgeIndex(edgeId, edge.from.nodeId, false);
-    if (edge.to.nodeId) this._updateEdgeIndex(edgeId, edge.to.nodeId, false);
+    // Clean up reverse index using last synced endpoints (from/to may already have changed).
+    const indexed = this._edgeIndexEndpoints.get(edgeId);
+    if (indexed?.from !== undefined) {
+      this._updateEdgeIndex(edgeId, indexed.from, false);
+    } else if (edge.from.nodeId) {
+      this._updateEdgeIndex(edgeId, edge.from.nodeId, false);
+    }
+    if (indexed?.to !== undefined) {
+      this._updateEdgeIndex(edgeId, indexed.to, false);
+    } else if (edge.to.nodeId) {
+      this._updateEdgeIndex(edgeId, edge.to.nodeId, false);
+    }
+    this._edgeIndexEndpoints.delete(edgeId);
 
     this._edges.delete(edgeId);
     edge.setDirtyListener(undefined);
@@ -873,6 +910,7 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> implements Diag
     this._edges.clear();
     this._groups.clear();
     this._nodeEdgeIndex.clear();
+    this._edgeIndexEndpoints.clear();
   }
 
   /**
@@ -884,6 +922,7 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> implements Diag
     }
     for (const edge of this._edges.values()) {
       edge.setDirtyListener(undefined);
+      edge.setBindingListener(undefined);
     }
     for (const group of this._groups.values()) {
       group.setDirtyListener(undefined);
@@ -892,7 +931,9 @@ export class DiagramRenderer extends EventEmitter<DiagramEvents> implements Diag
     this._edges.clear();
     this._groups.clear();
     this._nodeEdgeIndex.clear();
-    this.markDirty();
+    this._edgeIndexEndpoints.clear();
+    this.animationManager.clear();
+    this.markContentDirty();
   }
 
   private nativePixelRatio(): number {

@@ -897,6 +897,13 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
    * Cancel current connection
    */
   cancelConnection(): void {
+    if (this.isReconnecting) {
+      this.restoreReconnectingEndpoint();
+      this.resetReconnection();
+      this.renderer.markDirty();
+      return;
+    }
+
     if (!this.isConnecting) {
       return;
     }
@@ -904,6 +911,13 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     this.emit('connectionEnd', null);
     this.reset();
     this.renderer.markDirty();
+  }
+
+  /**
+   * Cancel any in-flight connect or reconnect gesture and restore edge auto-updates.
+   */
+  cancelAll(): void {
+    this.cancelConnection();
   }
 
   /**
@@ -1108,6 +1122,17 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     this.reconnectingTargetNodeId = null;
     this.reconnectPoint = null;
     this.setCursor('');
+  }
+
+  private restoreReconnectingEndpoint(): void {
+    if (!this.reconnectingEdge || !this.originalEdgeEndpoint || !this.reconnectingEndpoint) {
+      return;
+    }
+    if (this.reconnectingEndpoint === 'start') {
+      this.reconnectingEdge.from = this.originalEdgeEndpoint;
+    } else {
+      this.reconnectingEdge.to = this.originalEdgeEndpoint;
+    }
   }
 
   /**

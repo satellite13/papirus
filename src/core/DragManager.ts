@@ -61,6 +61,8 @@ export class DragManager extends EventEmitter<DragEvents> {
   private editablePolylineFullyConnectedEdges = new Set<string>();
   /** Snapshot of control points at drag start for cancel/restore */
   private initialControlPointsForFullyConnected = new Map<string, Point[]>();
+  /** Snapshots for single-end bend-follow edges restored on cancelDrag */
+  private initialControlPointsForBendFollow = new Map<string, Point[]>();
   private alignmentGuides: AlignmentGuide[] = [];
   private _handledMouseDown = false;
   private draggedGroupSelection = false;
@@ -319,6 +321,7 @@ export class DragManager extends EventEmitter<DragEvents> {
       point,
       delta
     );
+    this.lastDragPoint = point;
     this.renderer.markDirty();
 
     return true;
@@ -345,9 +348,6 @@ export class DragManager extends EventEmitter<DragEvents> {
         this.draggedNodes.map((n) => n.id),
         point
       );
-      if (this.draggedGroupSelection) {
-        this.selectionManager.clearSelection();
-      }
     }
 
     this.reset();
@@ -370,8 +370,14 @@ export class DragManager extends EventEmitter<DragEvents> {
         }
         node.state = 'selected';
       }
-      // Restore control points for fully-connected editable polyline edges
+      // Restore control points for any editable polyline bends moved during the drag
       for (const [edgeId, points] of this.initialControlPointsForFullyConnected) {
+        const edge = this.renderer.getEdge(edgeId);
+        if (edge) {
+          edge.controlPoints = clonePoints(points);
+        }
+      }
+      for (const [edgeId, points] of this.initialControlPointsForBendFollow) {
         const edge = this.renderer.getEdge(edgeId);
         if (edge) {
           edge.controlPoints = clonePoints(points);
@@ -400,6 +406,7 @@ export class DragManager extends EventEmitter<DragEvents> {
     this.editableBendFollow.clear();
     this.editablePolylineFullyConnectedEdges.clear();
     this.initialControlPointsForFullyConnected.clear();
+    this.initialControlPointsForBendFollow.clear();
     this.alignmentGuides = [];
     this.draggedGroupSelection = false;
     // Note: _handledMouseDown is reset at the start of next handleMouseDown
@@ -410,6 +417,7 @@ export class DragManager extends EventEmitter<DragEvents> {
     this.editableBendFollow.clear();
     this.editablePolylineFullyConnectedEdges.clear();
     this.initialControlPointsForFullyConnected.clear();
+    this.initialControlPointsForBendFollow.clear();
     const draggedIds = new Set(this.draggedNodes.map((node) => node.id));
     const nodeBindings = new Map<
       string,
@@ -472,6 +480,9 @@ export class DragManager extends EventEmitter<DragEvents> {
         const bindings = nodeBindings.get(node.id) ?? [];
         bindings.push({ edgeId: edge.id, controlPointIndex, axis });
         nodeBindings.set(node.id, bindings);
+        if (!this.initialControlPointsForBendFollow.has(edge.id)) {
+          this.initialControlPointsForBendFollow.set(edge.id, clonePoints(edge.controlPoints!));
+        }
       }
     }
 

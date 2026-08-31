@@ -195,6 +195,13 @@ export class SelectionManager extends EventEmitter<SelectionEvents> {
       }
     }
 
+    for (const edge of this.renderer.edges.values()) {
+      const bounds = edge.getBounds();
+      if (rectsIntersect(rect, bounds)) {
+        selected.push(edge.id);
+      }
+    }
+
     // Find groups within selection rect
     for (const group of this.renderer.groups.values()) {
       const bounds = group.getBounds();
@@ -248,6 +255,8 @@ export class SelectionManager extends EventEmitter<SelectionEvents> {
   }
 
   private updateElementStates(): void {
+    this.pruneStaleSelection();
+
     const updateState = (elements: Iterable<{ id: string; state: string }>): void => {
       for (const element of elements) {
         if (this._selectedIds.has(element.id)) {
@@ -264,6 +273,18 @@ export class SelectionManager extends EventEmitter<SelectionEvents> {
 
     this.renderer.markDirty();
     this.renderer.markStyleDirty();
+  }
+
+  private pruneStaleSelection(): void {
+    for (const id of Array.from(this._selectedIds)) {
+      if (
+        this.renderer.getNode(id) === undefined &&
+        this.renderer.getEdge(id) === undefined &&
+        this.renderer.getGroup(id) === undefined
+      ) {
+        this._selectedIds.delete(id);
+      }
+    }
   }
 
   private emitSelect(): void {
