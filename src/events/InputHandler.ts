@@ -113,8 +113,7 @@ export class InputHandler extends EventEmitter<InputEvents> {
     this.addCanvasListener('click', this.handleClick.bind(this));
     this.addCanvasListener('dblclick', this.handleDblClick.bind(this));
     this.addCanvasListener('mousedown', this.handleMouseDown.bind(this));
-    // mouseup/mousemove while pressed are on window (see ensureWindowPointerListeners).
-    // Canvas mousemove still handles hover when no button is down.
+    this.addCanvasListener('mouseup', this.handleCanvasMouseUp.bind(this));
     this.addCanvasListener('mousemove', this.handleCanvasMouseMove.bind(this));
     this.addCanvasListener('wheel', this.handleWheel.bind(this), { passive: false });
 
@@ -180,20 +179,33 @@ export class InputHandler extends EventEmitter<InputEvents> {
   }
 
   private handleCanvasMouseMove(e: Event): void {
-    if (this.windowPointerActive) {
+    const event = this.normalizeMouseEvent(e as MouseEvent);
+    this.emit('mousemove', event);
+  }
+
+  private handleWindowMouseMove(e: Event): void {
+    // Canvas already handled moves that happen over it (target phase before bubble).
+    if (e.target === this.canvas || this.canvas.contains(e.target as Node)) {
       return;
     }
     const event = this.normalizeMouseEvent(e as MouseEvent);
     this.emit('mousemove', event);
   }
 
-  private handleWindowMouseMove(e: Event): void {
-    const event = this.normalizeMouseEvent(e as MouseEvent);
-    this.emit('mousemove', event);
+  private handleCanvasMouseUp(e: Event): void {
+    this.finishPointerUp(e as MouseEvent);
   }
 
   private handleWindowMouseUp(e: Event): void {
-    const event = this.normalizeMouseEvent(e as MouseEvent);
+    // Prefer the canvas handler when the release is still over the canvas.
+    if (e.target === this.canvas || this.canvas.contains(e.target as Node)) {
+      return;
+    }
+    this.finishPointerUp(e as MouseEvent);
+  }
+
+  private finishPointerUp(mouseEvent: MouseEvent): void {
+    const event = this.normalizeMouseEvent(mouseEvent);
     this.teardownWindowPointerListeners();
     this.emit('mouseup', event);
   }

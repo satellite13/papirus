@@ -65,7 +65,6 @@ export class DragManager extends EventEmitter<DragEvents> {
   private initialControlPointsForBendFollow = new Map<string, Point[]>();
   private alignmentGuides: AlignmentGuide[] = [];
   private _handledMouseDown = false;
-  private draggedGroupSelection = false;
 
   constructor(options: DragManagerOptions) {
     super();
@@ -180,7 +179,6 @@ export class DragManager extends EventEmitter<DragEvents> {
       this._handledMouseDown = true;
       this.dragStartPoint = point;
       this.lastDragPoint = point;
-      this.draggedGroupSelection = false;
       this.draggedNodes = [];
       this.initialPositions.clear();
       for (const id of this.selectionManager.selectedIds) {
@@ -213,7 +211,6 @@ export class DragManager extends EventEmitter<DragEvents> {
     // Prepare for drag
     this.dragStartPoint = point;
     this.lastDragPoint = point;
-    this.draggedGroupSelection = false;
 
     // Get all selected nodes (expand groups to children)
     this.draggedNodes = [];
@@ -226,7 +223,6 @@ export class DragManager extends EventEmitter<DragEvents> {
 
       const selectedGroup = this.renderer.getGroup(id);
       if (selectedGroup !== undefined) {
-        this.draggedGroupSelection = true;
         for (const child of selectedGroup.getAllChildren()) {
           const childNode = this.renderer.getNode(child.id);
           if (childNode) {
@@ -408,7 +404,6 @@ export class DragManager extends EventEmitter<DragEvents> {
     this.initialControlPointsForFullyConnected.clear();
     this.initialControlPointsForBendFollow.clear();
     this.alignmentGuides = [];
-    this.draggedGroupSelection = false;
     // Note: _handledMouseDown is reset at the start of next handleMouseDown
     // to prevent click handler from firing after mouseup
   }

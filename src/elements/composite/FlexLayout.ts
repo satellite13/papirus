@@ -150,7 +150,7 @@ export function flexLayout(
         const shrink = Math.min(deficit * shrinkRatio, finalSizes[i]! - minMain);
         finalSizes[i] = finalSizes[i]! - shrink;
         distributed += shrink;
-        if (finalSizes[i]! - minMain <= epsilon) {
+        if (finalSizes[i] - minMain <= epsilon) {
           finalSizes[i] = minMain;
           active.delete(i);
         }
