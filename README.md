@@ -1,6 +1,7 @@
 # Papirus
 
 [![npm version](https://img.shields.io/npm/v/%40ngroznykh%2Fpapirus.svg)](https://www.npmjs.com/package/@ngroznykh/papirus)
+[![CI](https://github.com/satellite13/papirus/actions/workflows/ci.yml/badge.svg)](https://github.com/satellite13/papirus/actions/workflows/ci.yml)
 [![License: AGPL%20v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
 
 TypeScript library for building interactive 2D diagrams and flowcharts on HTML Canvas. Supports nodes, edges, groups, styling, serialization, export, and interactivity.
@@ -27,7 +28,7 @@ npm install @ngroznykh/papirus
 
 ## Requirements
 
-- Node.js `>=18`
+- Node.js `^20.19.0 || >=22.12.0`
 - A modern browser with Canvas API support (Chrome, Edge, Firefox, Safari)
 
 ## Quick Start
