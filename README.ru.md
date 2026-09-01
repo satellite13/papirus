@@ -28,7 +28,7 @@ npm install @ngroznykh/papirus
 
 ## Требования
 
-- Node.js `>=18`
+- Node.js `^20.19.0 || >=22.12.0`
 - Современный браузер с поддержкой Canvas API (Chrome, Edge, Firefox, Safari)
 
 ## Быстрый старт

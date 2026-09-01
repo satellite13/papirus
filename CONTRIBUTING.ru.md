@@ -29,7 +29,7 @@ English version: `CONTRIBUTING.md`
    npm run test
    npm run build
    ```
-   GitHub Actions запускает те же проверки на каждом pull request (Node 18/20/22).
+   GitHub Actions запускает те же проверки на каждом pull request (Node 20/22).
 4. Сделайте понятный commit
 5. Откройте PR в ветку `master`
 

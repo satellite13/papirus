@@ -8,7 +8,7 @@ This file provides essential information for AI coding agents working with the P
 
 - **Package**: `@ngroznykh/papirus`
 - **License**: AGPL-3.0-or-later (dual-licensed with commercial option)
-- **Node.js Requirements**: >= 18.0.0
+- **Node.js Requirements**: ^20.19.0 || >=22.12.0 (Vite 8 / Vitest 4)
 - **Repository**: https://gitverse.ru/ngroznykh/papirus
 
 ## Technology Stack

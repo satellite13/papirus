@@ -29,7 +29,7 @@ Thanks for your interest in contributing to Papirus.
    npm run test
    npm run build
    ```
-   GitHub Actions runs the same checks on every pull request (Node 18/20/22).
+   GitHub Actions runs the same checks on every pull request (Node 20/22).
 4. Commit with a clear message
 5. Open a PR against `master`
 
