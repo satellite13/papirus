@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.14] - 2026-09-01
+
+### Fixed
+- Reconnect keeps the node–edge index in sync; style export stores overrides instead of merged theme styles.
+- Mouseup outside the canvas no longer leaves reconnect or batchers stuck.
+- Group double-paint, PNG export bounds, bezier hit-tests, flex shrink, and SVG color escaping.
+
 ## [0.9.13] - 2026-08-31
 
 ### Changed
@@ -491,7 +498,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Edge animations (flow effect)
 - Context menu and search/filter
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.13...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.14...HEAD
+[0.9.14]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.13...v0.9.14
 [0.9.13]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.12...v0.9.13
 [0.9.12]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.11...v0.9.12
 [0.9.11]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.10...v0.9.11

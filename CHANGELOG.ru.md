@@ -9,6 +9,13 @@
 
 ## [Unreleased]
 
+## [0.9.14] - 2026-09-01
+
+### Исправлено
+- После переподключения связи индекс узел–ребро остаётся согласованным; в экспорт стилей пишутся переопределения, а не слитая тема.
+- Mouseup вне холста больше не оставляет reconnect и batchers в зависшем состоянии.
+- Двойная отрисовка групп, границы PNG, hit-test кривых Безье, flex shrink и экранирование цветов в SVG.
+
 ## [0.9.13] - 2026-08-31
 
 ### Изменено
@@ -498,7 +505,8 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.13...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.14...HEAD
+[0.9.14]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.13...v0.9.14
 [0.9.13]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.12...v0.9.13
 [0.9.12]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.11...v0.9.12
 [0.9.11]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.10...v0.9.11
