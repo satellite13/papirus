@@ -1,6 +1,7 @@
 # Papirus
 
 [![npm version](https://img.shields.io/npm/v/%40ngroznykh%2Fpapirus.svg)](https://www.npmjs.com/package/@ngroznykh/papirus)
+[![CI](https://github.com/satellite13/papirus/actions/workflows/ci.yml/badge.svg)](https://github.com/satellite13/papirus/actions/workflows/ci.yml)
 [![License: AGPL%20v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
 
 Papirus — библиотека на TypeScript для построения интерактивных 2D‑схем на HTML Canvas. Поддерживает узлы, связи, группы, стили, сериализацию, экспорт и интерактивность.
