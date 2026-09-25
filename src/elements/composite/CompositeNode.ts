@@ -311,7 +311,6 @@ export class CompositeNode extends Node {
   }
 
   private applyAutoSize(ctx: CanvasRenderingContext2D): void {
-    const contentSize = this._content.measure(ctx);
     const bounds = this.getBounds();
     const inset = resolveContentInset(
       this.contentInset,
@@ -320,24 +319,22 @@ export class CompositeNode extends Node {
       this.contentInsetBaseSize
     );
 
-    const neededWidth = Math.max(
-      this._minWidth,
-      contentSize.width + inset.left + inset.right
-    );
-    const neededHeight = Math.max(
-      this._minHeight,
-      contentSize.height + inset.top + inset.bottom
-    );
-
-    // Only grow, never shrink
+    // Width grows only to the longest-word floor — never back up to a single
+    // unwrapped line. Beyond the floor the user controls the width.
+    const floorContentWidth = this._content.measure(ctx, 0).width;
+    const neededWidth = Math.max(this._minWidth, floorContentWidth + inset.left + inset.right);
     if (neededWidth > this._width) {
       this._width = neededWidth;
     }
+
+    // Height fits the content wrapped at the current width.
+    const innerWidth = Math.max(0, this._width - inset.left - inset.right);
+    const contentSize = this._content.measure(ctx, innerWidth);
+    const neededHeight = Math.max(this._minHeight, contentSize.height + inset.top + inset.bottom);
     if (neededHeight > this._height) {
       this._height = neededHeight;
     }
   }
-
 
   // --- Outline methods for connections (delegate based on shapeType) ---
 
@@ -373,8 +370,32 @@ export class CompositeNode extends Node {
   /**
    * Get the minimum content size needed for the content tree.
    * Useful for external auto-sizing logic.
+   *
+   * With `availableWidth`, text wraps to the given node width: the returned
+   * width is the longest-word floor (content can never be narrower than its
+   * widest unbreakable word), the height is the wrapped height at that width.
    */
-  getContentMinSize(ctx: CanvasRenderingContext2D): Size {
-    return this._content.measure(ctx);
+  getContentMinSize(ctx: CanvasRenderingContext2D, availableWidth?: number): Size {
+    if (availableWidth === undefined) {
+      return this._content.measure(ctx);
+    }
+
+    const inset = resolveContentInset(
+      this.contentInset,
+      this.contentInsetScale,
+      { width: availableWidth, height: this._height },
+      this.contentInsetBaseSize
+    );
+    const innerWidth = Math.max(0, availableWidth - inset.left - inset.right);
+
+    // Height: content wrapped at the given width.
+    const wrapped = this._content.measure(ctx, innerWidth);
+    // Width floor: the widest unbreakable word (+ content padding).
+    const floorWidth = this._content.measure(ctx, 0).width;
+
+    return {
+      width: floorWidth + inset.left + inset.right,
+      height: wrapped.height + inset.top + inset.bottom,
+    };
   }
 }

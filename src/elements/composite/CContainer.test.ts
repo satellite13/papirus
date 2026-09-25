@@ -71,6 +71,56 @@ describe('CContainer', () => {
       const single = new CText({ text: 'A' }).measure(ctx);
       expect(size.height).toBeGreaterThan(single.height * 2);
     });
+
+    describe('with availableWidth (word-wrap constraint)', () => {
+      const widthByLength = (): CanvasRenderingContext2D =>
+        ({
+          ...ctx,
+          font: '',
+          measureText: vi.fn((text: string) => ({ width: text.length * 10 })),
+        }) as unknown as CanvasRenderingContext2D;
+
+      it('wraps column text children and grows height', () => {
+        const c = new CContainer({
+          direction: 'column',
+          padding: 10,
+          gap: 5,
+          children: [new CText({ text: 'one two three' }), new CText({ text: 'short' })],
+        });
+
+        // Inner width = 100 - 20 = 80 → 'one two'(70)/'three'(50), 'short'(50)
+        const size = c.measure(widthByLength(), 100);
+        expect(size.width).toBe(10 + 70 + 10);
+        expect(size.height).toBeCloseTo(10 + 2 * 14 * 1.2 + 5 + 14 * 1.2 + 10);
+      });
+
+      it('keeps unconstrained intrinsic size without availableWidth', () => {
+        const c = new CContainer({
+          direction: 'column',
+          padding: 10,
+          children: [new CText({ text: 'one two three' })],
+        });
+
+        const size = c.measure(widthByLength());
+        expect(size.width).toBe(10 + 130 + 10);
+        expect(size.height).toBeCloseTo(10 + 14 * 1.2 + 10);
+      });
+
+      it('propagates constraint into nested containers', () => {
+        const inner = new CContainer({
+          direction: 'column',
+          children: [new CText({ text: 'one two three' })],
+        });
+        const outer = new CContainer({
+          direction: 'column',
+          children: [inner],
+        });
+
+        const size = outer.measure(widthByLength(), 80);
+        expect(size.width).toBe(70);
+        expect(size.height).toBeCloseTo(2 * 14 * 1.2);
+      });
+    });
   });
 
   describe('render', () => {

@@ -207,20 +207,35 @@ export class CText extends CompositeComponentBase {
     });
   }
 
-  measure(ctx: CanvasRenderingContext2D): Size {
+  measure(ctx: CanvasRenderingContext2D, maxWidth?: number): Size {
     ctx.font = this.getFont();
     const lineHeightPx = this.getLineHeightPx();
 
+    // Width-constrained measurement: word-wrap first, then measure the result.
+    if (maxWidth !== undefined) {
+      const wrapped = wrapMeasuredText(ctx, this._text, maxWidth, {
+        maxLines: this._maxLines,
+        appendEllipsis: true,
+      });
+      const width = measureTextLines(ctx, wrapped);
+      const height = wrapped.length * lineHeightPx;
+
+      if (this._rotation === 90 || this._rotation === -90) {
+        return { width: height, height: width };
+      }
+      return { width, height };
+    }
+
     // Split by newlines first, then measure each
     const rawLines = this._text.split('\n');
-    const maxWidth = measureTextLines(ctx, rawLines);
+    const oneLineWidth = measureTextLines(ctx, rawLines);
 
     let lineCount = rawLines.length;
     if (this._maxLines !== undefined && lineCount > this._maxLines) {
       lineCount = this._maxLines;
     }
 
-    const width = maxWidth;
+    const width = oneLineWidth;
     const height = lineCount * lineHeightPx;
 
     // For rotated text, swap dimensions

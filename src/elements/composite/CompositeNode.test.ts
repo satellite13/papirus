@@ -286,6 +286,98 @@ describe('CompositeNode', () => {
       expect(node.width).toBe(50);
       expect(node.height).toBe(50);
     });
+
+    const widthByLength = (): CanvasRenderingContext2D =>
+      ({
+        ...ctx,
+        font: '',
+        measureText: vi.fn((text: string) => ({ width: text.length * 10 })),
+      }) as unknown as CanvasRenderingContext2D;
+
+    it('keeps user width and grows height to fit wrapped text', () => {
+      const node = new CompositeNode({
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 10,
+        content: container({
+          direction: 'column',
+          children: [text({ text: 'one two three' })],
+        }),
+        autoSize: true,
+      });
+
+      node.render(widthByLength());
+
+      // Width stays user-controlled; height grows for the wrapped lines.
+      expect(node.width).toBe(80);
+      expect(node.height).toBeCloseTo(2 * 14 * 1.2);
+    });
+
+    it('grows width only to the longest-word floor, not to one line', () => {
+      const node = new CompositeNode({
+        x: 0,
+        y: 0,
+        width: 20,
+        height: 10,
+        content: container({
+          direction: 'column',
+          children: [text({ text: 'one two three' })],
+        }),
+        autoSize: true,
+      });
+
+      node.render(widthByLength());
+
+      expect(node.width).toBe(50); // longest word 'three'
+      expect(node.height).toBeCloseTo(3 * 14 * 1.2);
+    });
+  });
+
+  describe('getContentMinSize', () => {
+    const widthByLength = (): CanvasRenderingContext2D =>
+      ({
+        ...ctx,
+        font: '',
+        measureText: vi.fn((text: string) => ({ width: text.length * 10 })),
+      }) as unknown as CanvasRenderingContext2D;
+
+    function makeLongTextNode(options: { contentInset?: number } = {}): CompositeNode {
+      return new CompositeNode({
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 100,
+        contentInset: options.contentInset,
+        content: container({
+          direction: 'column',
+          padding: 10,
+          children: [text({ text: 'one two three' })],
+        }),
+      });
+    }
+
+    it('returns intrinsic content size without a width constraint', () => {
+      const node = makeLongTextNode();
+      const size = node.getContentMinSize(widthByLength());
+      expect(size.width).toBe(10 + 130 + 10);
+      expect(size.height).toBeCloseTo(10 + 14 * 1.2 + 10);
+    });
+
+    it('returns longest-word floor width and wrapped height when a width is given', () => {
+      const node = makeLongTextNode();
+      // Inner width = 100 - 20 (padding) = 80 → 'one two' (70) / 'three' (50)
+      const size = node.getContentMinSize(widthByLength(), 100);
+      expect(size.width).toBe(70); // floor: longest word 'three' (50) + padding
+      expect(size.height).toBeCloseTo(10 + 2 * 14 * 1.2 + 10);
+    });
+
+    it('includes resolved content insets in the constrained min size', () => {
+      const node = makeLongTextNode({ contentInset: 5 });
+      const size = node.getContentMinSize(widthByLength(), 100);
+      expect(size.width).toBe(70 + 10);
+      expect(size.height).toBeCloseTo(10 + 2 * 14 * 1.2 + 10 + 10);
+    });
   });
 
   describe('content bounds', () => {

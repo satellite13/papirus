@@ -733,9 +733,11 @@ export abstract class Node extends Element {
   }
 
   /**
-   * Minimal size required to fit current contents
+   * Minimal size required to fit current contents.
+   * Optional availableWidth enables width-constrained measurement
+   * (composite content wraps text to fit the given width).
    */
-  getContentMinSize(ctx: CanvasRenderingContext2D): Size {
+  getContentMinSize(ctx: CanvasRenderingContext2D, _availableWidth?: number): Size {
     const bounds = this.getBounds();
     const labelSize = this._label ? this._label.measure(ctx) : undefined;
     const iconBoxSize = this._icon ? this.getIconBoxSize() : undefined;

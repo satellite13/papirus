@@ -3,7 +3,7 @@ import type { DiagramSurface } from './DiagramSurface';
 import type { SelectionManager } from './SelectionManager';
 import type { InputEvent } from '@/events/InputHandler';
 import type { Bounds, Point } from '@/types';
-import type { ResizeHandle } from '@/elements/Node';
+import type { Node, ResizeHandle } from '@/elements/Node';
 import { distance } from '@/utils/geometry';
 
 function cursorForResizeHandle(handle: ResizeHandle): string {
@@ -111,10 +111,18 @@ export class ResizeManager extends EventEmitter<ResizeEvents> {
     this.handle = hit;
     this.startPoint = point;
     this.startBounds = node.getBounds();
-    const contentMinSize = node.getContentMinSize(this.renderer.getContext());
+    this.updateMinSize(node, this.startBounds.width);
+    return true;
+  }
+
+  /**
+   * Recompute content minimums at the given width: as the node narrows, text
+   * wraps and the height floor grows to fit the wrapped lines.
+   */
+  private updateMinSize(node: Node, width: number): void {
+    const contentMinSize = node.getContentMinSize(this.renderer.getContext(), width);
     this.minWidth = Math.max(this.minSize, contentMinSize.width);
     this.minHeight = Math.max(this.minSize, contentMinSize.height);
-    return true;
   }
 
   /**
@@ -160,15 +168,35 @@ export class ResizeManager extends EventEmitter<ResizeEvents> {
       this.emit('resizeStart', node.id, this.handle, this.startBounds);
     }
 
-    const bounds = this.calculateBounds(point);
-    node.x = bounds.x;
-    node.y = bounds.y;
-    node.width = bounds.width;
-    node.height = bounds.height;
+    // Refresh content minimums at the prospective width BEFORE clamping: a
+    // stale height floor from a narrower position must not stick as the node
+    // widens again (clamps are one-directional, so fresh values come first).
+    const dx = point.x - this.startPoint.x;
+    const prospectiveWidth = this.handle.includes('w')
+      ? this.startBounds.width - dx
+      : this.startBounds.width + dx;
+    this.updateMinSize(node, prospectiveWidth);
 
-    this.emit('resize', node.id, bounds, {
-      x: bounds.x - this.startBounds.x,
-      y: bounds.y - this.startBounds.y,
+    const bounds = this.calculateBounds(point);
+    // Recompute at the final (post-snap) width, then re-clamp: grid snapping
+    // can narrow the width and raise the height floor.
+    this.updateMinSize(node, bounds.width);
+    const clamped = this.applyMinSize(
+      bounds.x,
+      bounds.y,
+      bounds.width,
+      bounds.height,
+      this.startBounds,
+      this.handle
+    );
+    node.x = clamped.x;
+    node.y = clamped.y;
+    node.width = clamped.width;
+    node.height = clamped.height;
+
+    this.emit('resize', node.id, clamped, {
+      x: clamped.x - this.startBounds.x,
+      y: clamped.y - this.startBounds.y,
     });
     this.renderer.markDirty();
     return true;

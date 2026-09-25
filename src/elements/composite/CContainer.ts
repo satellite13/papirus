@@ -167,11 +167,19 @@ export class CContainer extends CompositeComponentBase {
 
   private buildFlexChildren(
     ctx: CanvasRenderingContext2D,
+    availableWidth?: number,
     children: readonly CComponent[] = this.getLayoutChildren()
   ): FlexChild[] {
+    // Column children share the container's inner width, so pass it down as a
+    // word-wrap constraint; row children keep their intrinsic width.
+    const pad = normalizeSides(this._padding);
+    const innerWidth =
+      availableWidth !== undefined && this._direction === 'column'
+        ? Math.max(0, availableWidth - pad.left - pad.right)
+        : undefined;
     return children.map((child) => {
       const s = child.style;
-      const measured = child.measure(ctx);
+      const measured = child.measure(ctx, innerWidth);
       return {
         measure: measured,
         minSize: { width: 0, height: 0 },
@@ -184,8 +192,8 @@ export class CContainer extends CompositeComponentBase {
     });
   }
 
-  measure(ctx: CanvasRenderingContext2D): Size {
-    const flexChildren = this.buildFlexChildren(ctx);
+  measure(ctx: CanvasRenderingContext2D, availableWidth?: number): Size {
+    const flexChildren = this.buildFlexChildren(ctx, availableWidth);
     // For measurement, override all properties that depend on container size:
     // - justifyContent → 'start' (prevents main-axis offset from center/end/space-*)
     // - alignItems → 'start' (prevents cross-axis inflation from stretch/center/end)
@@ -209,7 +217,7 @@ export class CContainer extends CompositeComponentBase {
     if (this.style.visible === false) return;
 
     const layoutChildren = this.getLayoutChildren();
-    const flexChildren = this.buildFlexChildren(ctx, layoutChildren);
+    const flexChildren = this.buildFlexChildren(ctx, undefined, layoutChildren);
     const result = flexLayout(
       { width: bounds.width, height: bounds.height },
       this.getFlexConfig(),

@@ -65,8 +65,10 @@ export interface CComponent {
   /** Flex child style */
   style: CComponentStyle;
 
-  /** Measure intrinsic (preferred) size. Requires ctx for text measurement. */
-  measure(ctx: CanvasRenderingContext2D): Size;
+  /** Measure intrinsic (preferred) size. Requires ctx for text measurement.
+   * Optional maxWidth enables width-constrained measurement: text wraps by words
+   * to fit the given width and the returned size reflects wrapped content. */
+  measure(ctx: CanvasRenderingContext2D, maxWidth?: number): Size;
 
   /** Render the component within the given bounds (computed by layout). */
   render(ctx: CanvasRenderingContext2D, bounds: Bounds): void;

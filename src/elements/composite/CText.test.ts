@@ -80,6 +80,47 @@ describe('CText', () => {
       expect(size.height).toBe(2 * 10 * 1.2);
     });
 
+    it('wraps to maxWidth when provided', () => {
+      const mockCtx = {
+        ...ctx,
+        font: '',
+        measureText: vi.fn((text: string) => ({ width: text.length * 10 })),
+      } as unknown as CanvasRenderingContext2D;
+
+      const t = new CText({ text: 'one two three', fontSize: 14 });
+      // One line = 13 chars * 10 = 130px; constrained to 80px → 'one two' (70) / 'three' (50)
+      const size = t.measure(mockCtx, 80);
+      expect(size.width).toBe(70);
+      expect(size.height).toBe(2 * 14 * 1.2);
+    });
+
+    it('keeps single line when maxWidth fits the text', () => {
+      const mockCtx = {
+        ...ctx,
+        font: '',
+        measureText: vi.fn((text: string) => ({ width: text.length * 10 })),
+      } as unknown as CanvasRenderingContext2D;
+
+      const t = new CText({ text: 'one two', fontSize: 14 });
+      const size = t.measure(mockCtx, 200);
+      expect(size.width).toBe(70);
+      expect(size.height).toBe(14 * 1.2);
+    });
+
+    it('returns longest word width as floor when maxWidth is tiny', () => {
+      const mockCtx = {
+        ...ctx,
+        font: '',
+        measureText: vi.fn((text: string) => ({ width: text.length * 10 })),
+      } as unknown as CanvasRenderingContext2D;
+
+      const t = new CText({ text: 'one two three', fontSize: 14 });
+      // Longest word 'three' = 50px; maxWidth 10px forces one word per line
+      const size = t.measure(mockCtx, 10);
+      expect(size.width).toBe(50);
+      expect(size.height).toBeCloseTo(3 * 14 * 1.2);
+    });
+
     it('transposes dimensions for 90-degree rotation', () => {
       const t = new CText({ text: 'Hello', fontSize: 14, rotation: -90 });
       const size = t.measure(ctx);

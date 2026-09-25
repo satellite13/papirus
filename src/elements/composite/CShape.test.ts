@@ -60,6 +60,49 @@ describe('CShape', () => {
       expect(size.width).toBe(contentSize.width + 10);
       expect(size.height).toBe(contentSize.height + 10);
     });
+
+    it('propagates maxWidth to wrapped content', () => {
+      const mockCtx = {
+        ...ctx,
+        font: '',
+        measureText: vi.fn((text: string) => ({ width: text.length * 10 })),
+      } as unknown as CanvasRenderingContext2D;
+
+      const s = new CShape({
+        padding: 5,
+        borderWidth: 1,
+        content: new CContainer({
+          direction: 'column',
+          children: [new CText({ text: 'one two three' })],
+        }),
+      });
+
+      // Inner width = 100 - 10 (padding) - 2 (border) = 88 → 'one two' (70) / 'three' (50)
+      const size = s.measure(mockCtx, 100);
+      expect(size.width).toBe(70 + 10 + 2);
+      expect(size.height).toBeCloseTo(2 * 14 * 1.2 + 10 + 2);
+    });
+
+    it('keeps longest word as floor when maxWidth is tiny', () => {
+      const mockCtx = {
+        ...ctx,
+        font: '',
+        measureText: vi.fn((text: string) => ({ width: text.length * 10 })),
+      } as unknown as CanvasRenderingContext2D;
+
+      const s = new CShape({
+        padding: 5,
+        borderWidth: 1,
+        content: new CContainer({
+          direction: 'column',
+          children: [new CText({ text: 'one two three' })],
+        }),
+      });
+
+      const size = s.measure(mockCtx, 0);
+      expect(size.width).toBe(50 + 10 + 2);
+      expect(size.height).toBeCloseTo(3 * 14 * 1.2 + 10 + 2);
+    });
   });
 
   describe('render', () => {

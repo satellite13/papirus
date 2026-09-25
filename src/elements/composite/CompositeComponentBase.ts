@@ -30,7 +30,10 @@ export abstract class CompositeComponentBase implements CComponent {
     this._onChange?.();
   }
 
-  abstract measure(ctx: CanvasRenderingContext2D): { width: number; height: number };
+  abstract measure(
+    ctx: CanvasRenderingContext2D,
+    maxWidth?: number
+  ): { width: number; height: number };
   abstract render(ctx: CanvasRenderingContext2D, bounds: Bounds): void;
   abstract serialize(): ReturnType<CComponent['serialize']>;
   abstract toSVG(bounds: Bounds): string;

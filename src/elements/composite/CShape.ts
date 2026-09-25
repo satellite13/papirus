@@ -97,12 +97,14 @@ export class CShape extends CompositeComponentBase {
     return this._content;
   }
 
-  measure(ctx: CanvasRenderingContext2D): Size {
+  measure(ctx: CanvasRenderingContext2D, maxWidth?: number): Size {
     const pad = normalizeSides(this._padding);
     const bw = this._borderWidth;
 
     if (this._content) {
-      const contentSize = this._content.measure(ctx);
+      const innerWidth =
+        maxWidth === undefined ? undefined : Math.max(0, maxWidth - pad.left - pad.right - bw * 2);
+      const contentSize = this._content.measure(ctx, innerWidth);
       return {
         width: contentSize.width + pad.left + pad.right + bw * 2,
         height: contentSize.height + pad.top + pad.bottom + bw * 2,
