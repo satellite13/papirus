@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.15] - 2026-09-25
+
+### Fixed
+- Composite shapes with wrapped text: narrowing them by resize now wraps text by words and raises the height floor instead of stretching the width to one unwrapped line; content minimums are recomputed during resize so the shape can be widened again.
+
 ## [0.9.14] - 2026-09-01
 
 ### Fixed
