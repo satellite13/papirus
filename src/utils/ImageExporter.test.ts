@@ -63,4 +63,58 @@ describe('ImageExporter', () => {
 
     renderer.destroy();
   });
+
+  it('paints edges after nodes so arrowheads stay visible', async () => {
+    const canvas = document.createElement('canvas');
+    const renderer = new DiagramRenderer(canvas, {
+      width: 300,
+      height: 200,
+      retina: false,
+    });
+    const nodeA = new RectangleNode({
+      id: 'node-a',
+      x: 0,
+      y: 0,
+      width: 40,
+      height: 40,
+    });
+    const nodeB = new RectangleNode({
+      id: 'node-b',
+      x: 120,
+      y: 0,
+      width: 40,
+      height: 40,
+    });
+    const edge = new Edge({
+      from: { nodeId: nodeA.id },
+      to: { nodeId: nodeB.id },
+      type: 'straight',
+      endMarker: { type: 'arrow' },
+    });
+    edge.updateEndpoints({ x: 40, y: 20 }, { x: 120, y: 20 });
+    renderer.addNode(nodeA);
+    renderer.addNode(nodeB);
+    renderer.addEdge(edge);
+
+    const order: string[] = [];
+    vi.spyOn(nodeA, 'render').mockImplementation(() => {
+      order.push('node-a');
+    });
+    vi.spyOn(nodeB, 'render').mockImplementation(() => {
+      order.push('node-b');
+    });
+    vi.spyOn(edge, 'render').mockImplementation(() => {
+      order.push('edge');
+    });
+    vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation((callback): void => {
+      callback(new Blob());
+    });
+
+    await new ImageExporter(renderer).exportPNG({ scale: 1, padding: 0 });
+
+    expect(order.indexOf('edge')).toBeGreaterThan(order.indexOf('node-a'));
+    expect(order.indexOf('edge')).toBeGreaterThan(order.indexOf('node-b'));
+
+    renderer.destroy();
+  });
 });

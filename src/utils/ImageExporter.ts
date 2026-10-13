@@ -2,7 +2,7 @@ import type { DiagramRenderer } from '@/core/DiagramRenderer';
 import { applyStyleManagerToElements } from './style';
 import { getContentBounds } from './contentBounds';
 import { downloadBlob } from './download';
-import { getAllElements } from './elementIterator';
+import { getEdges, getGroups, getNodes } from './elementIterator';
 
 export interface ExportOptions {
   scale?: number;
@@ -105,8 +105,15 @@ export class ImageExporter {
       this.renderer.nodes.values()
     );
 
-    // Render elements (in correct order: groups -> edges -> nodes)
-    for (const element of getAllElements(this.renderer, { visibleOnly: true })) {
+    // Same order as the canvas and SVG export: groups, nodes, then edges.
+    // Edges must stay above nodes so arrowheads are not painted over.
+    for (const element of getGroups(this.renderer, { visibleOnly: true })) {
+      element.render(ctx);
+    }
+    for (const element of getNodes(this.renderer, { visibleOnly: true })) {
+      element.render(ctx);
+    }
+    for (const element of getEdges(this.renderer, { visibleOnly: true })) {
       element.render(ctx);
     }
 

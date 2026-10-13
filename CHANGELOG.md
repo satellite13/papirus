@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.17] - 2026-10-13
+
+### Fixed
+- PNG export paints edges after nodes, so arrowheads stay visible on top of nodes.
+
 ## [0.9.16] - 2026-10-13
 
 ### Fixed
@@ -508,7 +513,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Edge animations (flow effect)
 - Context menu and search/filter
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.16...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.17...HEAD
+[0.9.17]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.16...v0.9.17
 [0.9.16]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.15...v0.9.16
 [0.9.15]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.14...v0.9.15
 [0.9.14]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.13...v0.9.14

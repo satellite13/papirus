@@ -9,6 +9,11 @@
 
 ## [Unreleased]
 
+## [0.9.17] - 2026-10-13
+
+### Исправлено
+- Экспорт PNG рисует рёбра поверх узлов, поэтому наконечники стрелок остаются видны.
+
 ## [0.9.16] - 2026-10-13
 
 ### Исправлено
@@ -515,7 +520,8 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.16...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.17...HEAD
+[0.9.17]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.16...v0.9.17
 [0.9.16]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.15...v0.9.16
 [0.9.15]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.14...v0.9.15
 [0.9.14]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.13...v0.9.14
