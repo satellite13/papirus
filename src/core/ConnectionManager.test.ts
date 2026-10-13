@@ -116,7 +116,7 @@ describe('ConnectionManager', () => {
       })
     );
 
-    expect(canvas.style.cursor).toBe('crosshair');
+    expect(canvas.style.cursor).not.toBe('crosshair');
 
     canvas.dispatchEvent(
       new MouseEvent('mousedown', {
@@ -202,7 +202,7 @@ describe('ConnectionManager', () => {
       })
     );
 
-    expect(canvas.style.cursor).toBe('crosshair');
+    expect(canvas.style.cursor).not.toBe('crosshair');
 
     canvas.dispatchEvent(
       new MouseEvent('mousedown', {

@@ -1365,10 +1365,15 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     return { x, y };
   }
 
-  private drawPlus(radius: number, ctx: CanvasRenderingContext2D, point: Point): void {
+  private drawPlus(
+    radius: number,
+    ctx: CanvasRenderingContext2D,
+    point: Point,
+    lineWidth = 1.5
+  ): void {
     const plusSize = radius * 0.5;
     ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = lineWidth;
     ctx.beginPath();
     ctx.moveTo(point.x - plusSize, point.y);
     ctx.lineTo(point.x + plusSize, point.y);
@@ -1570,14 +1575,19 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
       return;
     }
     const { handle } = this.outlineConnectHandleFor(node, this.hoverPoint);
-    const radius = this.hoverOutlineHandle ? ANCHOR_POINT_HOVER_RADIUS : ANCHOR_POINT_RADIUS;
+    const zoom = Math.max(this.renderer.zoom, 0.0001);
+    // Screen-sized so the marker stays readable at any zoom and around the arrow tip.
+    const radius = 8 / zoom;
     ctx.save();
     ctx.setLineDash([]);
-    ctx.fillStyle = '#3b82f6';
     ctx.beginPath();
     ctx.arc(handle.x, handle.y, radius, 0, Math.PI * 2);
+    ctx.fillStyle = '#3b82f6';
     ctx.fill();
-    this.drawPlus(radius, ctx, handle);
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2 / zoom;
+    ctx.stroke();
+    this.drawPlus(radius, ctx, handle, 2 / zoom);
     ctx.restore();
   }
 
@@ -1612,9 +1622,8 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
       if (this.attachToOutline) {
         this.hoverOutlineSide = this.outlineConnectHandleFor(node, point).side;
       }
-      if (this.hoverOutlineHandle) {
-        this.setCursor('crosshair');
-      } else if (prevOutlineHandle) {
+      // The drawn port is the affordance. A crosshair sits on the same hotspot and hides it.
+      if (!this.hoverOutlineHandle && prevOutlineHandle) {
         this.setCursor('');
       }
     }
