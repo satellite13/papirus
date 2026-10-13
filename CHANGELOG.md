@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.16] - 2026-10-13
+
+### Fixed
+- Outline connect: the port marker stays visible under the pointer. The crosshair cursor no longer covers it, and the marker keeps a fixed screen size with a white ring so it stays readable at any zoom.
+
 ## [0.9.15] - 2026-09-25
 
 ### Fixed
@@ -503,7 +508,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Edge animations (flow effect)
 - Context menu and search/filter
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.14...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.16...HEAD
+[0.9.16]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.15...v0.9.16
+[0.9.15]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.14...v0.9.15
 [0.9.14]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.13...v0.9.14
 [0.9.13]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.12...v0.9.13
 [0.9.12]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.11...v0.9.12

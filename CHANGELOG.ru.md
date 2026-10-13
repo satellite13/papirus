@@ -9,6 +9,11 @@
 
 ## [Unreleased]
 
+## [0.9.16] - 2026-10-13
+
+### Исправлено
+- Порт соединения по контуру остаётся видимым под курсором: перекрестие его больше не закрывает, а маркер держит фиксированный экранный размер с белым кольцом и читается при любом масштабе.
+
 ## [0.9.15] - 2026-09-25
 
 ### Исправлено
@@ -510,7 +515,9 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.14...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.16...HEAD
+[0.9.16]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.15...v0.9.16
+[0.9.15]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.14...v0.9.15
 [0.9.14]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.13...v0.9.14
 [0.9.13]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.12...v0.9.13
 [0.9.12]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.11...v0.9.12
