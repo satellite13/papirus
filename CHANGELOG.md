@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.18] - 2026-10-20
+
+### Fixed
+- Composite `CText`: long names no longer overlap sibling slots or spill past the shape. Words wider than the slot break character-by-character (`breakLongWords`), and by default text that exceeds the assigned slot height is truncated with an ellipsis (`overflow: 'truncate'`; use `'visible'` for the previous overflow behavior).
+- `CContainer.render()` measures children against the real inner width so flex layout sees wrapped sizes instead of single-line estimates.
+
+### Changed
+- Default composite text overflow is now `'truncate'`. Existing serialized components without `overflow` get the new default; set `overflow: 'visible'` to keep legacy spill.
+- Composite width floor for wrapped text is the widest character (after long-word breaking), not the longest unbroken word.
+
 ## [0.9.17] - 2026-10-13
 
 ### Fixed
@@ -513,7 +523,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Edge animations (flow effect)
 - Context menu and search/filter
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.17...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.18...HEAD
+[0.9.18]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.17...v0.9.18
 [0.9.17]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.16...v0.9.17
 [0.9.16]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.15...v0.9.16
 [0.9.15]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.14...v0.9.15

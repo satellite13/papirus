@@ -9,6 +9,16 @@
 
 ## [Unreleased]
 
+## [0.9.18] - 2026-10-20
+
+### Исправлено
+- Composite `CText`: длинные названия больше не наезжают на соседние слоты и не вылезают за фигуру. Слова шире слота ломаются посимвольно (`breakLongWords`), а текст, не влезающий по высоте слота, по умолчанию обрезается с многоточием (`overflow: 'truncate'`; прежнее переполнение — через `'visible'`).
+- `CContainer.render()` меряет детей по реальной внутренней ширине, поэтому flex видит размеры с переносом, а не однострочные оценки.
+
+### Изменено
+- По умолчанию overflow composite-текста — `'truncate'`. Сериализованные компоненты без поля `overflow` получают новое поведение; для старого spill укажите `overflow: 'visible'`.
+- Нижняя граница ширины для переносимого текста — самый широкий символ (после разбиения длинных слов), а не самое длинное неразбитое слово.
+
 ## [0.9.17] - 2026-10-13
 
 ### Исправлено
@@ -520,7 +530,8 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.17...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.18...HEAD
+[0.9.18]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.17...v0.9.18
 [0.9.17]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.16...v0.9.17
 [0.9.16]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.15...v0.9.16
 [0.9.15]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.14...v0.9.15
