@@ -70,9 +70,7 @@ export function deserializeCComponent(data: SerializedCComponent): CComponent {
         backgroundColor: data.backgroundColor,
         cornerRadius: data.cornerRadius,
         padding: data.padding,
-        content: data.content
-          ? (deserializeCComponent(data.content) as CContainer)
-          : undefined,
+        content: data.content ? (deserializeCComponent(data.content) as CContainer) : undefined,
         style: data.style,
       });
 

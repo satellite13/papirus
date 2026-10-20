@@ -357,11 +357,7 @@ describe('CContainer', () => {
         padding: 10,
         justifyContent: 'center',
         alignItems: 'center',
-        children: [
-          new CText({ text: 'A' }),
-          new CDivider(),
-          new CText({ text: 'B' }),
-        ],
+        children: [new CText({ text: 'A' }), new CDivider(), new CText({ text: 'B' })],
       });
       const data = c.serialize();
       expect(data.type).toBe('container');

@@ -149,19 +149,13 @@ describe('CShape', () => {
   describe('hitTest', () => {
     it('returns self when hit within bounds', () => {
       const s = new CShape({ backgroundColor: '#eee' });
-      const hit = s.hitTest(
-        { x: 50, y: 25 },
-        { x: 0, y: 0, width: 100, height: 50 }
-      );
+      const hit = s.hitTest({ x: 50, y: 25 }, { x: 0, y: 0, width: 100, height: 50 });
       expect(hit).toBe(s);
     });
 
     it('returns null when outside bounds', () => {
       const s = new CShape();
-      const hit = s.hitTest(
-        { x: 150, y: 25 },
-        { x: 0, y: 0, width: 100, height: 50 }
-      );
+      const hit = s.hitTest({ x: 150, y: 25 }, { x: 0, y: 0, width: 100, height: 50 });
       expect(hit).toBeNull();
     });
 
@@ -173,19 +167,13 @@ describe('CShape', () => {
       // Need to render first to populate cached bounds
       s.render(ctx, { x: 0, y: 0, width: 200, height: 100 });
 
-      const hit = s.hitTest(
-        { x: 5, y: 5 },
-        { x: 0, y: 0, width: 200, height: 100 }
-      );
+      const hit = s.hitTest({ x: 5, y: 5 }, { x: 0, y: 0, width: 200, height: 100 });
       expect(hit).toBe(t);
     });
 
     it('returns null when invisible', () => {
       const s = new CShape({ style: { visible: false } });
-      const hit = s.hitTest(
-        { x: 50, y: 25 },
-        { x: 0, y: 0, width: 100, height: 50 }
-      );
+      const hit = s.hitTest({ x: 50, y: 25 }, { x: 0, y: 0, width: 100, height: 50 });
       expect(hit).toBeNull();
     });
   });

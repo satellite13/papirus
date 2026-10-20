@@ -368,7 +368,6 @@ describe('CText', () => {
       expect(c).toBeInstanceOf(CText);
       expect((c as CText).bindToProperty).toBe('__name__');
     });
-
   });
 
   describe('toSVG', () => {

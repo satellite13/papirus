@@ -52,7 +52,10 @@ describe('CompositeNode', () => {
 
     it('accepts shape options', () => {
       const node = new CompositeNode({
-        x: 0, y: 0, width: 100, height: 100,
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 100,
         content: container(),
         shapeType: 'circle',
         cornerRadius: 8,
@@ -81,7 +84,10 @@ describe('CompositeNode', () => {
 
     it('renders circle shape', () => {
       const node = new CompositeNode({
-        x: 0, y: 0, width: 100, height: 100,
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 100,
         content: container({ children: [text({ text: 'Hi' })] }),
         shapeType: 'circle',
       });
@@ -91,7 +97,10 @@ describe('CompositeNode', () => {
 
     it('renders diamond shape', () => {
       const node = new CompositeNode({
-        x: 0, y: 0, width: 100, height: 100,
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 100,
         content: container({ children: [text({ text: 'Hi' })] }),
         shapeType: 'diamond',
       });
@@ -102,7 +111,10 @@ describe('CompositeNode', () => {
 
     it('renders with cornerRadius', () => {
       const node = new CompositeNode({
-        x: 0, y: 0, width: 200, height: 100,
+        x: 0,
+        y: 0,
+        width: 200,
+        height: 100,
         content: container({ children: [text({ text: 'Hi' })] }),
         cornerRadius: 8,
       });
@@ -226,7 +238,10 @@ describe('CompositeNode', () => {
     it('grows node width to fit content', () => {
       // Node starts small, content needs more space
       const node = new CompositeNode({
-        x: 0, y: 0, width: 5, height: 5,
+        x: 0,
+        y: 0,
+        width: 5,
+        height: 5,
         content: container({
           padding: 20,
           children: [text({ text: 'A long text that needs space' })],
@@ -243,7 +258,10 @@ describe('CompositeNode', () => {
 
     it('respects minWidth and minHeight', () => {
       const node = new CompositeNode({
-        x: 0, y: 0, width: 10, height: 10,
+        x: 0,
+        y: 0,
+        width: 10,
+        height: 10,
         content: container(), // empty content
         autoSize: true,
         minWidth: 100,
@@ -256,7 +274,10 @@ describe('CompositeNode', () => {
 
     it('does not resize when autoSize is false', () => {
       const node = new CompositeNode({
-        x: 0, y: 0, width: 50, height: 30,
+        x: 0,
+        y: 0,
+        width: 50,
+        height: 30,
         content: container({
           padding: 100,
           children: [text({ text: 'Big content' })],
@@ -429,7 +450,10 @@ describe('CompositeNode', () => {
 
     it('finds nested child by id', () => {
       const node = new CompositeNode({
-        x: 0, y: 0, width: 200, height: 200,
+        x: 0,
+        y: 0,
+        width: 200,
+        height: 200,
         content: container({
           children: [
             shape({
@@ -471,7 +495,10 @@ describe('CompositeNode', () => {
   describe('hitTest', () => {
     it('works for rectangle shape', () => {
       const node = new CompositeNode({
-        x: 10, y: 10, width: 100, height: 50,
+        x: 10,
+        y: 10,
+        width: 100,
+        height: 50,
         content: container(),
       });
       expect(node.hitTest({ x: 50, y: 30 })).toBe(true);
@@ -481,7 +508,10 @@ describe('CompositeNode', () => {
 
     it('works for circle shape', () => {
       const node = new CompositeNode({
-        x: 0, y: 0, width: 100, height: 100,
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 100,
         content: container(),
         shapeType: 'circle',
       });
@@ -493,7 +523,10 @@ describe('CompositeNode', () => {
 
     it('works for diamond shape', () => {
       const node = new CompositeNode({
-        x: 0, y: 0, width: 100, height: 100,
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 100,
         content: container(),
         shapeType: 'diamond',
       });
@@ -540,7 +573,10 @@ describe('CompositeNode', () => {
   describe('complex composition', () => {
     it('renders UML-style class node', () => {
       const node = new CompositeNode({
-        x: 0, y: 0, width: 200, height: 160,
+        x: 0,
+        y: 0,
+        width: 200,
+        height: 160,
         content: container({
           direction: 'column',
           children: [
@@ -552,7 +588,12 @@ describe('CompositeNode', () => {
                 alignItems: 'center',
                 children: [
                   text({ text: '<<interface>>', fontSize: 10, fontStyle: 'italic' }),
-                  text({ id: 'name', text: 'Serializable', fontWeight: 'bold', bindToProperty: '__name__' }),
+                  text({
+                    id: 'name',
+                    text: 'Serializable',
+                    fontWeight: 'bold',
+                    bindToProperty: '__name__',
+                  }),
                 ],
               }),
             }),
@@ -561,9 +602,7 @@ describe('CompositeNode', () => {
               padding: 8,
               content: container({
                 direction: 'column',
-                children: [
-                  text({ text: '+ serialize(): string', fontSize: 12, align: 'left' }),
-                ],
+                children: [text({ text: '+ serialize(): string', fontSize: 12, align: 'left' })],
               }),
             }),
           ],
