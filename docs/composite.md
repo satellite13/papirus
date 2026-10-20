@@ -60,7 +60,9 @@ const node = new CompositeNode({
 ### Билдеры (декларативный API)
 
 - `container({ direction, justifyContent, alignItems, gap, padding, children })`
-- `text({ text, bindToProperty, align, verticalAlign, maxLines, rotation, role, ... })`
+- `text({ text, bindToProperty, align, verticalAlign, maxLines, rotation, role, overflow, ... })`
+
+`overflow` (по умолчанию `'truncate'`): текст, не влезающий в выделенный слот по высоте, обрезается с многоточием; `'visible'` — прежнее поведение с переполнением. Слова шире слота переносятся посимвольно.
 - `icon({ source, width, height, fillColor, bindsNotationIcon, ... })`
 - `shape({ shapeType, cornerRadius, content })` — фон/рамка с вложенным `content`
 - `divider({ color, thickness })`

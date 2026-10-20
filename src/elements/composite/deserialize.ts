@@ -26,6 +26,7 @@ export function deserializeCComponent(data: SerializedCComponent): CComponent {
         role: data.role,
         bindToProperty: data.bindToProperty,
         rotation: data.rotation,
+        overflow: data.overflow,
         style: data.style,
       });
 

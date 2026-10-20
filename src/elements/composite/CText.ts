@@ -22,6 +22,12 @@ export interface CTextOptions {
   bindToProperty?: string;
   /** Rotation in degrees (e.g. -90 for vertical swimlane text) */
   rotation?: number;
+  /**
+   * Behavior when wrapped text exceeds the assigned bounds height:
+   * 'truncate' (default) fits lines into the slot with an ellipsis,
+   * 'visible' draws overflowing lines (legacy behavior).
+   */
+  overflow?: 'visible' | 'truncate';
   style?: CComponentStyle;
 }
 
@@ -29,6 +35,9 @@ const DEFAULT_FONT_FAMILY = 'sans-serif';
 const DEFAULT_FONT_SIZE = 14;
 const DEFAULT_LINE_HEIGHT = 1.2;
 const DEFAULT_COLOR = '#000000';
+const DEFAULT_OVERFLOW: CTextOverflow = 'truncate';
+
+type CTextOverflow = 'visible' | 'truncate';
 
 /**
  * Lightweight text component for CompositeNode.
@@ -52,6 +61,7 @@ export class CText extends CompositeComponentBase {
   private _role?: string;
   private _bindToProperty?: string;
   private _rotation: number;
+  private _overflow: CTextOverflow;
   private _cachedLines: string[] | null = null;
 
   constructor(options: CTextOptions) {
@@ -70,6 +80,7 @@ export class CText extends CompositeComponentBase {
     this._role = options.role;
     this._bindToProperty = options.bindToProperty;
     this._rotation = options.rotation ?? 0;
+    this._overflow = options.overflow ?? DEFAULT_OVERFLOW;
     this.style = options.style ?? {};
   }
 
@@ -188,12 +199,45 @@ export class CText extends CompositeComponentBase {
     }
   }
 
+  get overflow(): CTextOverflow {
+    return this._overflow;
+  }
+  set overflow(value: CTextOverflow) {
+    if (this._overflow !== value) {
+      this._overflow = value;
+      this._cachedLines = null;
+      this.markChanged();
+    }
+  }
+
   private getFont(): string {
     return `${this._fontStyle} ${this._fontWeight} ${this._fontSize}px ${this._fontFamily}`;
   }
 
   private getLineHeightPx(): number {
     return this._fontSize * this._lineHeight;
+  }
+
+  /**
+   * Resolve display lines for the given width and slot height.
+   * With 'truncate', the effective line count is capped by the slot height
+   * (and the authored maxLines, if set), appending an ellipsis when cut off.
+   */
+  private resolveLines(
+    ctx: CanvasRenderingContext2D,
+    maxWidth: number,
+    maxHeightLines?: number
+  ): string[] {
+    ctx.font = this.getFont();
+    let maxLines = this._maxLines;
+    if (this._overflow === 'truncate' && maxHeightLines !== undefined) {
+      maxLines = maxLines === undefined ? maxHeightLines : Math.min(maxLines, maxHeightLines);
+    }
+    return wrapMeasuredText(ctx, this._text, maxWidth, {
+      maxLines,
+      appendEllipsis: true,
+      breakLongWords: true,
+    });
   }
 
   /**
@@ -204,6 +248,7 @@ export class CText extends CompositeComponentBase {
     return wrapMeasuredText(ctx, this._text, maxWidth, {
       maxLines: this._maxLines,
       appendEllipsis: true,
+      breakLongWords: true,
     });
   }
 
@@ -216,6 +261,7 @@ export class CText extends CompositeComponentBase {
       const wrapped = wrapMeasuredText(ctx, this._text, maxWidth, {
         maxLines: this._maxLines,
         appendEllipsis: true,
+        breakLongWords: true,
       });
       const width = measureTextLines(ctx, wrapped);
       const height = wrapped.length * lineHeightPx;
@@ -265,9 +311,11 @@ export class CText extends CompositeComponentBase {
       ? { x: bounds.x, y: bounds.y, width: bounds.height, height: bounds.width }
       : bounds;
 
-    const lines = this.wrapText(ctx, textBounds.width);
-    this._cachedLines = lines;
     const lineHeightPx = this.getLineHeightPx();
+    // Cap lines by the assigned slot height so text never spills into siblings.
+    const slotLines = Math.max(1, Math.floor(textBounds.height / lineHeightPx));
+    const lines = this.resolveLines(ctx, textBounds.width, slotLines);
+    this._cachedLines = lines;
     const totalTextHeight = lines.length * lineHeightPx;
 
     // Horizontal alignment
@@ -347,6 +395,7 @@ export class CText extends CompositeComponentBase {
     if (this._bindToProperty !== undefined) data.bindToProperty = this._bindToProperty;
     if (this._role !== undefined) data.role = this._role;
     if (this._rotation !== 0) data.rotation = this._rotation;
+    if (this._overflow !== DEFAULT_OVERFLOW) data.overflow = this._overflow;
     return data;
   }
 

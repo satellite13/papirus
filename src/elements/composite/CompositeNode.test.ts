@@ -314,7 +314,7 @@ describe('CompositeNode', () => {
       expect(node.height).toBeCloseTo(2 * 14 * 1.2);
     });
 
-    it('grows width only to the longest-word floor, not to one line', () => {
+    it('grows width only to the widest-char floor, not to one line', () => {
       const node = new CompositeNode({
         x: 0,
         y: 0,
@@ -329,8 +329,11 @@ describe('CompositeNode', () => {
 
       node.render(widthByLength());
 
-      expect(node.width).toBe(50); // longest word 'three'
-      expect(node.height).toBeCloseTo(3 * 14 * 1.2);
+      // Long words break to chars, so the width floor is the widest char (10)
+      // and the user width of 20 is kept; the node never grows to the 130px line.
+      expect(node.width).toBe(20);
+      // Wrapped at 20px width: one char per line chunk → 7 lines
+      expect(node.height).toBeCloseTo(7 * 14 * 1.2);
     });
   });
 
@@ -364,18 +367,18 @@ describe('CompositeNode', () => {
       expect(size.height).toBeCloseTo(10 + 14 * 1.2 + 10);
     });
 
-    it('returns longest-word floor width and wrapped height when a width is given', () => {
+    it('returns widest-char floor width and wrapped height when a width is given', () => {
       const node = makeLongTextNode();
       // Inner width = 100 - 20 (padding) = 80 → 'one two' (70) / 'three' (50)
       const size = node.getContentMinSize(widthByLength(), 100);
-      expect(size.width).toBe(70); // floor: longest word 'three' (50) + padding
+      expect(size.width).toBe(30); // floor: widest char (10) + container padding
       expect(size.height).toBeCloseTo(10 + 2 * 14 * 1.2 + 10);
     });
 
     it('includes resolved content insets in the constrained min size', () => {
       const node = makeLongTextNode({ contentInset: 5 });
       const size = node.getContentMinSize(widthByLength(), 100);
-      expect(size.width).toBe(70 + 10);
+      expect(size.width).toBe(10 + 20 + 10); // widest char + container padding + insets
       expect(size.height).toBeCloseTo(10 + 2 * 14 * 1.2 + 10 + 10);
     });
   });

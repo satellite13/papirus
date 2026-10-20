@@ -1,6 +1,8 @@
 export interface WrappedTextOptions {
   maxLines?: number;
   appendEllipsis?: boolean;
+  /** Break words wider than maxWidth across lines instead of letting them overflow. */
+  breakLongWords?: boolean;
 }
 
 /**
@@ -19,12 +21,29 @@ export function wrapMeasuredText(
     let currentLine = '';
 
     for (const word of words) {
-      const testLine = currentLine ? `${currentLine} ${word}` : word;
-      if (ctx.measureText(testLine).width > maxWidth && currentLine) {
-        lines.push(currentLine);
-        currentLine = word;
+      if (options.breakLongWords && ctx.measureText(word).width > maxWidth) {
+        // Flush the pending line, then split the oversized word chunk by chunk.
+        if (currentLine) {
+          lines.push(currentLine);
+          currentLine = '';
+        }
+        for (const ch of word) {
+          const testChunk = currentLine ? `${currentLine}${ch}` : ch;
+          if (ctx.measureText(testChunk).width > maxWidth && currentLine) {
+            lines.push(currentLine);
+            currentLine = ch;
+          } else {
+            currentLine = testChunk;
+          }
+        }
       } else {
-        currentLine = testLine;
+        const testLine = currentLine ? `${currentLine} ${word}` : word;
+        if (ctx.measureText(testLine).width > maxWidth && currentLine) {
+          lines.push(currentLine);
+          currentLine = word;
+        } else {
+          currentLine = testLine;
+        }
       }
     }
 

@@ -118,6 +118,8 @@ export interface SerializedCComponent {
   lineHeight?: number;
   role?: string;
   rotation?: number;
+  /** CText overflow behavior: 'truncate' (default) fits text into the slot, 'visible' overflows. */
+  overflow?: 'visible' | 'truncate';
 
   // CIcon fields
   source?: string;

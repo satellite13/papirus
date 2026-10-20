@@ -174,6 +174,29 @@ describe('CContainer', () => {
       // Second child should be below first
       expect(bounds2.y).toBeGreaterThan(bounds1.y);
     });
+
+    it('accounts for wrapped text when sizing children in render', () => {
+      // 'one two three' wraps to 3 lines at 50px width → height 3 * 14 * 1.2 = 50.4
+      const mockCtx = {
+        ...ctx,
+        font: '',
+        measureText: vi.fn((text: string) => ({ width: text.length * 10 })),
+      } as unknown as CanvasRenderingContext2D;
+
+      const t1 = new CText({ text: 'one two three', fontSize: 14 });
+      const t2 = new CText({ text: 'B', fontSize: 14 });
+      const spy1 = vi.spyOn(t1, 'render');
+      const spy2 = vi.spyOn(t2, 'render');
+
+      const c = new CContainer({ direction: 'column', children: [t1, t2] });
+      c.render(mockCtx, { x: 0, y: 0, width: 50, height: 68 });
+
+      const bounds1 = spy1.mock.calls[0]![1];
+      const bounds2 = spy2.mock.calls[0]![1];
+      // First slot must fit the wrapped text, second starts below it
+      expect(bounds1.height).toBeCloseTo(3 * 14 * 1.2);
+      expect(bounds2.y).toBeCloseTo(bounds1.y + 3 * 14 * 1.2);
+    });
   });
 
   describe('hitTest', () => {

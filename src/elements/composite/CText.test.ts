@@ -107,7 +107,7 @@ describe('CText', () => {
       expect(size.height).toBe(14 * 1.2);
     });
 
-    it('returns longest word width as floor when maxWidth is tiny', () => {
+    it('returns widest-char width as floor when maxWidth is tiny', () => {
       const mockCtx = {
         ...ctx,
         font: '',
@@ -115,10 +115,10 @@ describe('CText', () => {
       } as unknown as CanvasRenderingContext2D;
 
       const t = new CText({ text: 'one two three', fontSize: 14 });
-      // Longest word 'three' = 50px; maxWidth 10px forces one word per line
+      // Long words break to chars; maxWidth 10px → one char per line
       const size = t.measure(mockCtx, 10);
-      expect(size.width).toBe(50);
-      expect(size.height).toBeCloseTo(3 * 14 * 1.2);
+      expect(size.width).toBe(10);
+      expect(size.height).toBeCloseTo(11 * 14 * 1.2);
     });
 
     it('transposes dimensions for 90-degree rotation', () => {
@@ -195,6 +195,51 @@ describe('CText', () => {
       const t = new CText({ text: 'Hello' });
       t.render(ctx, { x: 0, y: 0, width: 100, height: 50 });
       expect(ctx.rotate).not.toHaveBeenCalled();
+    });
+
+    describe('slot height truncation', () => {
+      const widthByLength = (): CanvasRenderingContext2D =>
+        ({
+          ...ctx,
+          font: '',
+          fillText: ctx.fillText,
+          measureText: vi.fn((text: string) => ({ width: text.length * 10 })),
+        }) as unknown as CanvasRenderingContext2D;
+
+      it('truncates lines that do not fit the slot height with ellipsis', () => {
+        const mockCtx = widthByLength();
+        // lineHeight = 14 * 1.2 = 16.8; slot height 30 → floor(30/16.8) = 1 line
+        const t = new CText({ text: 'one two three', fontSize: 14 });
+        t.render(mockCtx, { x: 0, y: 0, width: 50, height: 30 });
+        expect(mockCtx.fillText).toHaveBeenCalledTimes(1);
+        expect(String((mockCtx.fillText as ReturnType<typeof vi.fn>).mock.calls[0]![0])).toContain(
+          '…'
+        );
+      });
+
+      it('renders all lines when they fit the slot', () => {
+        const mockCtx = widthByLength();
+        const t = new CText({ text: 'one two three', fontSize: 14 });
+        // Width 80 → 'one two'(70) / 'three'(50); slot fits 5 lines
+        t.render(mockCtx, { x: 0, y: 0, width: 80, height: 100 });
+        expect(mockCtx.fillText).toHaveBeenCalledTimes(2); // 'one two' / 'three'
+      });
+
+      it('draws overflowing lines when overflow is visible', () => {
+        const mockCtx = widthByLength();
+        const t = new CText({ text: 'one two three', fontSize: 14, overflow: 'visible' });
+        // Slot fits 1 line, but both wrapped lines are drawn
+        t.render(mockCtx, { x: 0, y: 0, width: 80, height: 30 });
+        expect(mockCtx.fillText).toHaveBeenCalledTimes(2);
+      });
+
+      it('breaks long words horizontally when rendering', () => {
+        const mockCtx = widthByLength();
+        const t = new CText({ text: 'extraordinary', fontSize: 14 });
+        // Slot width 50px, height 400px → 3 chunks of 5 chars, no ellipsis
+        t.render(mockCtx, { x: 0, y: 0, width: 50, height: 400 });
+        expect(mockCtx.fillText).toHaveBeenCalledTimes(3);
+      });
     });
   });
 
@@ -293,6 +338,24 @@ describe('CText', () => {
       const data = t.serialize();
       expect(data.bindToProperty).toBe('__name__');
       expect(t.bindToProperty).toBe('__name__');
+    });
+
+    it('omits overflow when truncate (default)', () => {
+      const t = new CText({ text: 'Hello' });
+      expect(t.serialize().overflow).toBeUndefined();
+    });
+
+    it('serializes and deserializes overflow visible', () => {
+      const t = new CText({ text: 'Hello', overflow: 'visible' });
+      const data = t.serialize();
+      expect(data.overflow).toBe('visible');
+      const c = deserializeCComponent(data);
+      expect((c as CText).overflow).toBe('visible');
+    });
+
+    it('defaults overflow to truncate on deserialize', () => {
+      const c = deserializeCComponent({ type: 'text', text: 'X' });
+      expect((c as CText).overflow).toBe('truncate');
     });
 
     it('deserializes bindToProperty', () => {

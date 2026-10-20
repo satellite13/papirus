@@ -217,7 +217,9 @@ export class CContainer extends CompositeComponentBase {
     if (this.style.visible === false) return;
 
     const layoutChildren = this.getLayoutChildren();
-    const flexChildren = this.buildFlexChildren(ctx, undefined, layoutChildren);
+    // Measure children against the real inner width (same as measure()) so the
+    // flex algorithm sees wrapped sizes instead of single-line estimates.
+    const flexChildren = this.buildFlexChildren(ctx, bounds.width, layoutChildren);
     const result = flexLayout(
       { width: bounds.width, height: bounds.height },
       this.getFlexConfig(),

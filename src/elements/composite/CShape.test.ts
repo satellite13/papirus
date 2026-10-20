@@ -83,7 +83,7 @@ describe('CShape', () => {
       expect(size.height).toBeCloseTo(2 * 14 * 1.2 + 10 + 2);
     });
 
-    it('keeps longest word as floor when maxWidth is tiny', () => {
+    it('keeps widest char as floor when maxWidth is tiny', () => {
       const mockCtx = {
         ...ctx,
         font: '',
@@ -100,8 +100,9 @@ describe('CShape', () => {
       });
 
       const size = s.measure(mockCtx, 0);
-      expect(size.width).toBe(50 + 10 + 2);
-      expect(size.height).toBeCloseTo(3 * 14 * 1.2 + 10 + 2);
+      // Long words break to chars → floor is the widest char (10)
+      expect(size.width).toBe(10 + 10 + 2);
+      expect(size.height).toBeCloseTo(11 * 14 * 1.2 + 10 + 2);
     });
   });
 
