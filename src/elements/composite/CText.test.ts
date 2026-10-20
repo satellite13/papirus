@@ -399,6 +399,21 @@ describe('CText', () => {
       expect(svg).toContain('&amp;');
       expect(svg).toContain('&quot;');
     });
+
+    it('exports truncated lines from the last render cache', () => {
+      const mockCtx = {
+        ...ctx,
+        font: '',
+        fillText: ctx.fillText,
+        measureText: vi.fn((text: string) => ({ width: text.length * 10 })),
+      } as unknown as CanvasRenderingContext2D;
+      // lineHeight = 14 * 1.2 = 16.8; slot height 30 → one truncated line with ellipsis
+      const t = new CText({ text: 'one two three', fontSize: 14 });
+      t.render(mockCtx, { x: 0, y: 0, width: 50, height: 30 });
+      const svg = t.toSVG({ x: 0, y: 0, width: 50, height: 30 });
+      expect(svg).toContain('…');
+      expect(svg.match(/<tspan/g)?.length ?? 0).toBe(1);
+    });
   });
 
   describe('onChange', () => {
