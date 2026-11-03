@@ -46,7 +46,7 @@ src/render/vendor/
 
 ## Лицензии (кратко)
 
-MIT/ISC **не ослабляют** AGPL на код Papirus. Коммерческая лицензия Papirus не затрагивается. Обязанность — copyright notices в `NOTICE` / `third-party-licenses.md`.
+Зависимости MIT/ISC совместимы с MIT-лицензией Papirus. Обязанность — copyright notices в `NOTICE` / `third-party-licenses.md`.
 
 | Библиотека | Лицензия | В runtime dist |
 |------------|----------|----------------|

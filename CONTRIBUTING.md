@@ -72,4 +72,4 @@ npm run build
 
 ## License
 
-By contributing, you agree that contributions are provided under AGPL-3.0-or-later (unless explicitly agreed otherwise in writing).
+By contributing, you agree that contributions are provided under the MIT License (unless explicitly agreed otherwise in writing).

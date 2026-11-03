@@ -42,7 +42,7 @@
     "typescript"
   ],
   "author": "Nikolay Groznykh <nikolay@groznykh.ru>",
-  "license": "AGPL-3.0-or-later",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://gitverse.ru/ngroznykh/papirus.git"

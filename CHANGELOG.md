@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- License switched from AGPL-3.0-or-later + commercial dual licensing to MIT.
+
 ## [0.9.18] - 2026-10-20
 
 ### Fixed

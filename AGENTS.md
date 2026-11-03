@@ -7,7 +7,7 @@ This file provides essential information for AI coding agents working with the P
 **Papirus** is a TypeScript library for building interactive 2D diagrams and flowcharts on HTML Canvas. It is framework-agnostic with zero runtime dependencies.
 
 - **Package**: `@ngroznykh/papirus`
-- **License**: AGPL-3.0-or-later (dual-licensed with commercial option)
+- **License**: MIT
 - **Node.js Requirements**: ^20.19.0 || >=22.12.0 (Vite 8 / Vitest 4)
 - **Repository**: https://gitverse.ru/ngroznykh/papirus
 
@@ -317,8 +317,10 @@ Papirus is framework-agnostic and can be integrated into Vue/React/Svelte/vanill
 
 ## License Notes
 
-This is dual-licensed software:
-- Open source: AGPL-3.0-or-later
-- Commercial: Available for proprietary use
+MIT License.
 
-Contributions are accepted under AGPL-3.0-or-later unless explicitly agreed otherwise.
+Previously dual-licensed (AGPL-3.0-or-later + commercial option); since 2026-11-03 the project is MIT.
+
+See `LICENSE` for details. Licensing questions: `nikolay@groznykh.ru`.
+
+Contributions are accepted under MIT unless explicitly agreed otherwise.
