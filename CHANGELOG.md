@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.19] - 2026-11-09
+
+### Fixed
+- Dragging an edge end along the same outline follows the cursor. The axis magnet no longer pulls it back onto the line through the other end.
+- A new editable-polyline bend pulled slightly off its segment stays a corner. The magnet no longer snaps that bend back onto its own segment. Alignment to a neighboring bend axis is unchanged.
+
 ### Changed
 - License switched from AGPL-3.0-or-later + commercial dual licensing to MIT.
 
