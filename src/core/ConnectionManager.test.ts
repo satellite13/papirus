@@ -326,6 +326,321 @@ describe('ConnectionManager', () => {
     expect(interaction.connection.reconnecting).toBe(true);
   });
 
+  it('keeps a start point slid along the outline when anchors are locked', () => {
+    const canvas = createCanvas(400, 240);
+    const renderer = new DiagramRenderer(canvas, { width: 400, height: 240, retina: false });
+    const interaction = renderer.enableInteractions({ attachToOutline: true });
+
+    const nodeA = new RectangleNode({ x: 40, y: 80, width: 80, height: 60 });
+    const nodeB = new RectangleNode({ x: 240, y: 80, width: 80, height: 60 });
+    renderer.addNode(nodeA);
+    renderer.addNode(nodeB);
+
+    const start = nodeA.getClosestPointOnOutline({ x: 120, y: 110 });
+    const end = nodeB.getClosestPointOnOutline({ x: 240, y: 110 });
+    const edge = new Edge({
+      from: { nodeId: nodeA.id, outlineParam: start.param },
+      to: { nodeId: nodeB.id, outlineParam: end.param },
+      type: 'polyline',
+      lockAnchors: true,
+    });
+    renderer.addEdge(edge);
+    renderer.render();
+
+    const beforeParam = edge.from.outlineParam ?? -1;
+    const handle = { ...edge.startPoint };
+    interaction.selection.select(edge.id);
+
+    const slideTo = nodeA.getClosestPointOnOutline({ x: 80, y: 80 });
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', {
+        clientX: handle.x,
+        clientY: handle.y,
+        button: 0,
+        bubbles: true,
+      })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mousemove', {
+        clientX: slideTo.point.x,
+        clientY: slideTo.point.y,
+        button: 0,
+        buttons: 1,
+        bubbles: true,
+      })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mouseup', {
+        clientX: slideTo.point.x,
+        clientY: slideTo.point.y,
+        button: 0,
+        bubbles: true,
+      })
+    );
+    renderer.render();
+
+    expect(edge.from.outlineParam).toBeDefined();
+    expect(edge.from.portId).toBeUndefined();
+    expect(Math.abs((edge.from.outlineParam ?? 0) - beforeParam)).toBeGreaterThan(0.05);
+    expect(edge.startPoint.y).toBeLessThan(handle.y - 15);
+  });
+
+  it('slides a locked side-port start along the outline instead of snapping back', () => {
+    const canvas = createCanvas(400, 240);
+    const renderer = new DiagramRenderer(canvas, { width: 400, height: 240, retina: false });
+    const interaction = renderer.enableInteractions({ attachToOutline: true });
+
+    const nodeA = new RectangleNode({ x: 40, y: 80, width: 80, height: 60 });
+    const nodeB = new RectangleNode({ x: 240, y: 80, width: 80, height: 60 });
+    renderer.addNode(nodeA);
+    renderer.addNode(nodeB);
+
+    const edge = new Edge({
+      from: { nodeId: nodeA.id, portId: 'anchor:right:0' },
+      to: { nodeId: nodeB.id, portId: 'anchor:left:0' },
+      type: 'polyline',
+      lockAnchors: true,
+    });
+    renderer.addEdge(edge);
+    renderer.render();
+
+    const handle = { ...edge.startPoint };
+    interaction.selection.select(edge.id);
+    const slideTo = nodeA.getClosestPointOnOutline({ x: 120, y: 82 });
+
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', {
+        clientX: handle.x,
+        clientY: handle.y,
+        button: 0,
+        bubbles: true,
+      })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mousemove', {
+        clientX: slideTo.point.x,
+        clientY: slideTo.point.y,
+        button: 0,
+        buttons: 1,
+        bubbles: true,
+      })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mouseup', {
+        clientX: slideTo.point.x,
+        clientY: slideTo.point.y,
+        button: 0,
+        bubbles: true,
+      })
+    );
+    renderer.render();
+
+    expect(edge.from.portId).toBeUndefined();
+    expect(edge.from.outlineParam).toBeDefined();
+    expect(edge.startPoint.y).toBeLessThan(handle.y - 15);
+  });
+
+  it('does not pull a same-node outline slide back onto the opposite endpoint axis', () => {
+    const canvas = createCanvas(400, 240);
+    const renderer = new DiagramRenderer(canvas, { width: 400, height: 240, retina: false });
+    const interaction = renderer.enableInteractions({ attachToOutline: true });
+
+    const nodeA = new RectangleNode({ x: 40, y: 80, width: 80, height: 60 });
+    const nodeB = new RectangleNode({ x: 240, y: 80, width: 80, height: 60 });
+    renderer.addNode(nodeA);
+    renderer.addNode(nodeB);
+
+    const start = nodeA.getClosestPointOnOutline({ x: 120, y: 110 });
+    const end = nodeB.getClosestPointOnOutline({ x: 240, y: 110 });
+    const edge = new Edge({
+      from: { nodeId: nodeA.id, outlineParam: start.param },
+      to: { nodeId: nodeB.id, outlineParam: end.param },
+      type: 'polyline',
+      lockAnchors: true,
+    });
+    renderer.addEdge(edge);
+    renderer.render();
+
+    const handle = { ...edge.startPoint };
+    interaction.selection.select(edge.id);
+    // 6px is inside the 10px axis magnet, which used to throw the point back.
+    const slideY = handle.y - 6;
+
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', {
+        clientX: handle.x,
+        clientY: handle.y,
+        button: 0,
+        bubbles: true,
+      })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mousemove', {
+        clientX: handle.x,
+        clientY: slideY,
+        button: 0,
+        buttons: 1,
+        bubbles: true,
+      })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mouseup', {
+        clientX: handle.x,
+        clientY: slideY,
+        button: 0,
+        bubbles: true,
+      })
+    );
+    renderer.render();
+
+    expect(edge.from.portId).toBeUndefined();
+    expect(edge.startPoint.y).toBeLessThan(handle.y - 4);
+  });
+
+  it('keeps a new editable bend pulled slightly off its segment', () => {
+    const canvas = createCanvas(400, 240);
+    const renderer = new DiagramRenderer(canvas, { width: 400, height: 240, retina: false });
+    const interaction = renderer.enableInteractions({ attachToOutline: true });
+
+    const nodeA = new RectangleNode({ x: 0, y: 80, width: 40, height: 40 });
+    const nodeB = new RectangleNode({ x: 200, y: 80, width: 40, height: 40 });
+    renderer.addNode(nodeA);
+    renderer.addNode(nodeB);
+
+    const edge = new Edge({
+      from: { nodeId: nodeA.id },
+      to: { nodeId: nodeB.id },
+      type: 'editable-polyline',
+    });
+    renderer.addEdge(edge);
+    edge.updateEndpoints({ x: 40, y: 100 }, { x: 200, y: 100 }, 'right', 'left');
+    renderer.render();
+    interaction.selection.select(edge.id);
+
+    // Midpoint of start → virtual center. The + sits on the straight segment.
+    const insert = { x: 80, y: 100 };
+    const draggedY = 94;
+
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', {
+        clientX: insert.x,
+        clientY: insert.y,
+        button: 0,
+        bubbles: true,
+      })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mousemove', {
+        clientX: insert.x,
+        clientY: draggedY,
+        button: 0,
+        buttons: 1,
+        bubbles: true,
+      })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mouseup', {
+        clientX: insert.x,
+        clientY: draggedY,
+        button: 0,
+        bubbles: true,
+      })
+    );
+
+    const offSegment = (edge.controlPoints ?? []).some((point) => point.y < 96);
+    expect(offSegment).toBe(true);
+  });
+
+  it('keeps a new bend when the pull is inside the screen magnet but the diagram is zoomed out', () => {
+    const canvas = createCanvas(400, 240);
+    const renderer = new DiagramRenderer(canvas, { width: 400, height: 240, retina: false });
+    const interaction = renderer.enableInteractions();
+    renderer.zoom = 0.5;
+
+    const nodeA = new RectangleNode({ x: 0, y: 80, width: 40, height: 40 });
+    const nodeB = new RectangleNode({ x: 200, y: 80, width: 40, height: 40 });
+    renderer.addNode(nodeA);
+    renderer.addNode(nodeB);
+
+    const edge = new Edge({
+      from: { nodeId: nodeA.id },
+      to: { nodeId: nodeB.id },
+      type: 'editable-polyline',
+    });
+    renderer.addEdge(edge);
+    edge.updateEndpoints({ x: 40, y: 100 }, { x: 200, y: 100 }, 'right', 'left');
+    renderer.render();
+    interaction.selection.select(edge.id);
+
+    // 15 world px is 7.5 screen px at zoom 0.5, inside the 10px magnet.
+    const insert = { x: 80, y: 100 };
+    const dragged = { x: 80, y: 85 };
+    const toClient = (point: { x: number; y: number }) => ({
+      x: point.x * renderer.zoom,
+      y: point.y * renderer.zoom,
+    });
+    const down = toClient(insert);
+    const move = toClient(dragged);
+
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', { clientX: down.x, clientY: down.y, button: 0, bubbles: true })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mousemove', {
+        clientX: move.x,
+        clientY: move.y,
+        button: 0,
+        buttons: 1,
+        bubbles: true,
+      })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mouseup', { clientX: move.x, clientY: move.y, button: 0, bubbles: true })
+    );
+
+    expect((edge.controlPoints ?? []).some((point) => point.y < 90)).toBe(true);
+  });
+
+  it('still snaps a bend to a neighbor axis that is not its own segment', () => {
+    const canvas = createCanvas(400, 240);
+    const renderer = new DiagramRenderer(canvas, { width: 400, height: 240, retina: false });
+    const interaction = renderer.enableInteractions();
+
+    const nodeA = new RectangleNode({ x: 0, y: 80, width: 40, height: 40 });
+    const nodeB = new RectangleNode({ x: 200, y: 80, width: 40, height: 40 });
+    renderer.addNode(nodeA);
+    renderer.addNode(nodeB);
+
+    const edge = new Edge({
+      from: { nodeId: nodeA.id },
+      to: { nodeId: nodeB.id },
+      type: 'editable-polyline',
+      controlPoints: [{ x: 120, y: 60 }],
+    });
+    renderer.addEdge(edge);
+    edge.updateEndpoints({ x: 40, y: 100 }, { x: 200, y: 100 }, 'right', 'left');
+    renderer.render();
+    interaction.selection.select(edge.id);
+
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', { clientX: 120, clientY: 60, button: 0, bubbles: true })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mousemove', {
+        clientX: 46,
+        clientY: 60,
+        button: 0,
+        buttons: 1,
+        bubbles: true,
+      })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mouseup', { clientX: 46, clientY: 60, button: 0, bubbles: true })
+    );
+
+    expect(edge.controlPoints?.[0]).toEqual({ x: 40, y: 60 });
+  });
+
   it('creates edge when connection completed onto another edge', () => {
     const canvas = createCanvas(400, 200);
     const renderer = new DiagramRenderer(canvas, { width: 400, height: 200, retina: false });

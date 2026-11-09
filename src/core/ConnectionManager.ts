@@ -366,7 +366,11 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
         snappedDir = bestResult.node.getOutlineDirection(bestResult.param);
 
         const otherNode = this.reconnectingEndpoint === 'start' ? toNode : fromNode;
-        if (otherNode) {
+        // Sliding along the same contour must follow the cursor. Axis magnet
+        // otherwise pulls the point back to the line through the other end,
+        // which is the previous attachment for an already-aligned edge.
+        const slidingOnSameNode = this.originalEdgeEndpoint?.nodeId === bestResult.node.id;
+        if (otherNode && !slidingOnSameNode) {
           const alignRef = edge.isEditablePolyline()
             ? this.getNearestBendPointForAxisAlignment(edge, this.reconnectingEndpoint!)
             : this.reconnectingEndpoint === 'start'
@@ -1341,24 +1345,32 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     let x = point.x;
     let y = point.y;
 
-    const xCandidates = [prev.x, next.x];
-    const yCandidates = [prev.y, next.y];
+    // Snapping onto the segment between the neighbors collapses a new bend
+    // back into a straight line, so the corner appears and then vanishes.
+    const segmentHorizontal = Math.abs(prev.y - next.y) <= 0.001;
+    const segmentVertical = Math.abs(prev.x - next.x) <= 0.001;
 
-    let closestXDist = Infinity;
-    for (const candidate of xCandidates) {
-      const dist = Math.abs(point.x - candidate);
-      if (dist <= tolerance && dist < closestXDist) {
-        closestXDist = dist;
-        x = candidate;
+    if (!segmentVertical) {
+      const xCandidates = [prev.x, next.x];
+      let closestXDist = Infinity;
+      for (const candidate of xCandidates) {
+        const dist = Math.abs(point.x - candidate);
+        if (dist <= tolerance && dist < closestXDist) {
+          closestXDist = dist;
+          x = candidate;
+        }
       }
     }
 
-    let closestYDist = Infinity;
-    for (const candidate of yCandidates) {
-      const dist = Math.abs(point.y - candidate);
-      if (dist <= tolerance && dist < closestYDist) {
-        closestYDist = dist;
-        y = candidate;
+    if (!segmentHorizontal) {
+      const yCandidates = [prev.y, next.y];
+      let closestYDist = Infinity;
+      for (const candidate of yCandidates) {
+        const dist = Math.abs(point.y - candidate);
+        if (dist <= tolerance && dist < closestYDist) {
+          closestYDist = dist;
+          y = candidate;
+        }
       }
     }
 
