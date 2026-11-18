@@ -5,7 +5,8 @@ import type { Node } from '@/elements/Node';
 import type { Group } from '@/elements/Group';
 import type { ArrowMarkerConfig, TextStyle } from '@/types';
 import type { NodeImageOptions } from '@/elements/NodeImage';
-import { EDGE_LABEL_BACKGROUND_RADIUS } from '@/constants';
+import { EDGE_BEND_RADIUS, EDGE_LABEL_BACKGROUND_RADIUS } from '@/constants';
+import { roundedPolylineToSvgD } from './roundedPolyline';
 import { applyStyleManagerToElements, canvasFontFromTextStyle } from './style';
 import { getContentBounds } from './contentBounds';
 import { downloadBlob } from './download';
@@ -444,6 +445,10 @@ export class SvgExporter {
       return d;
     }
 
+    if (edge.type === 'polyline' || edge.type === 'editable-polyline') {
+      return roundedPolylineToSvgD(path, EDGE_BEND_RADIUS);
+    }
+
     let d = `M ${path[0]!.x} ${path[0]!.y}`;
     for (let i = 1; i < path.length; i++) {
       d += ` L ${path[i]!.x} ${path[i]!.y}`;
@@ -582,7 +587,8 @@ export class SvgExporter {
     const metrics = this.measureTextLabel(edge.label.text, edge.label.style, edge.label.inset);
     const labelRect = this.getLabelGapRect(labelState.point, metrics, labelState.rotation);
     const withGap = this.cutPolylineByRect(polyline, labelRect);
-    return this.buildPolylinePath(withGap);
+    const roundBends = edge.type === 'polyline' || edge.type === 'editable-polyline';
+    return this.buildPolylinePath(withGap, roundBends);
   }
 
   private buildEdgePolyline(edge: Edge): Point[] {
@@ -708,16 +714,20 @@ export class SvgExporter {
     return segments.length > 0 ? segments : [polyline];
   }
 
-  private buildPolylinePath(segments: Point[][]): string {
+  private buildPolylinePath(segments: Point[][], roundBends = false): string {
     return segments
       .filter((segment) => segment.length > 1)
-      .map((segment) => {
-        let d = `M ${segment[0]!.x} ${segment[0]!.y}`;
-        for (let i = 1; i < segment.length; i++) {
-          d += ` L ${segment[i]!.x} ${segment[i]!.y}`;
-        }
-        return d;
-      })
+      .map((segment) =>
+        roundBends
+          ? roundedPolylineToSvgD(segment, EDGE_BEND_RADIUS)
+          : (() => {
+              let d = `M ${segment[0]!.x} ${segment[0]!.y}`;
+              for (let i = 1; i < segment.length; i++) {
+                d += ` L ${segment[i]!.x} ${segment[i]!.y}`;
+              }
+              return d;
+            })()
+      )
       .join(' ');
   }
 

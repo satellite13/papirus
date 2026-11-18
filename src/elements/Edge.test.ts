@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { Edge } from './Edge';
+import { mockCanvasContext } from '@/test/testUtils';
 
 describe('Edge', () => {
   it('recalculates path and hit tests', () => {
@@ -566,6 +567,22 @@ describe('Edge', () => {
     ]);
   });
 
+  it('keeps routed bends when a polyline becomes editable', () => {
+    const edge = new Edge({
+      from: { nodeId: 'a' },
+      to: { nodeId: 'b' },
+      type: 'polyline',
+    });
+    edge.updateEndpoints({ x: 0, y: 0 }, { x: 100, y: 20 });
+    const before = edge.path.map((point) => ({ x: point.x, y: point.y }));
+    expect(before.length).toBeGreaterThan(2);
+
+    edge.type = 'editable-polyline';
+
+    expect(edge.controlPoints).toEqual(before.slice(1, -1));
+    expect(edge.path.map((point) => ({ x: point.x, y: point.y }))).toEqual(before);
+  });
+
   it('clears control points when switching from editable-polyline to another type', () => {
     const edge = new Edge({
       from: { nodeId: 'a' },
@@ -790,5 +807,23 @@ describe('Edge', () => {
       expect(edge.labelOffset).toBe(15);
       expect(edge.labelBackground?.color).toBe('yellow');
     });
+  });
+
+  it('strokes editable-polyline corners with arcTo fillets', () => {
+    const edge = new Edge({
+      from: { nodeId: 'a' },
+      to: { nodeId: 'b' },
+      type: 'editable-polyline',
+      controlPoints: [
+        { x: 50, y: 0 },
+        { x: 50, y: 40 },
+      ],
+    });
+    edge.updateEndpoints({ x: 0, y: 0 }, { x: 100, y: 40 });
+
+    const ctx = mockCanvasContext();
+    edge.render(ctx);
+
+    expect(vi.mocked(ctx.arcTo).mock.calls.length).toBeGreaterThan(0);
   });
 });

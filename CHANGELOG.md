@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Polyline / editable-polyline corners render with a small fillet (`EDGE_BEND_RADIUS` = 3); SVG export matches. Hit-testing stays on the sharp path.
+- Mid-segment handles move orthogonal segments; auto-`polyline` promotes to `editable-polyline` on first drag. Endpoint segments insert stub bends.
+- Drag edge labels to update `labelPosition` / `labelOffset` (`labelDragStart` / `labelDragEnd`). Click a segment body (not the mid-handle) inserts a bend (replaces mid-segment `+`).
+- Deselecting an `editable-polyline` drops colinear bends on straight H/V runs (undoable).
+
 ## [0.9.19] - 2026-11-09
 
 ### Fixed

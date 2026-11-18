@@ -1582,4 +1582,55 @@ describe('InteractionManager', () => {
     canvas.dispatchEvent(new MouseEvent('mousemove', { clientX: 80, clientY: 70, bubbles: true }));
     expect(hoverMove).toHaveBeenCalled();
   });
+
+  it('removes colinear bends when an editable-polyline is deselected', () => {
+    const canvas = document.createElement('canvas');
+    vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 500,
+      height: 300,
+      right: 500,
+      bottom: 300,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+    const renderer = new DiagramRenderer(canvas, { width: 500, height: 300, retina: false });
+    const interaction = new InteractionManager({ renderer });
+
+    const source = new RectangleNode({ x: 40, y: 40, width: 80, height: 40 });
+    const target = new RectangleNode({ x: 280, y: 200, width: 100, height: 40 });
+    renderer.addNode(source);
+    renderer.addNode(target);
+
+    const edge = new Edge({
+      from: { nodeId: source.id },
+      to: { nodeId: target.id },
+      type: 'editable-polyline',
+      controlPoints: [
+        { x: 152, y: 60 },
+        { x: 180, y: 60 },
+        { x: 180, y: 220 },
+      ],
+    });
+    renderer.addEdge(edge);
+    edge.updateEndpoints({ x: 120, y: 60 }, { x: 280, y: 220 });
+
+    interaction.selection.select(edge.id);
+    expect(edge.controlPoints).toHaveLength(3);
+
+    interaction.selection.clearSelection();
+    expect(edge.controlPoints).toEqual([
+      { x: 180, y: 60 },
+      { x: 180, y: 220 },
+    ]);
+
+    interaction.history.undo();
+    expect(edge.controlPoints).toEqual([
+      { x: 152, y: 60 },
+      { x: 180, y: 60 },
+      { x: 180, y: 220 },
+    ]);
+  });
 });

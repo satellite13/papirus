@@ -17,10 +17,22 @@ import {
   ANCHOR_POINT_HOVER_RADIUS,
   ANCHOR_POINT_RADIUS,
   BEZIER_MAX_OFFSET,
+  DRAG_START_THRESHOLD,
+  EDGE_SEGMENT_INSERT_CLICK_DELAY_MS,
 } from '@/constants';
 import { clonePoints, distance } from '@/utils/geometry';
 import { directionFromAngle } from '@/utils/edgePath';
 import { getDirectionFromOutlineParam } from '@/utils/direction';
+import {
+  collapseColinearPoints,
+  listOrthogonalRuns,
+  moveOrthogonalRun,
+  orthogonalRunMidpoint,
+  resolveOrthogonalRun,
+  segmentAxis,
+  type OrthogonalRun,
+} from '@/utils/orthogonalSegmentDrag';
+import type { EdgePathType } from '@/types';
 import {
   OUTLINE_CONNECT_HANDLE_HYSTERESIS,
   getOutlineConnectHandle,
@@ -38,8 +50,10 @@ export interface ConnectionEvents {
   connect: [edge: Edge];
   edgeReconnectStart: [edge: Edge, endpoint: 'start' | 'end', original: EdgeEndpoint];
   edgeReconnect: [edge: Edge, endpoint: 'start' | 'end'];
-  controlPointDragStart: [edge: Edge, before: Point[]];
+  controlPointDragStart: [edge: Edge, before: Point[], beforeType: EdgePathType];
   controlPointDragEnd: [];
+  labelDragStart: [edge: Edge];
+  labelDragEnd: [];
 }
 
 export type ConnectionValidator = (sourceNodeId: string, targetNodeId: string) => boolean;
@@ -93,6 +107,26 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
   private reconnectingOutlineParam: number | null = null;
   private reconnectingTargetNodeId: string | null = null;
   private activeControlPointDrag: { edge: Edge; index: number } | null = null;
+  private activeSegmentDrag: {
+    edge: Edge;
+    run: OrthogonalRun;
+    /** Midpoint of the run when the gesture started / last applied — for re-resolve. */
+    trackMidpoint: Point;
+  } | null = null;
+  private activeLabelDrag: {
+    edge: Edge;
+    pointerOffsetX: number;
+    pointerOffsetY: number;
+  } | null = null;
+  /** Single-click insert bend, deferred so double-click can open the label editor instead. */
+  private pendingSegmentInsert: {
+    edge: Edge;
+    segmentIndex: number;
+    point: Point;
+    startX: number;
+    startY: number;
+  } | null = null;
+  private pendingSegmentInsertTimer: ReturnType<typeof setTimeout> | null = null;
   private snapToGrid: boolean;
   private gridSize: number;
   private attachToOutline: boolean;
@@ -146,7 +180,11 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
    * Перетаскивание опорной точки полилинии рёбра
    */
   get isEditingEdgeControlPoint(): boolean {
-    return this.activeControlPointDrag !== null;
+    return (
+      this.activeControlPointDrag !== null ||
+      this.activeSegmentDrag !== null ||
+      this.activeLabelDrag !== null
+    );
   }
 
   /**
@@ -272,14 +310,12 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     if (this.renderer.blocksDiagramPointerAtScreen(event.screenX, event.screenY)) {
       return false;
     }
-    if (this.tryStartEditableControlInteraction(event)) {
-      return true;
-    }
 
     const point = { x: event.worldX, y: event.worldY };
     const handleRadius = EDGE_HANDLE_RADIUS / Math.max(this.renderer.zoom, 0.0001);
 
-    // Check selected edges for handle hit
+    // Endpoint handles win over mid-handles / bends / segment body — otherwise a short
+    // first-run mid-handle steals reconnect near the port.
     for (const edge of this.renderer.edges.values()) {
       if (edge.state !== 'selected') {
         continue;
@@ -308,6 +344,10 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
         this.updateReconnectingEdge(point);
         return true;
       }
+    }
+
+    if (this.tryStartEditableControlInteraction(event)) {
+      return true;
     }
 
     return false;
@@ -521,6 +561,45 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
    * Handle mouse move during connection
    */
   handleMouseMove(event: InputEvent): boolean {
+    if (this.pendingSegmentInsert) {
+      const dx = event.worldX - this.pendingSegmentInsert.startX;
+      const dy = event.worldY - this.pendingSegmentInsert.startY;
+      if (dx * dx + dy * dy > DRAG_START_THRESHOLD * DRAG_START_THRESHOLD) {
+        this.cancelPendingSegmentInsert();
+      }
+    }
+
+    if (this.activeLabelDrag) {
+      this.applyLabelDrag(this.activeLabelDrag.edge, {
+        x: event.worldX,
+        y: event.worldY,
+      });
+      this.renderer.markDirty();
+      return true;
+    }
+
+    if (this.activeSegmentDrag) {
+      const { edge, run, trackMidpoint } = this.activeSegmentDrag;
+      const vertices = edge.getPathVertices();
+      const rawPoint = this.snapPoint({ x: event.worldX, y: event.worldY });
+      const currentRun =
+        resolveOrthogonalRun(vertices, run, trackMidpoint) ?? run;
+      const next = moveOrthogonalRun(vertices, currentRun, rawPoint);
+      if (next) {
+        edge.controlPoints = next;
+        const afterVertices = edge.getPathVertices();
+        const updated =
+          resolveOrthogonalRun(afterVertices, currentRun, {
+            x: currentRun.axis === 'vertical' ? rawPoint.x : trackMidpoint.x,
+            y: currentRun.axis === 'horizontal' ? rawPoint.y : trackMidpoint.y,
+          }) ?? currentRun;
+        this.activeSegmentDrag.run = updated;
+        this.activeSegmentDrag.trackMidpoint = orthogonalRunMidpoint(afterVertices, updated);
+      }
+      this.renderer.markDirty();
+      return true;
+    }
+
     if (this.activeControlPointDrag) {
       const controlPoints = this.activeControlPointDrag.edge.controlPoints
         ? [...this.activeControlPointDrag.edge.controlPoints]
@@ -735,6 +814,22 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
    * Handle mouse up to complete or cancel connection
    */
   handleMouseUp(event: InputEvent): boolean {
+    if (this.pendingSegmentInsert) {
+      this.armPendingSegmentInsert();
+      return true;
+    }
+    if (this.activeLabelDrag) {
+      this.activeLabelDrag = null;
+      this.emit('labelDragEnd');
+      this.renderer.markDirty();
+      return true;
+    }
+    if (this.activeSegmentDrag) {
+      this.activeSegmentDrag = null;
+      this.emit('controlPointDragEnd');
+      this.renderer.markDirty();
+      return true;
+    }
     if (this.activeControlPointDrag) {
       this.activeControlPointDrag = null;
       this.emit('controlPointDragEnd');
@@ -1191,58 +1286,88 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
   }
 
   private tryStartEditableControlInteraction(event: InputEvent): boolean {
+    // A new press cancels a pending single-click insert (e.g. 2nd click of a double-click).
+    this.clearPendingSegmentInsertTimer();
+
     const point = { x: event.worldX, y: event.worldY };
     const pointRadius = EDGE_CONTROL_POINT_RADIUS / Math.max(this.renderer.zoom, 0.0001);
-    const addRadius = EDGE_ADD_CONTROL_RADIUS / Math.max(this.renderer.zoom, 0.0001);
+    const segmentRadius = EDGE_ADD_CONTROL_RADIUS / Math.max(this.renderer.zoom, 0.0001);
     const pointRadiusSq = pointRadius * pointRadius;
-    const addRadiusSq = addRadius * addRadius;
+    const segmentRadiusSq = segmentRadius * segmentRadius;
     const edges = [...this.renderer.edges.values()];
 
     for (let i = edges.length - 1; i >= 0; i--) {
       const edge = edges[i]!;
-      if (edge.state !== 'selected' || !edge.isEditablePolyline()) {
+      if (edge.state !== 'selected') {
+        continue;
+      }
+      if (edge.type !== 'editable-polyline' && edge.type !== 'polyline') {
         continue;
       }
 
-      const controlPoints = edge.getEditableControlPoints();
-      if (controlPoints.length === 0) continue;
+      // 1) Bend vertices (editable-polyline only)
+      if (edge.isEditablePolyline()) {
+        const controlPoints = edge.getEditableControlPoints();
+        const beforePoints = edge.controlPoints?.length
+          ? clonePoints(edge.controlPoints)
+          : clonePoints(controlPoints);
+        const beforeType = edge.type;
 
-      const beforePoints = edge.controlPoints?.length
-        ? clonePoints(edge.controlPoints)
-        : clonePoints(controlPoints);
+        for (let ci = 0; ci < controlPoints.length; ci++) {
+          const dx = point.x - controlPoints[ci]!.x;
+          const dy = point.y - controlPoints[ci]!.y;
+          if (dx * dx + dy * dy > pointRadiusSq) {
+            continue;
+          }
 
-      for (let i = 0; i < controlPoints.length; i++) {
-        const dx = point.x - controlPoints[i]!.x;
-        const dy = point.y - controlPoints[i]!.y;
-        if (dx * dx + dy * dy > pointRadiusSq) {
+          if (!edge.controlPoints || edge.controlPoints.length === 0) {
+            edge.controlPoints = controlPoints;
+          }
+          this.activeControlPointDrag = { edge, index: ci };
+          this.emit('controlPointDragStart', edge, beforePoints, beforeType);
+          this.renderer.markDirty();
+          return true;
+        }
+      }
+
+      const vertices = this.getRoutableVertices(edge);
+      if (vertices.length < 2) {
+        continue;
+      }
+
+      // 2) Mid-segment handle → orthogonal run drag (colinear segments share one handle)
+      for (const run of listOrthogonalRuns(vertices)) {
+        const mid = orthogonalRunMidpoint(vertices, run);
+        const dx = point.x - mid.x;
+        const dy = point.y - mid.y;
+        if (dx * dx + dy * dy > segmentRadiusSq) {
           continue;
         }
+        return this.beginSegmentDrag(edge, run);
+      }
 
-        if (!edge.controlPoints || edge.controlPoints.length === 0) {
-          edge.controlPoints = controlPoints;
-        }
-        this.activeControlPointDrag = { edge, index: i };
-        this.emit('controlPointDragStart', edge, beforePoints);
+      // 3) Label drag (selected edge with a label)
+      if (this.hitSelectedEdgeLabel(edge, point)) {
+        this.activeLabelDrag = {
+          edge,
+          pointerOffsetX: 0,
+          pointerOffsetY: 0,
+        };
+        this.emit('labelDragStart', edge);
         this.renderer.markDirty();
         return true;
       }
 
-      const insertControls = this.getInsertControls(edge);
-      for (const insertControl of insertControls) {
-        const dx = point.x - insertControl.point.x;
-        const dy = point.y - insertControl.point.y;
-        if (dx * dx + dy * dy > addRadiusSq) {
-          continue;
-        }
-
-        const materialized = edge.controlPoints
-          ? clonePoints(edge.controlPoints)
-          : clonePoints(controlPoints);
-        materialized.splice(insertControl.index, 0, this.snapPoint(insertControl.point));
-        edge.controlPoints = materialized;
-        this.activeControlPointDrag = { edge, index: insertControl.index };
-        this.emit('controlPointDragStart', edge, beforePoints);
-        this.renderer.markDirty();
+      // 4) Click on segment body → pending insert (committed after delay unless dblclick)
+      const hit = this.hitSegmentBody(edge, point);
+      if (hit) {
+        this.pendingSegmentInsert = {
+          edge,
+          segmentIndex: hit.segmentIndex,
+          point: this.snapPoint(hit.point),
+          startX: event.worldX,
+          startY: event.worldY,
+        };
         return true;
       }
     }
@@ -1250,47 +1375,377 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     return false;
   }
 
+  private clearPendingSegmentInsertTimer(): void {
+    if (this.pendingSegmentInsertTimer !== null) {
+      clearTimeout(this.pendingSegmentInsertTimer);
+      this.pendingSegmentInsertTimer = null;
+    }
+  }
+
+  /** Cancel deferred bend insert (e.g. when double-click opens the label editor). */
+  cancelPendingSegmentInsert(): void {
+    this.clearPendingSegmentInsertTimer();
+    this.pendingSegmentInsert = null;
+  }
+
+  private armPendingSegmentInsert(): void {
+    if (!this.pendingSegmentInsert) {
+      return;
+    }
+    this.clearPendingSegmentInsertTimer();
+    const snapshot = this.pendingSegmentInsert;
+    this.pendingSegmentInsert = null;
+    this.pendingSegmentInsertTimer = setTimeout(() => {
+      this.pendingSegmentInsertTimer = null;
+      this.commitSegmentInsert(snapshot.edge, snapshot.segmentIndex, snapshot.point);
+    }, EDGE_SEGMENT_INSERT_CLICK_DELAY_MS);
+  }
+
+  private commitSegmentInsert(edge: Edge, segmentIndex: number, at: Point): void {
+    if (!this.renderer.edges.has(edge.id) || edge.state !== 'selected') {
+      return;
+    }
+    this.beginInsertBend(edge, segmentIndex, at);
+    // Click-insert is not a drag — close the gesture for history/collab.
+    if (this.activeControlPointDrag) {
+      this.activeControlPointDrag = null;
+      this.emit('controlPointDragEnd');
+      this.renderer.markDirty();
+    }
+  }
+
+  private hitSelectedEdgeLabel(edge: Edge, point: Point): boolean {
+    if (!edge.label) {
+      return false;
+    }
+    const labelPosition = edge.getLabelPosition();
+    if (!labelPosition) {
+      return false;
+    }
+    const zoom = Math.max(this.renderer.zoom, 0.0001);
+    const maxDistance = 28 / zoom;
+    const dx = point.x - labelPosition.x;
+    const dy = point.y - labelPosition.y;
+    return dx * dx + dy * dy <= maxDistance * maxDistance;
+  }
+
+  private getRoutableVertices(edge: Edge): Point[] {
+    if (edge.isEditablePolyline()) {
+      return edge.getPathVertices();
+    }
+    if (edge.type === 'polyline') {
+      return edge.path.map((p) => ({ x: p.x, y: p.y }));
+    }
+    return [];
+  }
+
+  private beginSegmentDrag(edge: Edge, run: OrthogonalRun): boolean {
+    const beforeType = edge.type;
+    const beforePoints = edge.isEditablePolyline()
+      ? edge.controlPoints?.length
+        ? clonePoints(edge.controlPoints)
+        : clonePoints(edge.getEditableControlPoints())
+      : [];
+
+    if (edge.type === 'polyline') {
+      edge.type = 'editable-polyline';
+    }
+    if (!edge.isEditablePolyline()) {
+      return false;
+    }
+    if (!edge.controlPoints?.length) {
+      const cps = edge.getEditableControlPoints();
+      if (cps.length) {
+        edge.controlPoints = cps;
+      }
+    }
+
+    // Seed mid from the run the user hit (before collapse shifts indices).
+    const preCollapseVertices = edge.getPathVertices();
+    const seedMid = orthogonalRunMidpoint(preCollapseVertices, {
+      axis: run.axis,
+      startIndex: Math.min(run.startIndex, Math.max(0, preCollapseVertices.length - 2)),
+      endIndex: Math.min(
+        Math.max(run.endIndex, run.startIndex + 1),
+        Math.max(1, preCollapseVertices.length - 1)
+      ),
+    });
+
+    // Drop router exit-stub waypoints so they never show as bend handles.
+    if (edge.controlPoints?.length) {
+      const collapsed = collapseColinearPoints(preCollapseVertices);
+      const nextCps = collapsed.slice(1, -1);
+      if (nextCps.length !== edge.controlPoints.length) {
+        edge.controlPoints = nextCps;
+      }
+    }
+
+    const vertices = edge.getPathVertices();
+    const resolved =
+      resolveOrthogonalRun(vertices, run, seedMid) ?? {
+        axis: run.axis,
+        startIndex: Math.min(run.startIndex, Math.max(0, vertices.length - 2)),
+        endIndex: Math.min(
+          Math.max(run.endIndex, run.startIndex + 1),
+          Math.max(1, vertices.length - 1)
+        ),
+      };
+
+    this.activeSegmentDrag = {
+      edge,
+      run: resolved,
+      trackMidpoint: orthogonalRunMidpoint(vertices, resolved),
+    };
+    this.emit('controlPointDragStart', edge, beforePoints, beforeType);
+    this.renderer.markDirty();
+    return true;
+  }
+
+  private beginInsertBend(edge: Edge, segmentIndex: number, at: Point): boolean {
+    const beforeType = edge.type;
+    if (edge.type === 'polyline') {
+      edge.type = 'editable-polyline';
+    }
+    if (!edge.isEditablePolyline()) {
+      return false;
+    }
+
+    const controlPoints = edge.controlPoints?.length
+      ? clonePoints(edge.controlPoints)
+      : clonePoints(edge.getEditableControlPoints());
+    const beforePoints = clonePoints(controlPoints);
+
+    // Promote/collapse can shift vertex indices vs the click-time segmentIndex.
+    // Re-resolve against the current path and project onto that segment.
+    edge.controlPoints = controlPoints;
+    const vertices = edge.getPathVertices();
+    const resolved = this.resolveInsertSegment(vertices, at, segmentIndex);
+    const insertIndex = resolved?.segmentIndex ?? segmentIndex;
+    const insertAt = this.snapPoint(resolved?.point ?? at);
+    const clampedIndex = Math.max(0, Math.min(insertIndex, controlPoints.length));
+    controlPoints.splice(clampedIndex, 0, insertAt);
+    edge.controlPoints = controlPoints;
+    this.activeControlPointDrag = { edge, index: clampedIndex };
+    this.emit('controlPointDragStart', edge, beforePoints, beforeType);
+    this.renderer.markDirty();
+    return true;
+  }
+
+  /**
+   * Map a click to a segment index on the current vertices (cps insert index =
+   * vertex segment index). Prefers the closest segment to `at`; `hintIndex` is
+   * only a tie-break when distances are equal.
+   */
+  private resolveInsertSegment(
+    vertices: readonly Point[],
+    at: Point,
+    hintIndex: number
+  ): { segmentIndex: number; point: Point } | null {
+    if (vertices.length < 2) {
+      return null;
+    }
+    let best: { segmentIndex: number; point: Point; dist: number } | null = null;
+    for (let i = 0; i < vertices.length - 1; i++) {
+      const a = vertices[i]!;
+      const b = vertices[i + 1]!;
+      const point = this.closestPointOnSegment(at, a, b);
+      const dist = distance(at, point);
+      if (
+        !best ||
+        dist < best.dist - 1e-6 ||
+        (Math.abs(dist - best.dist) <= 1e-6 && i === hintIndex)
+      ) {
+        best = { segmentIndex: i, point, dist };
+      }
+    }
+    return best ? { segmentIndex: best.segmentIndex, point: best.point } : null;
+  }
+
+  /**
+   * Hit any path segment (orthogonal or diagonal) for bend insertion.
+   * Skips mid-handle hotspots of orthogonal runs (those are for segment drag).
+   */
+  private hitSegmentBody(
+    edge: Edge,
+    point: Point
+  ): { segmentIndex: number; point: Point } | null {
+    const vertices = this.getRoutableVertices(edge);
+    const tolerance = Math.max((edge.style.strokeWidth ?? 2) * 2, 8);
+    const segmentRadius = EDGE_ADD_CONTROL_RADIUS / Math.max(this.renderer.zoom, 0.0001);
+    const segmentRadiusSq = segmentRadius * segmentRadius;
+
+    for (const run of listOrthogonalRuns(vertices)) {
+      const mid = orthogonalRunMidpoint(vertices, run);
+      const mdx = point.x - mid.x;
+      const mdy = point.y - mid.y;
+      if (mdx * mdx + mdy * mdy <= segmentRadiusSq) {
+        return null;
+      }
+    }
+
+    let best: { segmentIndex: number; point: Point; dist: number } | null = null;
+    for (let i = 0; i < vertices.length - 1; i++) {
+      const a = vertices[i]!;
+      const b = vertices[i + 1]!;
+      const closest = this.closestPointOnSegment(point, a, b);
+      const dist = distance(point, closest);
+      if (dist > tolerance) {
+        continue;
+      }
+      if (!best || dist < best.dist) {
+        best = { segmentIndex: i, point: closest, dist };
+      }
+    }
+    return best ? { segmentIndex: best.segmentIndex, point: best.point } : null;
+  }
+
+  private closestPointOnSegment(point: Point, a: Point, b: Point): Point {
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const lenSq = dx * dx + dy * dy;
+    if (lenSq === 0) {
+      return { x: a.x, y: a.y };
+    }
+    let t = ((point.x - a.x) * dx + (point.y - a.y) * dy) / lenSq;
+    t = Math.max(0, Math.min(1, t));
+    return { x: a.x + t * dx, y: a.y + t * dy };
+  }
+
+  private applyLabelDrag(edge: Edge, pointer: Point): void {
+    const closest = edge.getClosestPointOnPath(pointer);
+    if (!closest) {
+      return;
+    }
+    edge.labelPosition = closest.pathParam;
+    const onPath = closest.point;
+    if (edge.labelFollowPath) {
+      const at = edge.getPointAt(closest.pathParam);
+      const tangent = at?.angle ?? 0;
+      const nx = Math.cos(tangent + Math.PI / 2);
+      const ny = Math.sin(tangent + Math.PI / 2);
+      edge.labelOffset = (pointer.x - onPath.x) * nx + (pointer.y - onPath.y) * ny;
+    } else {
+      // Default semantics: offset is world-vertical (see EdgeLabelRenderer).
+      edge.labelOffset = pointer.y - onPath.y;
+    }
+  }
+
   private renderEditablePolylineControls(ctx: CanvasRenderingContext2D): void {
     const pointRadius = EDGE_CONTROL_POINT_RADIUS / Math.max(this.renderer.zoom, 0.0001);
-    const addRadius = EDGE_ADD_CONTROL_RADIUS / Math.max(this.renderer.zoom, 0.0001);
+    const segmentRadius = EDGE_ADD_CONTROL_RADIUS / Math.max(this.renderer.zoom, 0.0001);
 
     ctx.save();
     ctx.setLineDash([]);
 
     for (const edge of this.renderer.edges.values()) {
-      if (edge.state !== 'selected' || !edge.isEditablePolyline()) {
+      if (edge.state !== 'selected') {
+        continue;
+      }
+      if (edge.type !== 'editable-polyline' && edge.type !== 'polyline') {
         continue;
       }
 
-      const controlPoints = edge.getEditableControlPoints();
-      const insertControls = this.getInsertControls(edge);
-      for (const insertControl of insertControls) {
-        this.drawAddControl(ctx, insertControl.point, addRadius);
+      const vertices = this.getRoutableVertices(edge);
+      for (const run of listOrthogonalRuns(vertices)) {
+        this.drawSegmentHandle(
+          ctx,
+          orthogonalRunMidpoint(vertices, run),
+          segmentRadius,
+          run.axis
+        );
+      }
+      for (let i = 0; i < vertices.length - 1; i++) {
+        const start = vertices[i]!;
+        const end = vertices[i + 1]!;
+        if (segmentAxis(start, end)) {
+          continue;
+        }
+        if (distance(start, end) <= segmentRadius * 4) {
+          continue;
+        }
+        this.drawInsertHandle(
+          ctx,
+          { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 },
+          segmentRadius
+        );
       }
 
-      for (const point of controlPoints) {
-        this.drawControlPoint(ctx, point, pointRadius);
+      if (edge.isEditablePolyline()) {
+        for (const point of edge.getEditableControlPoints()) {
+          this.drawControlPoint(ctx, point, pointRadius);
+        }
       }
     }
 
     ctx.restore();
   }
 
-  private getInsertControls(edge: Edge): { point: Point; index: number }[] {
-    const vertices = edge.getPathVertices();
-    const controls: { point: Point; index: number }[] = [];
-    for (let i = 0; i < vertices.length - 1; i++) {
-      const start = vertices[i]!;
-      const end = vertices[i + 1]!;
-      controls.push({
-        point: {
-          x: (start.x + end.x) / 2,
-          y: (start.y + end.y) / 2,
-        },
-        index: i,
-      });
+  private drawSegmentHandle(
+    ctx: CanvasRenderingContext2D,
+    point: Point,
+    radius: number,
+    axis: 'horizontal' | 'vertical'
+  ): void {
+    const zoom = Math.max(this.renderer.zoom, 0.0001);
+    const along = radius * 2;
+    const across = radius * 1.2;
+    const corner = Math.min(across * 0.45, 2.5 / zoom);
+    ctx.save();
+    ctx.translate(point.x, point.y);
+    // Elongate along the run: vertical edges get a 90° turn of the same capsule.
+    if (axis === 'vertical') {
+      ctx.rotate(Math.PI / 2);
     }
-    return controls;
+    this.pathRoundedRect(ctx, -along / 2, -across / 2, along, across, corner);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+    ctx.strokeStyle = '#3b82f6';
+    ctx.lineWidth = 1.5 / zoom;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  private pathRoundedRect(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    r: number
+  ): void {
+    const radius = Math.max(0, Math.min(r, w / 2, h / 2));
+    ctx.beginPath();
+    if (typeof ctx.roundRect === 'function') {
+      ctx.roundRect(x, y, w, h, radius);
+      return;
+    }
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + w - radius, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+    ctx.lineTo(x + w, y + h - radius);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+    ctx.lineTo(x + radius, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+    ctx.lineTo(x, y + radius);
+    ctx.quadraticCurveTo(x, y, x + radius, y);
+    ctx.closePath();
+  }
+
+  private drawInsertHandle(ctx: CanvasRenderingContext2D, point: Point, radius: number): void {
+    ctx.beginPath();
+    ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+    ctx.strokeStyle = '#3b82f6';
+    ctx.lineWidth = 1.5 / Math.max(this.renderer.zoom, 0.0001);
+    ctx.stroke();
+    const plusSize = radius * 0.7;
+    ctx.beginPath();
+    ctx.moveTo(point.x - plusSize, point.y);
+    ctx.lineTo(point.x + plusSize, point.y);
+    ctx.moveTo(point.x, point.y - plusSize);
+    ctx.lineTo(point.x, point.y + plusSize);
+    ctx.stroke();
   }
 
   private drawControlPoint(ctx: CanvasRenderingContext2D, point: Point, radius: number): void {
@@ -1300,26 +1755,6 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     ctx.fill();
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 2 / Math.max(this.renderer.zoom, 0.0001);
-    ctx.stroke();
-  }
-
-  private drawAddControl(ctx: CanvasRenderingContext2D, point: Point, radius: number): void {
-    ctx.beginPath();
-    ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
-    ctx.fillStyle = '#ffffff';
-    ctx.fill();
-    ctx.strokeStyle = '#3b82f6';
-    ctx.lineWidth = 1.5 / Math.max(this.renderer.zoom, 0.0001);
-    ctx.stroke();
-
-    const plusSize = radius * 0.7;
-    ctx.beginPath();
-    ctx.moveTo(point.x - plusSize, point.y);
-    ctx.lineTo(point.x + plusSize, point.y);
-    ctx.moveTo(point.x, point.y - plusSize);
-    ctx.lineTo(point.x, point.y + plusSize);
-    ctx.strokeStyle = '#3b82f6';
-    ctx.lineWidth = 1.5 / Math.max(this.renderer.zoom, 0.0001);
     ctx.stroke();
   }
 
@@ -1558,6 +1993,11 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     if (!this.attachToOutline) {
       return null;
     }
+    // Keep the selected edge's endpoint circle as the affordance — the outline "+"
+    // would cover the same hotspot and steal the hover.
+    if (this.isNearSelectedEdgeEndpoint(point)) {
+      return null;
+    }
     const radiusSq = this.outlineHandleHitRadius() ** 2;
     const nodes = Array.from(this.renderer.nodes.values());
     for (let i = nodes.length - 1; i >= 0; i--) {
@@ -1576,6 +2016,23 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
       }
     }
     return null;
+  }
+
+  /** True when the pointer is on a selected edge's start/end reconnect handle. */
+  private isNearSelectedEdgeEndpoint(point: Point): boolean {
+    const handleRadius = EDGE_HANDLE_RADIUS / Math.max(this.renderer.zoom, 0.0001);
+    for (const edge of this.renderer.edges.values()) {
+      if (edge.state !== 'selected') {
+        continue;
+      }
+      if (
+        edge.hitTestStartHandle(point, handleRadius) ||
+        edge.hitTestEndHandle(point, handleRadius)
+      ) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private renderOutlineConnectHandle(ctx: CanvasRenderingContext2D): void {
@@ -1629,8 +2086,13 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
       this.clearOutlineHandleCursor();
     } else {
       this.hoverNodeId = node.id;
-      this.hoverAnchorId = handleHit ? null : (this.getAnchorAtPoint(node, point)?.id ?? null);
-      this.hoverOutlineHandle = handleHit !== null;
+      // Port-mode "+" on an anchor that coincides with a selected edge end is the same clash.
+      const nearSelectedEndpoint = this.isNearSelectedEdgeEndpoint(point);
+      this.hoverAnchorId =
+        handleHit || nearSelectedEndpoint
+          ? null
+          : (this.getAnchorAtPoint(node, point)?.id ?? null);
+      this.hoverOutlineHandle = handleHit !== null && !nearSelectedEndpoint;
       if (this.attachToOutline) {
         this.hoverOutlineSide = this.outlineConnectHandleFor(node, point).side;
       }

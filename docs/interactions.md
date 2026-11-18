@@ -126,13 +126,20 @@ interactions.connection.setAttachToOutline(true);  // привязка стре�
 
 При срабатывании выравнивания отображаются направляющие линии (вертикальная/горизонтальная).
 
-### Редактируемая полилиния (`editable-polyline`)
+### Полилиния и редактируемая полилиния (`polyline` / `editable-polyline`)
 
-Для ребра с `type: 'editable-polyline'` доступны интерактивные точки перелома:
+У выделенной связи:
 
-- drag синей точки — перемещение перелома;
-- click по маленькому `+` на сегменте — добавить новый перелом;
-- double-click по синей точке — удалить перелом.
+- hit-test: сначала ручки концов (переподключение / сдвиг по контуру), затем изломы, mid-handle, метка, тело сегмента;
+- mid-segment handle — сдвиг **ортогонального** сегмента по перпендикуляру (для крайних сегментов при необходимости вставляются изломы; якорь на узле не отрывается); у наклонных сегментов mid-handle нет;
+- на авто-`polyline` первый такой жест переводит тип в `editable-polyline` с сохранением текущих изломов;
+- drag синей точки — перемещение перелома (`editable-polyline`);
+- одиночный клик по линии сегмента (в т.ч. наклонного; не по mid-handle у H/V) — вставить излом (с короткой задержкой, чтобы double-click успел открыть метку);
+- double-click по синей точке — удалить перелом;
+- drag метки — `labelPosition` / `labelOffset`; **двойной клик по линии или метке** — inline-редактор текста (без нового излома).
+- при **снятии выделения** с `editable-polyline` лишние изломы на прямых H/V (колинеарные) удаляются; реальные углы сохраняются (undo через history).
+
+Углы `polyline` / `editable-polyline` рисуются со скруглением (`EDGE_BEND_RADIUS` = 3 world px); hit-test и геометрия вершин остаются острыми.
 
 Дополнительно:
 
@@ -140,14 +147,18 @@ interactions.connection.setAttachToOutline(true);  // привязка стре�
 - при drag точки работают осевые магниты (к вертикали/горизонтали соседних сегментов);
 - при drag узла ближайшая ортогональная точка перелома может сопровождать движение для сохранения геометрии.
 
-Undo/redo для правок контрольных точек выполняется через `ChangeEditablePolylineControlPointsCommand` (добавляется в `history` автоматически при интерактивном drag; можно использовать вручную при программных изменениях).
+Undo/redo для правок контрольных точек выполняется через `ChangeEditablePolylineControlPointsCommand` (добавляется в `history` автоматически при интерактивном drag; можно использовать вручную при программных изменениях). Сдвиг метки — через `ChangeEdgeLabelLayoutCommand`.
 
 ### События `ConnectionManager`
 
-При перетаскивании контрольных точек polyline/bezier (в т.ч. `editable-polyline`):
+При перетаскивании контрольных точек / сегментов (`editable-polyline`, в т.ч. после promote):
 
-- `controlPointDragStart` — начало drag точки;
+- `controlPointDragStart` — начало жеста (передаёт снимок точек и исходный `type`);
 - `controlPointDragEnd` — завершение (отпускание или отмена).
+
+При перетаскивании метки:
+
+- `labelDragStart` / `labelDragEnd`.
 
 Удобно для live sync и совместного редактирования в host-приложении:
 
@@ -156,6 +167,12 @@ interactions.connection.on('controlPointDragStart', () => {
   // pause remote updates
 });
 interactions.connection.on('controlPointDragEnd', () => {
+  // commit + resume sync
+});
+interactions.connection.on('labelDragStart', () => {
+  // pause remote updates
+});
+interactions.connection.on('labelDragEnd', () => {
   // commit + resume sync
 });
 ```

@@ -3,6 +3,7 @@ import { DiagramRenderer } from './DiagramRenderer';
 import { RectangleNode } from '../elements/nodes/RectangleNode';
 import { DiamondNode } from '../elements/nodes/DiamondNode';
 import { Edge } from '../elements/Edge';
+import { EDGE_SEGMENT_INSERT_CLICK_DELAY_MS } from '../constants';
 import { stubCanvasContext, stubAnimationFrame } from '../test/testUtils';
 
 describe('ConnectionManager', () => {
@@ -216,6 +217,46 @@ describe('ConnectionManager', () => {
     expect(interaction.connection.connecting).toBe(true);
   });
 
+  it('does not show the outline + over a selected edge endpoint handle', () => {
+    const canvas = createCanvas(400, 200);
+    const renderer = new DiagramRenderer(canvas, { width: 400, height: 200, retina: false });
+    const interaction = renderer.enableInteractions({
+      attachToOutline: true,
+      createEdge: (from, to) => new Edge({ from, to, type: 'polyline' }),
+    });
+
+    const nodeA = new RectangleNode({ x: 50, y: 80, width: 60, height: 40 });
+    const nodeB = new RectangleNode({ x: 250, y: 80, width: 60, height: 40 });
+    renderer.addNode(nodeA);
+    renderer.addNode(nodeB);
+
+    const edge = new Edge({
+      from: { nodeId: nodeA.id, portId: 'anchor:right:0' },
+      to: { nodeId: nodeB.id, portId: 'anchor:left:0' },
+      type: 'polyline',
+    });
+    renderer.addEdge(edge);
+    renderer.render();
+    interaction.selection.select(edge.id);
+
+    const drawPlus = vi.spyOn(
+      interaction.connection as unknown as { drawPlus: (...args: unknown[]) => void },
+      'drawPlus'
+    );
+
+    const handle = { ...edge.startPoint };
+    canvas.dispatchEvent(
+      new MouseEvent('mousemove', {
+        clientX: handle.x,
+        clientY: handle.y,
+        bubbles: true,
+      })
+    );
+    renderer.render();
+
+    expect(drawPlus).not.toHaveBeenCalled();
+  });
+
   it('shows resize cursor instead of outline handle on a selected node resize corner', () => {
     const canvas = createCanvas(400, 200);
     const renderer = new DiagramRenderer(canvas, { width: 400, height: 200, retina: false });
@@ -324,6 +365,98 @@ describe('ConnectionManager', () => {
     );
 
     expect(interaction.connection.reconnecting).toBe(true);
+  });
+
+  it('prefers endpoint reconnect over a nearby first-segment mid-handle', () => {
+    const canvas = createCanvas(500, 300);
+    const renderer = new DiagramRenderer(canvas, { width: 500, height: 300, retina: false });
+    const interaction = renderer.enableInteractions({ attachToOutline: true });
+
+    const nodeA = new RectangleNode({ x: 40, y: 40, width: 80, height: 40 });
+    const nodeB = new RectangleNode({ x: 280, y: 200, width: 100, height: 40 });
+    renderer.addNode(nodeA);
+    renderer.addNode(nodeB);
+
+    // Short first horizontal: mid-handle sits close to the start endpoint.
+    const edge = new Edge({
+      from: { nodeId: nodeA.id },
+      to: { nodeId: nodeB.id },
+      type: 'editable-polyline',
+      controlPoints: [
+        { x: 140, y: 60 },
+        { x: 140, y: 220 },
+      ],
+    });
+    renderer.addEdge(edge);
+    edge.updateEndpoints({ x: 120, y: 60 }, { x: 280, y: 220 });
+    interaction.selection.select(edge.id);
+
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', {
+        clientX: 120,
+        clientY: 60,
+        button: 0,
+        bubbles: true,
+      })
+    );
+
+    expect(interaction.connection.reconnecting).toBe(true);
+    expect(interaction.connection.reconnectingEdgeId).toBe(edge.id);
+  });
+
+  it('reconnects a polyline endpoint even when a mid-handle is near the start', () => {
+    const canvas = createCanvas(500, 300);
+    const renderer = new DiagramRenderer(canvas, { width: 500, height: 300, retina: false });
+    const interaction = renderer.enableInteractions({ attachToOutline: true });
+
+    const nodeA = new RectangleNode({ x: 40, y: 80, width: 80, height: 60 });
+    const nodeB = new RectangleNode({ x: 280, y: 80, width: 80, height: 60 });
+    renderer.addNode(nodeA);
+    renderer.addNode(nodeB);
+
+    const edge = new Edge({
+      from: { nodeId: nodeA.id, portId: 'anchor:right:0' },
+      to: { nodeId: nodeB.id, portId: 'anchor:left:0' },
+      type: 'polyline',
+    });
+    renderer.addEdge(edge);
+    renderer.render();
+    interaction.selection.select(edge.id);
+
+    const handle = { ...edge.startPoint };
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', {
+        clientX: handle.x,
+        clientY: handle.y,
+        button: 0,
+        bubbles: true,
+      })
+    );
+
+    expect(interaction.connection.reconnecting).toBe(true);
+
+    const slideTo = nodeA.getClosestPointOnOutline({ x: 120, y: 82 });
+    canvas.dispatchEvent(
+      new MouseEvent('mousemove', {
+        clientX: slideTo.point.x,
+        clientY: slideTo.point.y,
+        button: 0,
+        buttons: 1,
+        bubbles: true,
+      })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mouseup', {
+        clientX: slideTo.point.x,
+        clientY: slideTo.point.y,
+        button: 0,
+        bubbles: true,
+      })
+    );
+    renderer.render();
+
+    expect(edge.from.portId).toBeUndefined();
+    expect(edge.from.outlineParam).toBeDefined();
   });
 
   it('keeps a start point slid along the outline when anchors are locked', () => {
@@ -2031,5 +2164,387 @@ describe('ConnectionManager', () => {
     );
     renderer.render();
     expect(ctx.bezierCurveTo).toHaveBeenCalled();
+  });
+
+  it('moves an orthogonal mid-segment of editable-polyline', () => {
+    const canvas = createCanvas(500, 300);
+    const renderer = new DiagramRenderer(canvas, { width: 500, height: 300, retina: false });
+    renderer.enableInteractions({
+      createEdge: (from, to) => new Edge({ from, to, type: 'editable-polyline' }),
+    });
+
+    const source = new RectangleNode({ x: 40, y: 100, width: 80, height: 40 });
+    const target = new RectangleNode({ x: 320, y: 180, width: 80, height: 40 });
+    renderer.addNode(source);
+    renderer.addNode(target);
+
+    const edge = new Edge({
+      from: { nodeId: source.id },
+      to: { nodeId: target.id },
+      type: 'editable-polyline',
+      controlPoints: [
+        { x: 200, y: 120 },
+        { x: 200, y: 200 },
+      ],
+    });
+    renderer.addEdge(edge);
+    edge.updateEndpoints({ x: 120, y: 120 }, { x: 320, y: 200 });
+    edge.state = 'selected';
+
+    const mid = { x: 200, y: 160 };
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', {
+        clientX: mid.x,
+        clientY: mid.y,
+        button: 0,
+        bubbles: true,
+      })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mousemove', {
+        clientX: mid.x + 40,
+        clientY: mid.y,
+        button: 0,
+        buttons: 1,
+        bubbles: true,
+      })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mouseup', {
+        clientX: mid.x + 40,
+        clientY: mid.y,
+        button: 0,
+        bubbles: true,
+      })
+    );
+
+    expect(edge.controlPoints?.every((p) => Math.abs(p.x - 240) < 1)).toBe(true);
+  });
+
+  it('inserts a bend when clicking a diagonal segment', () => {
+    vi.useFakeTimers();
+    const canvas = createCanvas(500, 300);
+    const renderer = new DiagramRenderer(canvas, { width: 500, height: 300, retina: false });
+    renderer.enableInteractions({
+      createEdge: (from, to) => new Edge({ from, to, type: 'editable-polyline' }),
+    });
+
+    const source = new RectangleNode({ x: 40, y: 40, width: 60, height: 40 });
+    const target = new RectangleNode({ x: 300, y: 200, width: 60, height: 40 });
+    renderer.addNode(source);
+    renderer.addNode(target);
+
+    const edge = new Edge({
+      from: { nodeId: source.id },
+      to: { nodeId: target.id },
+      type: 'editable-polyline',
+      controlPoints: [{ x: 200, y: 80 }],
+    });
+    renderer.addEdge(edge);
+    edge.updateEndpoints({ x: 100, y: 60 }, { x: 300, y: 220 });
+    edge.controlPoints = [{ x: 180, y: 200 }];
+    edge.updateEndpoints({ x: 100, y: 60 }, { x: 300, y: 60 });
+    edge.state = 'selected';
+
+    const beforeCount = edge.controlPoints?.length ?? 0;
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', {
+        clientX: 140,
+        clientY: 130,
+        button: 0,
+        bubbles: true,
+      })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mouseup', {
+        clientX: 140,
+        clientY: 130,
+        button: 0,
+        bubbles: true,
+      })
+    );
+    expect(edge.controlPoints?.length ?? 0).toBe(beforeCount);
+    vi.advanceTimersByTime(EDGE_SEGMENT_INSERT_CLICK_DELAY_MS + 1);
+    expect(edge.controlPoints?.length ?? 0).toBe(beforeCount + 1);
+    vi.useRealTimers();
+  });
+
+  it('inserts a bend when clicking the segment body away from the mid-handle', () => {
+    vi.useFakeTimers();
+    const canvas = createCanvas(500, 300);
+    const renderer = new DiagramRenderer(canvas, { width: 500, height: 300, retina: false });
+    renderer.enableInteractions({
+      createEdge: (from, to) => new Edge({ from, to, type: 'editable-polyline' }),
+    });
+
+    const source = new RectangleNode({ x: 40, y: 100, width: 80, height: 40 });
+    const target = new RectangleNode({ x: 320, y: 100, width: 80, height: 40 });
+    renderer.addNode(source);
+    renderer.addNode(target);
+
+    const edge = new Edge({
+      from: { nodeId: source.id },
+      to: { nodeId: target.id },
+      type: 'editable-polyline',
+      controlPoints: [
+        { x: 200, y: 120 },
+        { x: 200, y: 200 },
+      ],
+    });
+    renderer.addEdge(edge);
+    edge.updateEndpoints({ x: 120, y: 120 }, { x: 320, y: 200 });
+    edge.state = 'selected';
+
+    const beforeCount = edge.controlPoints?.length ?? 0;
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', {
+        clientX: 200,
+        clientY: 140,
+        button: 0,
+        bubbles: true,
+      })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mouseup', {
+        clientX: 200,
+        clientY: 140,
+        button: 0,
+        bubbles: true,
+      })
+    );
+    expect(edge.controlPoints?.length ?? 0).toBe(beforeCount);
+    vi.advanceTimersByTime(EDGE_SEGMENT_INSERT_CLICK_DELAY_MS + 1);
+    expect(edge.controlPoints?.length ?? 0).toBe(beforeCount + 1);
+    vi.useRealTimers();
+  });
+
+  it('inserts a bend on the vertical between corners, not past the bottom corner', () => {
+    vi.useFakeTimers();
+    const canvas = createCanvas(500, 300);
+    const renderer = new DiagramRenderer(canvas, { width: 500, height: 300, retina: false });
+    renderer.enableInteractions({
+      createEdge: (from, to) => new Edge({ from, to, type: 'polyline' }),
+    });
+
+    const source = new RectangleNode({ x: 40, y: 40, width: 80, height: 40 });
+    const target = new RectangleNode({ x: 280, y: 200, width: 100, height: 40 });
+    renderer.addNode(source);
+    renderer.addNode(target);
+
+    // Path with an exit stub so promote collapses indices vs the click segmentIndex.
+    const edge = new Edge({
+      from: { nodeId: source.id },
+      to: { nodeId: target.id },
+      type: 'polyline',
+    });
+    renderer.addEdge(edge);
+    edge.updateEndpoints({ x: 120, y: 60 }, { x: 280, y: 220 });
+    // Force a stubbed orthogonal path like the router (indices shift on promote).
+    (edge as unknown as { _path: { x: number; y: number }[] })._path = [
+      { x: 120, y: 60 },
+      { x: 152, y: 60 },
+      { x: 180, y: 60 },
+      { x: 180, y: 220 },
+      { x: 280, y: 220 },
+    ];
+    edge.state = 'selected';
+
+    // Click on the vertical below its mid-handle (mid of 180,60→180,220 is y=140; click y=180).
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', {
+        clientX: 180,
+        clientY: 180,
+        button: 0,
+        bubbles: true,
+      })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mouseup', {
+        clientX: 180,
+        clientY: 180,
+        button: 0,
+        bubbles: true,
+      })
+    );
+    vi.advanceTimersByTime(EDGE_SEGMENT_INSERT_CLICK_DELAY_MS + 1);
+
+    expect(edge.type).toBe('editable-polyline');
+    const verts = edge.getPathVertices();
+    // New bend must sit on the vertical between the two corners — not after the bottom corner.
+    const onVertical = edge.controlPoints!.filter(
+      (p) => Math.abs(p.x - 180) < 1 && p.y > 60 + 1 && p.y < 220 - 1
+    );
+    expect(onVertical.length).toBeGreaterThanOrEqual(1);
+    expect(verts[verts.length - 2]!.y).not.toBeCloseTo(180, 0);
+    // No backtrack spur: y should be monotonic along the vertical run.
+    const verticalXs = verts.filter((p) => Math.abs(p.x - 180) < 1);
+    const ys = verticalXs.map((p) => p.y);
+    for (let i = 1; i < ys.length; i++) {
+      expect(ys[i]!).toBeGreaterThan(ys[i - 1]!);
+    }
+    vi.useRealTimers();
+  });
+
+  it('does not insert a bend when double-clicking a segment to edit the label', () => {
+    vi.useFakeTimers();
+    const canvas = createCanvas(500, 300);
+    const renderer = new DiagramRenderer(canvas, { width: 500, height: 300, retina: false });
+    const interaction = renderer.enableInteractions({
+      createEdge: (from, to) => new Edge({ from, to, type: 'editable-polyline' }),
+    });
+
+    const source = new RectangleNode({ x: 40, y: 100, width: 80, height: 40 });
+    const target = new RectangleNode({ x: 320, y: 100, width: 80, height: 40 });
+    renderer.addNode(source);
+    renderer.addNode(target);
+
+    const edge = new Edge({
+      from: { nodeId: source.id },
+      to: { nodeId: target.id },
+      type: 'editable-polyline',
+      controlPoints: [
+        { x: 200, y: 120 },
+        { x: 200, y: 200 },
+      ],
+      label: 'Link',
+    });
+    renderer.addEdge(edge);
+    edge.updateEndpoints({ x: 120, y: 120 }, { x: 320, y: 200 });
+    edge.state = 'selected';
+
+    const beforeCount = edge.controlPoints?.length ?? 0;
+    const x = 200;
+    const y = 140;
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', { clientX: x, clientY: y, button: 0, bubbles: true, detail: 1 })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mouseup', { clientX: x, clientY: y, button: 0, bubbles: true, detail: 1 })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', { clientX: x, clientY: y, button: 0, bubbles: true, detail: 2 })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mouseup', { clientX: x, clientY: y, button: 0, bubbles: true, detail: 2 })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('dblclick', { clientX: x, clientY: y, button: 0, bubbles: true, detail: 2 })
+    );
+    interaction.connection.cancelPendingSegmentInsert();
+    vi.advanceTimersByTime(EDGE_SEGMENT_INSERT_CLICK_DELAY_MS + 1);
+    expect(edge.controlPoints?.length ?? 0).toBe(beforeCount);
+    vi.useRealTimers();
+  });
+
+  it('does not leave a bend on the upper horizontal when dragging past a router exit stub', () => {
+    const canvas = createCanvas(500, 300);
+    const renderer = new DiagramRenderer(canvas, { width: 500, height: 300, retina: false });
+    renderer.enableInteractions({
+      createEdge: (from, to) => new Edge({ from, to, type: 'editable-polyline' }),
+    });
+
+    const source = new RectangleNode({ x: 40, y: 40, width: 80, height: 40 });
+    const target = new RectangleNode({ x: 280, y: 200, width: 100, height: 40 });
+    renderer.addNode(source);
+    renderer.addNode(target);
+
+    // Upper H has a colinear router exit stub at x=152 — must disappear when V moves past it.
+    const edge = new Edge({
+      from: { nodeId: source.id },
+      to: { nodeId: target.id },
+      type: 'editable-polyline',
+      controlPoints: [
+        { x: 152, y: 60 },
+        { x: 180, y: 60 },
+        { x: 180, y: 220 },
+      ],
+    });
+    renderer.addEdge(edge);
+    edge.updateEndpoints({ x: 120, y: 60 }, { x: 280, y: 220 });
+    edge.state = 'selected';
+
+    const vMid = { x: 180, y: 140 };
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', {
+        clientX: vMid.x,
+        clientY: vMid.y,
+        button: 0,
+        bubbles: true,
+      })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mousemove', {
+        clientX: 100,
+        clientY: vMid.y,
+        button: 0,
+        buttons: 1,
+        bubbles: true,
+      })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mouseup', {
+        clientX: 100,
+        clientY: vMid.y,
+        button: 0,
+        bubbles: true,
+      })
+    );
+
+    expect(edge.controlPoints).toEqual([
+      { x: 100, y: 60 },
+      { x: 100, y: 220 },
+    ]);
+    const verts = edge.getPathVertices();
+    expect(verts.filter((p) => Math.abs(p.y - 60) < 1)).toHaveLength(2);
+  });
+
+  it('promotes auto-polyline on first segment-handle drag', () => {
+    const canvas = createCanvas(500, 300);
+    const renderer = new DiagramRenderer(canvas, { width: 500, height: 300, retina: false });
+    renderer.enableInteractions({
+      createEdge: (from, to) => new Edge({ from, to, type: 'polyline' }),
+    });
+
+    const source = new RectangleNode({ x: 40, y: 40, width: 60, height: 40 });
+    const target = new RectangleNode({ x: 300, y: 200, width: 60, height: 40 });
+    renderer.addNode(source);
+    renderer.addNode(target);
+
+    const edge = new Edge({
+      from: { nodeId: source.id },
+      to: { nodeId: target.id },
+      type: 'polyline',
+    });
+    renderer.addEdge(edge);
+    edge.updateEndpoints(
+      source.getConnectionPoint({ x: 300, y: 200 }),
+      target.getConnectionPoint({ x: 40, y: 40 })
+    );
+    expect(edge.type).toBe('polyline');
+    expect(edge.path.length).toBeGreaterThanOrEqual(3);
+    edge.state = 'selected';
+
+    // Midpoint of first orthogonal segment
+    const a = edge.path[0]!;
+    const b = edge.path[1]!;
+    const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', {
+        clientX: Math.round(mid.x),
+        clientY: Math.round(mid.y),
+        button: 0,
+        bubbles: true,
+      })
+    );
+    expect(edge.type).toBe('editable-polyline');
+    canvas.dispatchEvent(
+      new MouseEvent('mouseup', {
+        clientX: Math.round(mid.x),
+        clientY: Math.round(mid.y),
+        button: 0,
+        bubbles: true,
+      })
+    );
   });
 });
