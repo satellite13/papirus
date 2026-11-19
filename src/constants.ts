@@ -6,6 +6,8 @@
 export const EDGE_HANDLE_RADIUS = 6;
 export const EDGE_CONTROL_POINT_RADIUS = 6;
 export const EDGE_ADD_CONTROL_RADIUS = 4;
+/** Visual fillet radius (world px) for polyline / editable-polyline corners */
+export const EDGE_BEND_RADIUS = 3;
 export const ARROW_SIZE = 10;
 export const ARROW_ANGLE = Math.PI / 6; // 30 degrees
 
@@ -18,6 +20,12 @@ export const MARKER_SIZES: Record<string, number> = {
   circle: 6,
   square: 6,
 };
+
+// Perpendicular approach stub before the edge end (routing)
+export const END_STUB_EXTRA = 4;
+export const END_STUB_MIN = 12;
+export const END_STUB_FACING_START_MIN = 8;
+export const DEFAULT_END_STUB = (MARKER_SIZES.arrow ?? ARROW_SIZE) + END_STUB_EXTRA;
 
 // Edge label
 export const EDGE_LABEL_BACKGROUND_RADIUS = 2;
@@ -63,3 +71,5 @@ export const ALIGNMENT_SCREEN_TOLERANCE = 8;
 export const EDITABLE_POLYLINE_ORTHOGONAL_TOLERANCE = 6;
 /** Screen tolerance for axis magnet when dragging editable polyline control points */
 export const EDGE_AXIS_MAGNET_SCREEN_TOLERANCE = 10;
+/** Delay before committing a segment-body click as bend insert (lets dblclick edit the label). */
+export const EDGE_SEGMENT_INSERT_CLICK_DELAY_MS = 280;

@@ -22,8 +22,19 @@ import {
   PolylinePathStrategy,
   BezierPathStrategy,
 } from './paths';
-import { EDGE_HANDLE_RADIUS, DEFAULT_SELECTION_COLOR, DEFAULT_HOVER_COLOR } from '@/constants';
-import { getCanvasMarkerLength, renderEdgeMarkers } from './edge/EdgeMarkerRenderer';
+import {
+  EDGE_HANDLE_RADIUS,
+  EDGE_BEND_RADIUS,
+  DEFAULT_SELECTION_COLOR,
+  DEFAULT_HOVER_COLOR,
+} from '@/constants';
+import { traceRoundedPolyline } from '@/utils/roundedPolyline';
+import { collapseColinearPoints } from '@/utils/orthogonalSegmentDrag';
+import {
+  getCanvasMarkerLength,
+  renderEdgeMarkers,
+  resolveEndStubLength,
+} from './edge/EdgeMarkerRenderer';
 import {
   getEdgeLabelPosition,
   getEdgeLabelRotation,
@@ -62,6 +73,17 @@ const DEFAULT_EDGE_STYLE: EdgeStyle = {
 };
 
 /** Compare path options that affect polyline routing (not control-point identity). */
+/** Interior vertices of a routed polyline, without the two endpoints. */
+function interiorBendPoints(path: readonly Point[]): Point[] {
+  if (path.length < 3) {
+    return [];
+  }
+  // Drop duplicates and colinear router stubs so promote does not paint
+  // extra bend handles on a straight H/V section.
+  const collapsed = collapseColinearPoints(path);
+  return collapsed.slice(1, -1).map((point) => ({ x: point.x, y: point.y }));
+}
+
 function routingOptionsEqual(
   a: PathStrategyOptions | undefined,
   b: PathStrategyOptions | undefined
@@ -203,11 +225,26 @@ export class Edge extends Element {
 
   set type(value: EdgePathType) {
     if (this._type !== value) {
+      const previousType = this._type;
+      const previousPath = this._path.map((point) => ({ x: point.x, y: point.y }));
       this._type = value;
       this._pathStrategy = this.getPathStrategy(value);
       if (value !== 'editable-polyline' && this._controlPoints?.length) {
         // Clears control points and recalculates via the controlPoints setter.
         this.controlPoints = undefined;
+      } else if (
+        value === 'editable-polyline' &&
+        previousType === 'polyline' &&
+        !this._controlPoints?.length
+      ) {
+        // Keep the bends the user already sees. An empty editable polyline would
+        // collapse the route to a single midpoint and then snap back on the next sync.
+        const bends = interiorBendPoints(previousPath);
+        if (bends.length > 0) {
+          this.controlPoints = bends;
+        } else {
+          this.recalculatePath();
+        }
       } else {
         // Strategy changed (e.g. bezier → straight): rebuild path immediately so
         // render does not keep drawing the previous multi-point curve as a polyline.
@@ -225,8 +262,9 @@ export class Edge extends Element {
 
   set arrowType(value: ArrowType) {
     if (this._arrowType !== value) {
-      this._arrowType = value;
-      this.markDirty();
+      this.updateMarkers(() => {
+        this._arrowType = value;
+      });
     }
   }
 
@@ -238,8 +276,9 @@ export class Edge extends Element {
   }
 
   set startMarker(value: ArrowMarkerConfig | undefined) {
-    this._startMarker = value;
-    this.markDirty();
+    this.updateMarkers(() => {
+      this._startMarker = value;
+    });
   }
 
   /**
@@ -250,8 +289,27 @@ export class Edge extends Element {
   }
 
   set endMarker(value: ArrowMarkerConfig | undefined) {
-    this._endMarker = value;
+    this.updateMarkers(() => {
+      this._endMarker = value;
+    });
+  }
+
+  /** Markers feed routing only through the end stub; hosts reassign them on every sync. */
+  private updateMarkers(assign: () => void): void {
+    const before = this.endStubLength();
+    assign();
+    if (this.endStubLength() !== before) {
+      this.recalculatePath();
+    }
     this.markDirty();
+  }
+
+  private endStubLength(): number {
+    return resolveEndStubLength({
+      startMarker: this._startMarker,
+      endMarker: this._endMarker,
+      arrowType: this._arrowType,
+    });
   }
 
   /**
@@ -556,6 +614,7 @@ export class Edge extends Element {
         controlPoints: this._controlPoints,
         editablePolyline: this.isEditablePolyline(),
         selfLoop: this._from.nodeId === this._to.nodeId,
+        endStubLength: this.endStubLength(),
       }
     );
     if (
@@ -683,6 +742,27 @@ export class Edge extends Element {
     ctx.fill();
     ctx.strokeStyle = DEFAULT_SELECTION_COLOR;
     ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
+  /** True when corners should be visually filleted (hit geometry stays sharp). */
+  private usesBendRadius(): boolean {
+    return this._type === 'polyline' || this._type === 'editable-polyline';
+  }
+
+  private strokePolyline(ctx: CanvasRenderingContext2D, points: readonly Point[]): void {
+    if (points.length < 2) {
+      return;
+    }
+    ctx.beginPath();
+    if (this.usesBendRadius()) {
+      traceRoundedPolyline(points, EDGE_BEND_RADIUS, ctx);
+    } else {
+      ctx.moveTo(points[0]!.x, points[0]!.y);
+      for (let i = 1; i < points.length; i++) {
+        ctx.lineTo(points[i]!.x, points[i]!.y);
+      }
+    }
     ctx.stroke();
   }
 
@@ -863,24 +943,24 @@ export class Edge extends Element {
         y: end.y - endOffset * Math.sin(endAngle),
       };
 
-      ctx.beginPath();
-      ctx.moveTo(shortenedStart.x, shortenedStart.y);
-
       if (this._type === 'bezier' && path.length >= 4) {
+        ctx.beginPath();
+        ctx.moveTo(shortenedStart.x, shortenedStart.y);
         for (let i = 1; i + 2 < path.length; i += 3) {
           const cp1 = path[i]!;
           const cp2 = path[i + 1]!;
           const segmentEnd = i + 2 === path.length - 1 ? shortenedEnd : path[i + 2]!;
           ctx.bezierCurveTo(cp1.x, cp1.y, cp2.x, cp2.y, segmentEnd.x, segmentEnd.y);
         }
+        ctx.stroke();
       } else {
+        const sharp: Point[] = [shortenedStart];
         for (let i = 1; i < path.length - 1; i++) {
-          ctx.lineTo(path[i]!.x, path[i]!.y);
+          sharp.push(path[i]!);
         }
-        ctx.lineTo(shortenedEnd.x, shortenedEnd.y);
+        sharp.push(shortenedEnd);
+        this.strokePolyline(ctx, sharp);
       }
-
-      ctx.stroke();
       return;
     }
 
@@ -937,12 +1017,7 @@ export class Edge extends Element {
 
     if (segmentIntersections.length < 2) {
       // No meaningful intersection with label rect: draw as single polyline
-      ctx.beginPath();
-      ctx.moveTo(polyline[0]!.x, polyline[0]!.y);
-      for (let i = 1; i < polyline.length; i++) {
-        ctx.lineTo(polyline[i]!.x, polyline[i]!.y);
-      }
-      ctx.stroke();
+      this.strokePolyline(ctx, polyline);
       return;
     }
 
@@ -953,50 +1028,57 @@ export class Edge extends Element {
       return a.segIndex - b.segIndex;
     });
 
-    ctx.beginPath();
-    ctx.moveTo(polyline[0]!.x, polyline[0]!.y);
-
+    const pieces: Point[][] = [];
+    let currentPiece: Point[] = [{ x: polyline[0]!.x, y: polyline[0]!.y }];
     let entered = false;
     let exited = false;
 
+    const flushPiece = (): void => {
+      if (currentPiece.length >= 2) {
+        pieces.push(currentPiece);
+      }
+      currentPiece = [];
+    };
+
     for (let i = 0; i < polyline.length - 1; i++) {
       const p1 = polyline[i + 1]!;
-
       const currentIntersections = segmentIntersections.filter((it) => it.segIndex === i);
 
       if (!entered && currentIntersections.length > 0) {
-        // First time we meet an intersection: entry into label rect
         const first = currentIntersections[0]!;
-        ctx.lineTo(first.point.x, first.point.y);
+        currentPiece.push({ x: first.point.x, y: first.point.y });
+        flushPiece();
         entered = true;
 
         const maybeExit = currentIntersections.length > 1 ? currentIntersections[1]! : undefined;
         if (maybeExit) {
-          // Enter and exit on the same segment
-          ctx.moveTo(maybeExit.point.x, maybeExit.point.y);
+          currentPiece = [{ x: maybeExit.point.x, y: maybeExit.point.y }];
           exited = true;
-          // Draw remainder of the segment after exit
-          ctx.lineTo(p1.x, p1.y);
+          currentPiece.push({ x: p1.x, y: p1.y });
         }
         continue;
       }
 
       if (entered && !exited && currentIntersections.length > 0) {
-        // We are leaving the label rect on this segment
         const lastOnSegment = currentIntersections[currentIntersections.length - 1]!;
-        ctx.moveTo(lastOnSegment.point.x, lastOnSegment.point.y);
+        currentPiece = [{ x: lastOnSegment.point.x, y: lastOnSegment.point.y }];
         exited = true;
-        ctx.lineTo(p1.x, p1.y);
+        currentPiece.push({ x: p1.x, y: p1.y });
         continue;
       }
 
       if (!entered || exited) {
-        ctx.lineTo(p1.x, p1.y);
+        if (currentPiece.length === 0) {
+          currentPiece.push({ x: polyline[i]!.x, y: polyline[i]!.y });
+        }
+        currentPiece.push({ x: p1.x, y: p1.y });
       }
-      // While inside gap (entered && !exited), skip drawing
     }
 
-    ctx.stroke();
+    flushPiece();
+    for (const piece of pieces) {
+      this.strokePolyline(ctx, piece);
+    }
   }
 
   private renderArrows(ctx: CanvasRenderingContext2D): void {

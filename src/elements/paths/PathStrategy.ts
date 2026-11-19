@@ -18,6 +18,8 @@ export interface PathStrategyOptions {
   editablePolyline?: boolean;
   selfLoop?: boolean;
   obstacles?: PathObstacle[];
+  /** Perpendicular stub before the end point when the route turns there. */
+  endStubLength?: number;
 }
 
 export interface PathStrategy {

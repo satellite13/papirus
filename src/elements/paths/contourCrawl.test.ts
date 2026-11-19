@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { DEFAULT_END_STUB } from '@/constants';
 import { PolylinePathStrategy } from './PolylinePathStrategy';
 import { preserveFacingGap, routeOrthogonalAround } from './routeOrthogonalAround';
 
@@ -22,7 +23,7 @@ describe('no contour crawl under Business Process', () => {
   function assertNotOnEntryStub(
     path: { x: number; y: number }[],
     toY: number,
-    exitDistance = 20
+    exitDistance = DEFAULT_END_STUB
   ): void {
     const stubY = toY + exitDistance;
     for (let i = 1; i < path.length; i++) {

@@ -1,4 +1,7 @@
 import type { Point } from '@/types';
+import { DEFAULT_END_STUB, END_STUB_FACING_START_MIN } from '@/constants';
+import { ROUTE_BEND_COST, orthogonalRouteCost } from './routeCost';
+import { MinHeap } from './minHeap';
 
 export type Side = 'top' | 'right' | 'bottom' | 'left';
 
@@ -27,14 +30,22 @@ export type RouteOrthogonalAroundInput = {
   others?: RouteRect[];
   margin?: number;
   exitDistance?: number;
+  /** Stub before `to` when the route turns there; default DEFAULT_END_STUB. */
+  endStubLength?: number;
 };
 
 const DEFAULT_MARGIN = 12;
 const DEFAULT_EXIT = 20;
-const BEND_PENALTY = 0.001;
-/** Prefer mid-gap over hugging obstacle borders (same Manhattan, fewer bends). */
+/** Prefer mid-gap over hugging obstacle borders among routes with equal bends. */
 const CONTOUR_BAND = 18;
-const CONTOUR_PENALTY = 140;
+/** Tie-breaker only: an 800 px hug costs one bend. */
+const CONTOUR_COST_PER_PX = 0.2;
+
+type Axis = 'h' | 'v';
+
+export function axisOf(side: Side): Axis {
+  return side === 'left' || side === 'right' ? 'h' : 'v';
+}
 
 function expandRect(r: RouteRect, m: number): RouteRect {
   return { ...r, x: r.x - m, y: r.y - m, width: r.width + 2 * m, height: r.height + 2 * m };
@@ -209,7 +220,7 @@ function manhattan(a: Point, b: Point): number {
 
 /**
  * Extra cost when a segment runs parallel to an obstacle edge inside CONTOUR_BAND.
- * Scaled by segment length so a long “lick” along a wide BP costs far more than a short stub.
+ * Scaled by segment length; kept below a bend for realistic lengths.
  */
 export function contourProximityPenalty(a: Point, b: Point, obstacles: RouteRect[]): number {
   if (obstacles.length === 0) return 0;
@@ -238,8 +249,7 @@ export function contourProximityPenalty(a: Point, b: Point, obstacles: RouteRect
   }
   if (!Number.isFinite(minDist) || minDist >= CONTOUR_BAND) return 0;
   const proximity = 1 - minDist / CONTOUR_BAND;
-  // Per-pixel crawl cost: a long glued jog must lose to an outer route.
-  return segLen * (CONTOUR_PENALTY / 10) * proximity;
+  return segLen * CONTOUR_COST_PER_PX * proximity;
 }
 
 /** Push along dir until outside expanded blocker (and at least exitDistance). */
@@ -422,11 +432,11 @@ function canAlignSameSideExits(
 function computeEndEntry(
   to: Point,
   toDir: Side,
-  exitDistance: number,
+  endStubLength: number,
   rawTarget?: RouteRect,
   rawNeighbor?: RouteRect
 ): Point {
-  const stub = moveByDir(to, toDir, exitDistance);
+  const stub = moveByDir(to, toDir, endStubLength);
   if (!rawTarget || !rawNeighbor) return stub;
 
   // Prefer the visual mid-gap over a fixed stub when the approach faces a neighbor.
@@ -434,25 +444,30 @@ function computeEndEntry(
   const mid = facingGapMid(rawTarget, rawNeighbor);
   if (!mid) return stub;
 
+  // Peel is symmetric, so mirroring `to` (on the target edge) across the mid-gap
+  // gives the neighbor edge on the same footing.
+  const meetY = (): number => endStubMeet(2 * mid.y - to.y, to.y, endStubLength);
+  const meetX = (): number => endStubMeet(2 * mid.x - to.x, to.x, endStubLength);
+
   switch (toDir) {
     case 'bottom':
       if (mid.y > to.y && rawNeighbor.y >= rawTarget.y + rawTarget.height) {
-        return { x: to.x, y: mid.y };
+        return { x: to.x, y: meetY() };
       }
       break;
     case 'top':
       if (mid.y < to.y && rawNeighbor.y + rawNeighbor.height <= rawTarget.y) {
-        return { x: to.x, y: mid.y };
+        return { x: to.x, y: meetY() };
       }
       break;
     case 'right':
       if (mid.x > to.x && rawNeighbor.x >= rawTarget.x + rawTarget.width) {
-        return { x: mid.x, y: to.y };
+        return { x: meetX(), y: to.y };
       }
       break;
     case 'left':
       if (mid.x < to.x && rawNeighbor.x + rawNeighbor.width <= rawTarget.x) {
-        return { x: mid.x, y: to.y };
+        return { x: meetX(), y: to.y };
       }
       break;
   }
@@ -460,9 +475,24 @@ function computeEndEntry(
 }
 
 /**
- * When nodes face each other closer than 2×exitDistance, fixed stubs cross
- * (startExit past endEntry). That draws a U-turn "tail" at the first bend.
- * Meet both stubs on the mid-gap instead.
+ * Coordinate of the turn between facing endpoints on the approach axis.
+ * Mid-gap when it leaves `endStubLength`; otherwise `endStubLength` before `to`
+ * while the source side keeps END_STUB_FACING_START_MIN; else mid-gap (no loop back).
+ */
+export function endStubMeet(fromC: number, toC: number, endStubLength: number): number {
+  const gap = Math.abs(toC - fromC);
+  const mid = (fromC + toC) / 2;
+  if (gap / 2 >= endStubLength) return mid;
+  if (gap >= endStubLength + END_STUB_FACING_START_MIN) {
+    return toC - Math.sign(toC - fromC) * endStubLength;
+  }
+  return mid;
+}
+
+/**
+ * When nodes face each other closer than exitDistance + endStubLength, fixed stubs
+ * cross (startExit past endEntry). That draws a U-turn "tail" at the first bend.
+ * Meet both stubs on one line instead (see endStubMeet).
  */
 export function clampFacingExitEntry(
   from: Point,
@@ -470,35 +500,24 @@ export function clampFacingExitEntry(
   fromDir: Side,
   toDir: Side,
   startExit: Point,
-  endEntry: Point
+  endEntry: Point,
+  endStubLength: number = DEFAULT_END_STUB
 ): { startExit: Point; endEntry: Point } {
   if (fromDir === 'bottom' && toDir === 'top' && to.y > from.y && startExit.y > endEntry.y) {
-    const midY = (from.y + to.y) / 2;
-    return {
-      startExit: { x: startExit.x, y: midY },
-      endEntry: { x: endEntry.x, y: midY },
-    };
+    const y = endStubMeet(from.y, to.y, endStubLength);
+    return { startExit: { x: startExit.x, y }, endEntry: { x: endEntry.x, y } };
   }
   if (fromDir === 'top' && toDir === 'bottom' && to.y < from.y && startExit.y < endEntry.y) {
-    const midY = (from.y + to.y) / 2;
-    return {
-      startExit: { x: startExit.x, y: midY },
-      endEntry: { x: endEntry.x, y: midY },
-    };
+    const y = endStubMeet(from.y, to.y, endStubLength);
+    return { startExit: { x: startExit.x, y }, endEntry: { x: endEntry.x, y } };
   }
   if (fromDir === 'right' && toDir === 'left' && to.x > from.x && startExit.x > endEntry.x) {
-    const midX = (from.x + to.x) / 2;
-    return {
-      startExit: { x: midX, y: startExit.y },
-      endEntry: { x: midX, y: endEntry.y },
-    };
+    const x = endStubMeet(from.x, to.x, endStubLength);
+    return { startExit: { x, y: startExit.y }, endEntry: { x, y: endEntry.y } };
   }
   if (fromDir === 'left' && toDir === 'right' && to.x < from.x && startExit.x < endEntry.x) {
-    const midX = (from.x + to.x) / 2;
-    return {
-      startExit: { x: midX, y: startExit.y },
-      endEntry: { x: midX, y: endEntry.y },
-    };
+    const x = endStubMeet(from.x, to.x, endStubLength);
+    return { startExit: { x, y: startExit.y }, endEntry: { x, y: endEntry.y } };
   }
   return { startExit, endEntry };
 }
@@ -624,7 +643,7 @@ function collectLatticeCoords(
   };
 }
 
-type GraphEdge = { to: number; dir: 'h' | 'v'; length: number };
+export type GraphEdge = { to: number; dir: 'h' | 'v'; length: number };
 
 function buildCornerGraph(
   startExit: Point,
@@ -635,145 +654,242 @@ function buildCornerGraph(
   margin?: number
 ): { nodes: Point[]; edges: Map<number, GraphEdge[]>; startIdx: number; goalIdx: number } | null {
   const { xs, ys } = collectLatticeCoords(startExit, endEntry, obstacles, parent, target, margin);
-  const nodes: Point[] = [];
-  const nodeIndex = new Map<string, number>();
-  const nodeKey = (x: number, y: number): string => `${x}|${y}`;
+  const nx = xs.length;
+  const ny = ys.length;
+  const xAt = new Map(xs.map((x, i) => [x, i]));
+  const yAt = new Map(ys.map((y, i) => [y, i]));
+  const cell = (ix: number, iy: number): number => ix * ny + iy;
 
-  const addNode = (x: number, y: number): void => {
-    const key = nodeKey(x, y);
-    if (nodeIndex.has(key)) return;
-    const point = { x, y };
-    if (obstacles.some((o) => pointInOpenInterior(point, o))) return;
-    nodeIndex.set(key, nodes.length);
-    nodes.push(point);
-  };
-
-  for (const x of xs) {
-    for (const y of ys) {
-      addNode(x, y);
+  // Obstacle edges are lattice lines, so open-interior tests reduce to index ranges.
+  // blockedV / blockedH mark the lattice step from a cell to its +y / +x neighbour.
+  const blockedCell = new Uint8Array(nx * ny);
+  const blockedV = new Uint8Array(nx * ny);
+  const blockedH = new Uint8Array(nx * ny);
+  for (const o of obstacles) {
+    const x0 = xAt.get(o.x);
+    const x1 = xAt.get(o.x + o.width);
+    const y0 = yAt.get(o.y);
+    const y1 = yAt.get(o.y + o.height);
+    if (x0 === undefined || x1 === undefined || y0 === undefined || y1 === undefined) continue;
+    for (let ix = x0 + 1; ix < x1; ix++) {
+      for (let iy = y0 + 1; iy < y1; iy++) blockedCell[cell(ix, iy)] = 1;
+      for (let iy = y0; iy < y1; iy++) blockedV[cell(ix, iy)] = 1;
+    }
+    for (let iy = y0 + 1; iy < y1; iy++) {
+      for (let ix = x0; ix < x1; ix++) blockedH[cell(ix, iy)] = 1;
     }
   }
-  addNode(startExit.x, startExit.y);
-  addNode(endEntry.x, endEntry.y);
 
-  const startIdx = nodeIndex.get(nodeKey(startExit.x, startExit.y));
-  const goalIdx = nodeIndex.get(nodeKey(endEntry.x, endEntry.y));
-  if (startIdx == null || goalIdx == null) return null;
+  const nodes: Point[] = [];
+  const nodeAt = new Int32Array(nx * ny).fill(-1);
+  for (let ix = 0; ix < nx; ix++) {
+    for (let iy = 0; iy < ny; iy++) {
+      if (blockedCell[cell(ix, iy)]) continue;
+      nodeAt[cell(ix, iy)] = nodes.length;
+      nodes.push({ x: xs[ix]!, y: ys[iy]! });
+    }
+  }
+
+  const nodeOf = (p: Point): number => {
+    const ix = xAt.get(p.x);
+    const iy = yAt.get(p.y);
+    return ix === undefined || iy === undefined ? -1 : nodeAt[cell(ix, iy)]!;
+  };
+  const startIdx = nodeOf(startExit);
+  const goalIdx = nodeOf(endEntry);
+  if (startIdx < 0 || goalIdx < 0) return null;
 
   const edges = new Map<number, GraphEdge[]>();
-  const pushEdge = (a: number, b: number, dir: 'h' | 'v', length: number): void => {
-    const list = edges.get(a) ?? [];
-    list.push({ to: b, dir, length });
-    edges.set(a, list);
+  for (let i = 0; i < nodes.length; i++) edges.set(i, []);
+  const link = (a: number, b: number, dir: 'h' | 'v', near: RouteRect[]): void => {
+    const pa = nodes[a]!;
+    const pb = nodes[b]!;
+    const length = manhattan(pa, pb) + contourProximityPenalty(pa, pb, near);
+    edges.get(a)!.push({ to: b, dir, length });
+    edges.get(b)!.push({ to: a, dir, length });
   };
+  const nearLine = (
+    c: number,
+    lo: (o: RouteRect) => number,
+    size: (o: RouteRect) => number
+  ): RouteRect[] =>
+    obstacles.filter(
+      (o) => Math.min(Math.abs(c - lo(o)), Math.abs(c - lo(o) - size(o))) < CONTOUR_BAND
+    );
 
-  const byX = new Map<number, number[]>();
-  const byY = new Map<number, number[]>();
-  for (let i = 0; i < nodes.length; i++) {
-    const node = nodes[i]!;
-    const xsList = byX.get(node.x) ?? [];
-    xsList.push(i);
-    byX.set(node.x, xsList);
-    const ysList = byY.get(node.y) ?? [];
-    ysList.push(i);
-    byY.set(node.y, ysList);
-  }
-
-  for (const list of byX.values()) {
-    list.sort((a, b) => nodes[a]!.y - nodes[b]!.y);
-    for (let i = 1; i < list.length; i++) {
-      const a = nodes[list[i - 1]!]!;
-      const b = nodes[list[i]!]!;
-      if (!segmentHitsObstacles(a, b, obstacles)) {
-        const length = manhattan(a, b) + contourProximityPenalty(a, b, obstacles);
-        pushEdge(list[i - 1]!, list[i]!, 'v', length);
-        pushEdge(list[i]!, list[i - 1]!, 'v', length);
-      }
+  for (let ix = 0; ix < nx; ix++) {
+    const near = nearLine(
+      xs[ix]!,
+      (o) => o.x,
+      (o) => o.width
+    );
+    for (let iy = 1; iy < ny; iy++) {
+      const a = nodeAt[cell(ix, iy - 1)]!;
+      const b = nodeAt[cell(ix, iy)]!;
+      if (a >= 0 && b >= 0 && !blockedV[cell(ix, iy - 1)]) link(a, b, 'v', near);
     }
   }
-
-  for (const list of byY.values()) {
-    list.sort((a, b) => nodes[a]!.x - nodes[b]!.x);
-    for (let i = 1; i < list.length; i++) {
-      const a = nodes[list[i - 1]!]!;
-      const b = nodes[list[i]!]!;
-      if (!segmentHitsObstacles(a, b, obstacles)) {
-        const length = manhattan(a, b) + contourProximityPenalty(a, b, obstacles);
-        pushEdge(list[i - 1]!, list[i]!, 'h', length);
-        pushEdge(list[i]!, list[i - 1]!, 'h', length);
-      }
+  for (let iy = 0; iy < ny; iy++) {
+    const near = nearLine(
+      ys[iy]!,
+      (o) => o.y,
+      (o) => o.height
+    );
+    for (let ix = 1; ix < nx; ix++) {
+      const a = nodeAt[cell(ix - 1, iy)]!;
+      const b = nodeAt[cell(ix, iy)]!;
+      if (a >= 0 && b >= 0 && !blockedH[cell(ix - 1, iy)]) link(a, b, 'h', near);
     }
   }
 
   return { nodes, edges, startIdx, goalIdx };
 }
 
-type DirState = 'h' | 'v' | 's';
+/**
+ * Fewest axis changes along [dir, ...remaining edge axes, goalAxis] when the remaining
+ * edges must move along `needH` / `needV`. A null end imposes nothing.
+ */
+function minRemainingBends(
+  dir: Axis | null,
+  needH: boolean,
+  needV: boolean,
+  goalAxis: Axis | null
+): number {
+  if (needH && needV) return dir !== null && dir === goalAxis ? 2 : 1;
+  if (!needH && !needV) return 0;
+  const axis: Axis = needH ? 'h' : 'v';
+  return (dir !== null && dir !== axis ? 1 : 0) + (goalAxis !== null && goalAxis !== axis ? 1 : 0);
+}
 
-function searchMidPath(
+const AXIS_STATE: Record<Axis, number> = { h: 0, v: 1 };
+const NO_AXIS_STATE = 2;
+
+/** Signed directions of the stubs around the searched mid path. */
+export type MidPathStubs = {
+  /** Direction the start stub travels (`fromDir`): the first edge must not turn back. */
+  startDir?: Side;
+  /** Outward side at the target (`toDir`): the last edge must not move outward. */
+  goalDir?: Side;
+};
+
+function sideDot(side: Side, dx: number, dy: number): number {
+  switch (side) {
+    case 'top':
+      return -dy;
+    case 'bottom':
+      return dy;
+    case 'left':
+      return -dx;
+    case 'right':
+      return dx;
+  }
+}
+
+/**
+ * A* over the corner graph: edge length + ROUTE_BEND_COST per axis change, plus one
+ * more when the last edge arrives across `goalAxis`. A null axis means "free".
+ * Axis state alone makes a 180° turn at a stub free; `stubs` forbids it (ignored on
+ * a free end).
+ */
+export function searchMidPath(
   nodes: Point[],
   edges: Map<number, GraphEdge[]>,
   startIdx: number,
-  goalIdx: number
+  goalIdx: number,
+  startAxis: Axis | null,
+  goalAxis: Axis | null,
+  stubs?: MidPathStubs
 ): Point[] | null {
-  type QueueState = { node: number; dir: DirState; g: number; f: number; key: string };
-  const makeStateKey = (node: number, dir: DirState): string => `${node}:${dir}`;
-  const open: QueueState[] = [];
-  const best = new Map<string, number>();
-  const prev = new Map<string, string>();
-  const startKey = makeStateKey(startIdx, 's');
-  best.set(startKey, 0);
+  const goal = nodes[goalIdx]!;
+  const startDir = startAxis !== null ? stubs?.startDir : undefined;
+  const goalDir = goalAxis !== null ? stubs?.goalDir : undefined;
+  const turnsBack = (from: number, to: number): boolean => {
+    if (startDir === undefined && goalDir === undefined) return false;
+    const a = nodes[from]!;
+    const b = nodes[to]!;
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    if (startDir !== undefined && from === startIdx && sideDot(startDir, dx, dy) < 0) return true;
+    return goalDir !== undefined && to === goalIdx && sideDot(goalDir, dx, dy) > 0;
+  };
+  // Admissible and consistent: edges cost ≥ their Manhattan length, and every remaining
+  // path needs at least minRemainingBends axis changes (the goal-axis surcharge counts as one).
+  const heuristic = (node: number, dir: Axis | null): number => {
+    const p = nodes[node]!;
+    if (node === goalIdx) return 0;
+    const bends = minRemainingBends(dir, p.x !== goal.x, p.y !== goal.y, goalAxis);
+    return manhattan(p, goal) + bends * ROUTE_BEND_COST;
+  };
+
+  type QueueState = {
+    state: number;
+    node: number;
+    dir: Axis | null;
+    g: number;
+    f: number;
+    seq: number;
+  };
+  const stateCount = nodes.length * 3;
+  const bestG = new Float64Array(stateCount).fill(Infinity);
+  const prevState = new Int32Array(stateCount).fill(-1);
+  const closed = new Uint8Array(stateCount);
+  const open = new MinHeap<QueueState>((a, b) => a.f < b.f || (a.f === b.f && a.seq < b.seq));
+  let seq = 0;
+
+  const startState = startIdx * 3 + (startAxis ? AXIS_STATE[startAxis] : NO_AXIS_STATE);
+  bestG[startState] = 0;
   open.push({
+    state: startState,
     node: startIdx,
-    dir: 's',
+    dir: startAxis,
     g: 0,
-    f: manhattan(nodes[startIdx]!, nodes[goalIdx]!),
-    key: startKey,
+    f: heuristic(startIdx, startAxis),
+    seq: seq++,
   });
 
-  let goalKey: string | null = null;
-  while (open.length > 0) {
-    let bestIdx = 0;
-    for (let i = 1; i < open.length; i++) {
-      if (open[i]!.f < open[bestIdx]!.f) bestIdx = i;
-    }
-    const current = open.splice(bestIdx, 1)[0]!;
+  let goalState = -1;
+  while (open.size > 0) {
+    const current = open.pop()!;
+    if (closed[current.state]) continue;
+    closed[current.state] = 1;
     if (current.node === goalIdx) {
-      goalKey = current.key;
+      goalState = current.state;
       break;
     }
 
     for (const edge of edges.get(current.node) ?? []) {
       const nextDir = edge.dir;
+      const nextState = edge.to * 3 + AXIS_STATE[nextDir];
+      if (closed[nextState]) continue;
+      if (turnsBack(current.node, edge.to)) continue;
       let stepCost = edge.length;
-      if (current.dir !== 's' && current.dir !== nextDir) {
-        stepCost += BEND_PENALTY;
+      if (current.dir !== null && current.dir !== nextDir) stepCost += ROUTE_BEND_COST;
+      // Arriving across the entry axis means one more bend into the end stub.
+      if (edge.to === goalIdx && goalAxis !== null && nextDir !== goalAxis) {
+        stepCost += ROUTE_BEND_COST;
       }
       const nextG = current.g + stepCost;
-      const nextKey = makeStateKey(edge.to, nextDir);
-      if (nextG >= (best.get(nextKey) ?? Infinity)) continue;
-      best.set(nextKey, nextG);
-      prev.set(nextKey, current.key);
+      if (nextG >= bestG[nextState]!) continue;
+      bestG[nextState] = nextG;
+      prevState[nextState] = current.state;
       open.push({
+        state: nextState,
         node: edge.to,
         dir: nextDir,
         g: nextG,
-        f: nextG + manhattan(nodes[edge.to]!, nodes[goalIdx]!),
-        key: nextKey,
+        f: nextG + heuristic(edge.to, nextDir),
+        seq: seq++,
       });
     }
   }
 
-  if (!goalKey) return null;
+  if (goalState < 0) return null;
 
   const path: Point[] = [];
-  let key: string | undefined = goalKey;
-  while (key) {
-    const nodeIdx = Number(key.split(':')[0]);
-    path.unshift(nodes[nodeIdx]!);
-    key = prev.get(key);
+  for (let s = goalState; s >= 0; s = prevState[s]!) {
+    path.push(nodes[Math.floor(s / 3)]!);
   }
-  return path;
+  return path.reverse();
 }
 
 function pathIsValid(path: Point[], obstacles: RouteRect[]): boolean {
@@ -791,7 +907,13 @@ function orthogonalElbow(startExit: Point, endEntry: Point): Point[] {
   return [startExit, { x: startExit.x, y: endEntry.y }, endEntry];
 }
 
-function fallbackOuterRoute(startExit: Point, endEntry: Point, obstacles: RouteRect[]): Point[] {
+function fallbackOuterRoute(
+  from: Point,
+  to: Point,
+  startExit: Point,
+  endEntry: Point,
+  obstacles: RouteRect[]
+): Point[] {
   if (obstacles.length === 0) {
     return orthogonalElbow(startExit, endEntry);
   }
@@ -814,27 +936,27 @@ function fallbackOuterRoute(startExit: Point, endEntry: Point, obstacles: RouteR
   ];
 
   let best: Point[] | null = null;
-  let bestLen = Infinity;
+  let bestCost = Infinity;
   for (const candidate of candidates) {
     const simplified = simplifyPath(candidate);
     if (!pathIsValid(simplified, obstacles)) continue;
-    const len = simplified.reduce((sum, p, i) => {
-      if (i === 0) return 0;
-      return sum + manhattan(simplified[i - 1]!, p);
-    }, 0);
-    if (len < bestLen) {
-      bestLen = len;
+    const cost = orthogonalRouteCost([from, ...simplified, to]);
+    if (cost < bestCost) {
+      bestCost = cost;
       best = simplified;
     }
   }
-
   // Last resort: orthogonal elbow even if it clips — never a diagonal.
   return best ?? orthogonalElbow(startExit, endEntry);
 }
 
 function routeMidPath(
+  from: Point,
+  to: Point,
   startExit: Point,
   endEntry: Point,
+  startAxis: Axis,
+  goalAxis: Axis,
   obstacles: RouteRect[],
   parent?: RouteRect,
   target?: RouteRect,
@@ -847,16 +969,24 @@ function routeMidPath(
 
   const graph = buildCornerGraph(startExit, endEntry, obstacles, parent, target, margin);
   if (graph) {
-    const mid = searchMidPath(graph.nodes, graph.edges, graph.startIdx, graph.goalIdx);
+    const mid = searchMidPath(
+      graph.nodes,
+      graph.edges,
+      graph.startIdx,
+      graph.goalIdx,
+      startAxis,
+      goalAxis
+    );
     if (mid && pathIsValid(mid, obstacles)) return mid;
   }
 
-  return fallbackOuterRoute(startExit, endEntry, obstacles);
+  return fallbackOuterRoute(from, to, startExit, endEntry, obstacles);
 }
 
 export function routeOrthogonalAround(input: RouteOrthogonalAroundInput): Point[] {
   const margin = input.margin ?? DEFAULT_MARGIN;
   const exitDistance = input.exitDistance ?? DEFAULT_EXIT;
+  const endStubLength = input.endStubLength ?? DEFAULT_END_STUB;
   const others = input.others ?? [];
 
   // Both endpoints inside parent → internal edge: stay in the container and dodge
@@ -868,16 +998,8 @@ export function routeOrthogonalAround(input: RouteOrthogonalAroundInput): Point[
 
   // Clear the outer blocker first (container), else the source node itself.
   const exitBlocker = internalParent ? input.source : (input.parent ?? input.source);
-  let rawStartExit = computeStartExit(
-    input.from,
-    input.fromDir,
-    exitBlocker,
-    margin,
-    exitDistance
-  );
-  const gapNeighbor = internalParent
-    ? input.source
-    : (input.parent ?? input.source);
+  let rawStartExit = computeStartExit(input.from, input.fromDir, exitBlocker, margin, exitDistance);
+  const gapNeighbor = internalParent ? input.source : (input.parent ?? input.source);
   const peeledTargetNeighbor =
     input.target && gapNeighbor ? peelForFacingGap(input.target, gapNeighbor) : null;
 
@@ -885,10 +1007,16 @@ export function routeOrthogonalAround(input: RouteOrthogonalAroundInput): Point[
   let rawEndEntry = computeEndEntry(
     input.to,
     input.toDir,
-    exitDistance,
+    endStubLength,
     peeledTargetNeighbor?.a,
     peeledTargetNeighbor?.b
   );
+  // Mid-gap ignores siblings: one standing in the gap would swallow the entry point.
+  if (
+    others.some((o) => segmentIntersectsOpenInterior(rawEndEntry, input.to, expandRect(o, margin)))
+  ) {
+    rawEndEntry = computeEndEntry(input.to, input.toDir, endStubLength);
+  }
 
   // Same-side elbows (left→left / top→top): clear siblings AND the target/source
   // so a wrap does not drop a straight segment through an endpoint node.
@@ -969,12 +1097,12 @@ export function routeOrthogonalAround(input: RouteOrthogonalAroundInput): Point[
     input.fromDir,
     input.toDir,
     rawStartExit,
-    rawEndEntry
+    rawEndEntry,
+    endStubLength
   );
 
   let sourceObs = input.source ? expandRect(input.source, margin) : undefined;
-  let parentObs =
-    input.parent && !internalParent ? expandRect(input.parent, margin) : undefined;
+  let parentObs = input.parent && !internalParent ? expandRect(input.parent, margin) : undefined;
   let targetObs = input.target ? expandRect(input.target, margin) : undefined;
 
   const openCorridor = (
@@ -1019,8 +1147,12 @@ export function routeOrthogonalAround(input: RouteOrthogonalAroundInput): Point[
   const latticeB = peeledLattice?.b ?? input.target;
 
   const mid = routeMidPath(
+    input.from,
+    input.to,
     startExit,
     endEntry,
+    axisOf(input.fromDir),
+    axisOf(input.toDir),
     obstacles,
     latticeA,
     latticeB,
@@ -1028,21 +1160,13 @@ export function routeOrthogonalAround(input: RouteOrthogonalAroundInput): Point[
   ).slice(1, -1);
 
   // If mid already ends on the approach ray outside `to`, skip endEntry — otherwise
-  // a fixed exitDistance stub overshoots and simplify has to cut a visible spur.
+  // a fixed end stub overshoots and simplify has to cut a visible spur.
   const lastMid = mid[mid.length - 1];
   const alreadyApproaching =
-    !!lastMid && isOnApproachOutside(lastMid, input.to, input.toDir, 1);
+    !!lastMid && isOnApproachOutside(lastMid, input.to, input.toDir, endStubLength);
 
-  const raw = [
-    input.from,
-    startExit,
-    ...mid,
-    ...(alreadyApproaching ? [] : [endEntry]),
-    input.to,
-  ];
-  return simplifyPath(
-    ensureOrthogonalPath(raw, { exitDir: input.fromDir, enterDir: input.toDir })
-  );
+  const raw = [input.from, startExit, ...mid, ...(alreadyApproaching ? [] : [endEntry]), input.to];
+  return simplifyPath(ensureOrthogonalPath(raw, { exitDir: input.fromDir, enterDir: input.toDir }));
 }
 
 /** Elbow that leaves `prev` along `dir` first (source exit). */
@@ -1077,17 +1201,13 @@ export interface EnsureOrthogonalOptions {
 }
 
 /** Insert elbows so no consecutive points form a diagonal (safety net). */
-export function ensureOrthogonalPath(
-  path: Point[],
-  options?: EnsureOrthogonalOptions
-): Point[] {
+export function ensureOrthogonalPath(path: Point[], options?: EnsureOrthogonalOptions): Point[] {
   if (path.length < 2) return path;
   const out: Point[] = [path[0]!];
   for (let i = 1; i < path.length; i++) {
     const prev = out[out.length - 1]!;
     const next = path[i]!;
-    const axisAligned =
-      Math.abs(prev.x - next.x) < 0.001 || Math.abs(prev.y - next.y) < 0.001;
+    const axisAligned = Math.abs(prev.x - next.x) < 0.001 || Math.abs(prev.y - next.y) < 0.001;
     if (!axisAligned) {
       const isFirst = out.length === 1;
       const isLast = i === path.length - 1;

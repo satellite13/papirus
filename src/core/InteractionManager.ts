@@ -25,10 +25,16 @@ import type { Bounds, EdgeEndpoint, Point, SerializedEdge, SerializedNode } from
 import { Edge } from '@/elements/Edge';
 import type { Group } from '@/elements/Group';
 import type { Node } from '@/elements/Node';
-import { ChangeEditablePolylineControlPointsCommand, CompositeCommand } from './history/commands';
+import {
+  ChangeEditablePolylineControlPointsCommand,
+  ChangeEdgeLabelLayoutCommand,
+  CompositeCommand,
+} from './history/commands';
+import type { EdgePathType } from '@/types';
 import { LabelEditor } from './LabelEditor';
 import { shallowEqual } from '@/utils/style';
 import { clonePoints, mergeBounds } from '@/utils/geometry';
+import { cleanupColinearControlPoints } from '@/utils/orthogonalSegmentDrag';
 import type { Command } from '@/types';
 import type { CompositeNode } from '@/elements/composite/CompositeNode';
 import type { CContainer } from '@/elements/composite/CContainer';
@@ -90,7 +96,16 @@ export class InteractionManager {
 
   private dragStartPositions = new Map<string, { x: number; y: number }>();
   private dragStartEditablePolylinePoints = new Map<string, Point[]>();
-  private controlPointGestureBefore = new Map<string, Point[]>();
+  private controlPointGestureBefore = new Map<
+    string,
+    { points: Point[]; type: EdgePathType }
+  >();
+  private labelGestureBefore = new Map<
+    string,
+    { labelPosition: number; labelOffset: number }
+  >();
+  /** Previous selection ids — used to collapse colinear bends on deselection. */
+  private previousSelectedIds = new Set<string>();
   private resizeStartBounds: Bounds | null = null;
   private reconnectOrigins = new Map<
     string,
@@ -245,6 +260,60 @@ export class InteractionManager {
     return true;
   }
 
+  /**
+   * When an editable-polyline loses selection, drop bends that sit on a
+   * straight H/V run so leftover router stubs / mid-segment inserts do not linger.
+   */
+  private cleanupColinearBendsOnDeselect(selectedIds: string[]): void {
+    const nextSelected = new Set(selectedIds);
+    if (this.navigationOnly) {
+      this.previousSelectedIds = nextSelected;
+      return;
+    }
+
+    const changes = new Map<
+      string,
+      {
+        before: Point[];
+        after: Point[];
+      }
+    >();
+
+    for (const id of this.previousSelectedIds) {
+      if (nextSelected.has(id)) {
+        continue;
+      }
+      const edge = this.renderer.getEdge(id);
+      if (!edge?.isEditablePolyline() || !edge.controlPoints?.length) {
+        continue;
+      }
+      const before = clonePoints(edge.controlPoints);
+      const cleaned = cleanupColinearControlPoints(
+        edge.startPoint,
+        edge.endPoint,
+        before
+      );
+      if (!cleaned) {
+        continue;
+      }
+      edge.controlPoints = cleaned.length > 0 ? cleaned : undefined;
+      changes.set(id, { before, after: cleaned });
+    }
+
+    this.previousSelectedIds = nextSelected;
+
+    if (changes.size === 0) {
+      return;
+    }
+    this.historyManager.execute(
+      new ChangeEditablePolylineControlPointsCommand(
+        (id) => this.renderer.getEdge(id),
+        changes
+      )
+    );
+    this.renderer.markDirty();
+  }
+
   changeNodeProperties(nodeId: string, apply: (node: Node) => void): void {
     const node = this.renderer.getNode(nodeId);
     if (!node) {
@@ -380,6 +449,10 @@ export class InteractionManager {
     this.inputHandler.on('pinch', (event) => this.handlePinch(event));
     this.inputHandler.on('keydown', (event) => this.handleKeyDown(event));
     this.inputHandler.on('keyup', (event) => this.handleKeyUp(event));
+
+    this.selectionManager.on('select', (selectedIds) => {
+      this.cleanupColinearBendsOnDeselect(selectedIds);
+    });
 
     if (!this.navigationOnly) {
       this.dragManager.on('dragstart', (nodeIds) => {
@@ -522,21 +595,40 @@ export class InteractionManager {
         );
       });
 
-      this.connectionManager.on('controlPointDragStart', (edge, before) => {
-        this.controlPointGestureBefore.set(edge.id, clonePoints(before));
+      this.connectionManager.on('controlPointDragStart', (edge, before, beforeType) => {
+        this.controlPointGestureBefore.set(edge.id, {
+          points: clonePoints(before),
+          type: beforeType,
+        });
       });
 
       this.connectionManager.on('controlPointDragEnd', () => {
-        const changes = new Map<string, { before: Point[]; after: Point[] }>();
+        const changes = new Map<
+          string,
+          {
+            before: Point[];
+            after: Point[];
+            beforeType?: EdgePathType;
+            afterType?: EdgePathType;
+          }
+        >();
         for (const [id, before] of this.controlPointGestureBefore) {
           const edge = this.renderer.getEdge(id);
-          if (!edge?.isEditablePolyline()) {
+          if (!edge) {
             continue;
           }
           const after = clonePoints(edge.controlPoints ?? []);
-          if (!this.editablePolylinePointsEqual(before, after)) {
-            changes.set(id, { before: clonePoints(before), after });
+          const typeChanged = edge.type !== before.type;
+          const pointsChanged = !this.editablePolylinePointsEqual(before.points, after);
+          if (!typeChanged && !pointsChanged) {
+            continue;
           }
+          changes.set(id, {
+            before: clonePoints(before.points),
+            after,
+            beforeType: typeChanged ? before.type : undefined,
+            afterType: typeChanged ? edge.type : undefined,
+          });
         }
         this.controlPointGestureBefore.clear();
         if (changes.size === 0) {
@@ -548,6 +640,41 @@ export class InteractionManager {
             changes
           )
         );
+      });
+
+      this.connectionManager.on('labelDragStart', (edge) => {
+        this.labelGestureBefore.set(edge.id, {
+          labelPosition: edge.labelPosition,
+          labelOffset: edge.labelOffset,
+        });
+      });
+
+      this.connectionManager.on('labelDragEnd', () => {
+        for (const [id, before] of this.labelGestureBefore) {
+          const edge = this.renderer.getEdge(id);
+          if (!edge) {
+            continue;
+          }
+          const after = {
+            labelPosition: edge.labelPosition,
+            labelOffset: edge.labelOffset,
+          };
+          if (
+            after.labelPosition === before.labelPosition &&
+            after.labelOffset === before.labelOffset
+          ) {
+            continue;
+          }
+          this.historyManager.execute(
+            new ChangeEdgeLabelLayoutCommand(
+              (edgeId) => this.renderer.getEdge(edgeId),
+              id,
+              before,
+              after
+            )
+          );
+        }
+        this.labelGestureBefore.clear();
       });
     }
 
@@ -838,6 +965,9 @@ export class InteractionManager {
     if (this.navigationOnly) {
       return;
     }
+
+    // Cancel deferred bend-insert from the first click of this double-click.
+    this.connectionManager.cancelPendingSegmentInsert();
 
     const polylineBeforeByEdge = new Map<string, Point[]>();
     for (const edge of this.renderer.edges.values()) {

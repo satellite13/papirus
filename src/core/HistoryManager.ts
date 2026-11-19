@@ -146,6 +146,7 @@ export {
   RemoveNodeCommand,
   CompositeCommand,
   ChangeEditablePolylineControlPointsCommand,
+  ChangeEdgeLabelLayoutCommand,
   ChangeNodePropertiesCommand,
   ChangeEdgePropertiesCommand,
   ChangeGroupPropertiesCommand,

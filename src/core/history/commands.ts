@@ -37,6 +37,7 @@ export interface EdgeSnapshot {
   styleClass?: string;
   label?: LabelSnapshot;
   labelOffset: number;
+  labelPosition: number;
   labelBackground?: EdgeLabelBackground;
   labelLineGap: boolean;
   startMarker?: ArrowMarkerConfig;
@@ -117,6 +118,7 @@ export const createEdgeSnapshot = (edge: Edge): EdgeSnapshot => {
     styleClass: edge.styleClass,
     label: snapshotLabel(edge.label),
     labelOffset: edge.labelOffset,
+    labelPosition: edge.labelPosition,
     labelBackground: cloneValue(edge.labelBackground),
     labelLineGap: edge.labelLineGap,
     startMarker: cloneValue(edge.startMarker),
@@ -227,40 +229,67 @@ export class ResizeNodesCommand implements Command {
   }
 }
 
+export type EditablePolylineControlPointsChange = {
+  before: Point[];
+  after: Point[];
+  /** Present when the gesture also changed edge path type (e.g. polyline → editable-polyline). */
+  beforeType?: EdgePathType;
+  afterType?: EdgePathType;
+};
+
 /**
  * Restores editable-polyline control points on undo (used with node drag composite).
+ * Optionally restores path type when a gesture promoted polyline → editable-polyline.
  */
 export class ChangeEditablePolylineControlPointsCommand implements Command {
-  private readonly changes: Map<string, { before: Point[]; after: Point[] }>;
+  private readonly changes: Map<string, EditablePolylineControlPointsChange>;
   private readonly getEdge: (id: string) => Edge | undefined;
 
   constructor(
     getEdge: (id: string) => Edge | undefined,
-    changes: Map<string, { before: Point[]; after: Point[] }>
+    changes: Map<string, EditablePolylineControlPointsChange>
   ) {
     this.getEdge = getEdge;
     this.changes = new Map(
       Array.from(changes.entries()).map(([id, v]) => [
         id,
-        { before: clonePoints(v.before), after: clonePoints(v.after) },
+        {
+          before: clonePoints(v.before),
+          after: clonePoints(v.after),
+          beforeType: v.beforeType,
+          afterType: v.afterType,
+        },
       ])
     );
   }
 
   execute(): void {
-    for (const [id, { after }] of this.changes) {
+    for (const [id, change] of this.changes) {
       const edge = this.getEdge(id);
-      if (edge?.isEditablePolyline()) {
-        edge.controlPoints = after.length > 0 ? clonePoints(after) : undefined;
+      if (!edge) {
+        continue;
+      }
+      if (change.afterType && edge.type !== change.afterType) {
+        edge.type = change.afterType;
+      }
+      if (edge.isEditablePolyline()) {
+        edge.controlPoints = change.after.length > 0 ? clonePoints(change.after) : undefined;
       }
     }
   }
 
   undo(): void {
-    for (const [id, { before }] of this.changes) {
+    for (const [id, change] of this.changes) {
       const edge = this.getEdge(id);
-      if (edge?.isEditablePolyline()) {
-        edge.controlPoints = before.length > 0 ? clonePoints(before) : undefined;
+      if (!edge) {
+        continue;
+      }
+      if (change.beforeType && edge.type !== change.beforeType) {
+        edge.type = change.beforeType;
+        continue;
+      }
+      if (edge.isEditablePolyline()) {
+        edge.controlPoints = change.before.length > 0 ? clonePoints(change.before) : undefined;
       }
     }
   }
@@ -387,6 +416,46 @@ export class ChangeNodePropertiesCommand implements Command {
 }
 
 /**
+ * Undoable change of edge label layout (position along path + offset).
+ */
+export class ChangeEdgeLabelLayoutCommand implements Command {
+  private readonly getEdge: (id: string) => Edge | undefined;
+  private readonly edgeId: string;
+  private readonly before: { labelPosition: number; labelOffset: number };
+  private readonly after: { labelPosition: number; labelOffset: number };
+
+  constructor(
+    getEdge: (id: string) => Edge | undefined,
+    edgeId: string,
+    before: { labelPosition: number; labelOffset: number },
+    after: { labelPosition: number; labelOffset: number }
+  ) {
+    this.getEdge = getEdge;
+    this.edgeId = edgeId;
+    this.before = { ...before };
+    this.after = { ...after };
+  }
+
+  execute(): void {
+    const edge = this.getEdge(this.edgeId);
+    if (!edge) {
+      return;
+    }
+    edge.labelPosition = this.after.labelPosition;
+    edge.labelOffset = this.after.labelOffset;
+  }
+
+  undo(): void {
+    const edge = this.getEdge(this.edgeId);
+    if (!edge) {
+      return;
+    }
+    edge.labelPosition = this.before.labelPosition;
+    edge.labelOffset = this.before.labelOffset;
+  }
+}
+
+/**
  * Command for changing edge properties
  */
 export class ChangeEdgePropertiesCommand implements Command {
@@ -418,6 +487,7 @@ export class ChangeEdgePropertiesCommand implements Command {
     edge.startMarker = cloneValue(this.after.startMarker);
     edge.endMarker = cloneValue(this.after.endMarker);
     edge.labelOffset = this.after.labelOffset;
+    edge.labelPosition = this.after.labelPosition;
     edge.labelBackground = cloneValue(this.after.labelBackground);
     edge.labelLineGap = this.after.labelLineGap;
     edge.style = cloneValue(this.after.style ?? {});
@@ -436,6 +506,7 @@ export class ChangeEdgePropertiesCommand implements Command {
     edge.startMarker = cloneValue(this.before.startMarker);
     edge.endMarker = cloneValue(this.before.endMarker);
     edge.labelOffset = this.before.labelOffset;
+    edge.labelPosition = this.before.labelPosition;
     edge.labelBackground = cloneValue(this.before.labelBackground);
     edge.labelLineGap = this.before.labelLineGap;
     edge.style = cloneValue(this.before.style ?? {});
