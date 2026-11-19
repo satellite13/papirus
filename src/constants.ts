@@ -21,6 +21,12 @@ export const MARKER_SIZES: Record<string, number> = {
   square: 6,
 };
 
+// Perpendicular approach stub before the edge end (routing)
+export const END_STUB_EXTRA = 4;
+export const END_STUB_MIN = 12;
+export const END_STUB_FACING_START_MIN = 8;
+export const DEFAULT_END_STUB = (MARKER_SIZES.arrow ?? ARROW_SIZE) + END_STUB_EXTRA;
+
 // Edge label
 export const EDGE_LABEL_BACKGROUND_RADIUS = 2;
 
