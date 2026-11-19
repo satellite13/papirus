@@ -9,6 +9,8 @@
 
 ## [Unreleased]
 
+## [0.9.20] - 2026-11-19
+
 ### Добавлено
 - Скругление углов `polyline` / `editable-polyline` (`EDGE_BEND_RADIUS` = 3); то же в SVG. Hit-test остаётся по острой ломаной.
 - Mid-segment handle сдвигает ортогональный сегмент; авто-`polyline` при первом жесте становится `editable-polyline`. У крайних сегментов вставляются изломы.

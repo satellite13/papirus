@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.20] - 2026-11-19
+
 ### Added
 - Polyline / editable-polyline corners render with a small fillet (`EDGE_BEND_RADIUS` = 3); SVG export matches. Hit-testing stays on the sharp path.
 - Mid-segment handles move orthogonal segments; auto-`polyline` promotes to `editable-polyline` on first drag. Endpoint segments insert stub bends.
