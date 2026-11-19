@@ -1,6 +1,7 @@
 import type { Point } from '@/types';
 import type { PathStrategy, PathStrategyOptions, PathObstacle } from './PathStrategy';
-import { routeOrthogonalAround, type Side } from './routeOrthogonalAround';
+import { endStubMeet, routeOrthogonalAround, type Side } from './routeOrthogonalAround';
+import { ROUTE_BEND_COST } from './routeCost';
 import { distance, distanceToSegment } from '@/utils/geometry';
 import { isHorizontal, isVertical, isOppositeDirections } from '@/utils/direction';
 import { routeDebug } from '@/utils/routeDebug';
@@ -117,17 +118,16 @@ const OPPOSITE_BYPASS_ARC = 48;
 const OBSTACLE_ROUTING_DISTANCE = 1200;
 const OBSTACLE_MARGIN = 12;
 const ROUTE_EXIT_DISTANCE = 32;
-const TURN_PENALTY = 70;
-const FIRST_VERTICAL_PENALTY = 28;
+const ROUTE_TARGET_MARGIN = 4;
 
-function expandObstacles(obstacles: PathObstacle[], margin: number): PathObstacle[] {
-  return obstacles.map((obstacle) => ({
-    ...obstacle,
-    x: obstacle.x - margin,
-    y: obstacle.y - margin,
-    width: obstacle.width + margin * 2,
-    height: obstacle.height + margin * 2,
-  }));
+function expandForRouting(
+  obstacles: PathObstacle[],
+  target: PathObstacle | undefined
+): PathObstacle[] {
+  return obstacles.map((o) => {
+    const m = o === target ? ROUTE_TARGET_MARGIN : OBSTACLE_MARGIN;
+    return { ...o, x: o.x - m, y: o.y - m, width: o.width + m * 2, height: o.height + m * 2 };
+  });
 }
 
 function pointInsideObstacle(point: Point, obstacle: PathObstacle): boolean {
@@ -192,17 +192,16 @@ function moveByDir(point: Point, dir: string | undefined, distance: number): Poi
   }
 }
 
-/** Push `point` along `dir` until it clears every obstacle (plus margin). */
+/** Push `point` along `dir` until it clears every pre-expanded obstacle. */
 function moveOutsideObstacles(
   point: Point,
   dir: string | undefined,
-  obstacles: PathObstacle[],
+  expanded: PathObstacle[],
   minDistance: number
 ): Point {
-  if (!dir || obstacles.length === 0) {
+  if (!dir || expanded.length === 0) {
     return moveByDir(point, dir, minDistance);
   }
-  const expanded = expandObstacles(obstacles, OBSTACLE_MARGIN);
   let dist = minDistance;
   let candidate = moveByDir(point, dir, dist);
   const step = 16;
@@ -212,6 +211,12 @@ function moveOutsideObstacles(
     candidate = moveByDir(point, dir, dist);
   }
   return candidate;
+}
+
+function routeAxis(dir: string | undefined): 'h' | 'v' | null {
+  if (isHorizontal(dir)) return 'h';
+  if (isVertical(dir)) return 'v';
+  return null;
 }
 
 function inferExitDir(from: Point, to: Point): string {
@@ -283,19 +288,23 @@ function buildRoutedPolyline(
   to: Point,
   fromDir: string | undefined,
   toDir: string | undefined,
-  obstacles: PathObstacle[]
+  obstacles: PathObstacle[],
+  endStubLength: number
 ): Point[] | null {
   if (obstacles.length === 0) {
     return null;
   }
 
   const effectiveFromDir = fromDir ?? inferExitDir(from, to);
-  const { target: routedTarget } = resolveRoutingRoles(from, to, obstacles);
+  const roles = resolveRoutingRoles(from, to, obstacles);
+  // Padded obstacles put `to` inside the rect, not on its outline — fall back to containment.
+  const routedTarget =
+    roles.target ?? smallestContaining(to, obstacles, new Set(roles.source ? [roles.source] : []));
   const effectiveToDir = resolveApproachDir(from, to, toDir, routedTarget);
 
-  const startExit = moveOutsideObstacles(from, effectiveFromDir, obstacles, ROUTE_EXIT_DISTANCE);
-  const endEntry = moveOutsideObstacles(to, effectiveToDir, obstacles, ROUTE_EXIT_DISTANCE);
-  const expanded = expandObstacles(obstacles, OBSTACLE_MARGIN);
+  const expanded = expandForRouting(obstacles, routedTarget);
+  const startExit = moveOutsideObstacles(from, effectiveFromDir, expanded, ROUTE_EXIT_DISTANCE);
+  const endEntry = moveOutsideObstacles(to, effectiveToDir, expanded, endStubLength);
 
   const xs = new Set<number>([startExit.x, endEntry.x]);
   const ys = new Set<number>([startExit.y, endEntry.y]);
@@ -385,11 +394,14 @@ function buildRoutedPolyline(
   const open: QueueState[] = [];
   const best = new Map<string, number>();
   const prev = new Map<string, string>();
-  const startKey = makeStateKey(startIdx, 's');
+  const startAxis = routeAxis(effectiveFromDir);
+  const goalAxis = routeAxis(effectiveToDir);
+  const startDir: DirState = startAxis ?? 's';
+  const startKey = makeStateKey(startIdx, startDir);
   best.set(startKey, 0);
   open.push({
     node: startIdx,
-    dir: 's',
+    dir: startDir,
     g: 0,
     f: manhattan(nodes[startIdx]!, nodes[goalIdx]!),
     key: startKey,
@@ -411,10 +423,10 @@ function buildRoutedPolyline(
       const nextDir = edge.dir;
       let stepCost = edge.length;
       if (current.dir !== 's' && current.dir !== nextDir) {
-        stepCost += TURN_PENALTY;
+        stepCost += ROUTE_BEND_COST;
       }
-      if (current.dir === 's' && nextDir === 'v') {
-        stepCost += FIRST_VERTICAL_PENALTY;
+      if (edge.to === goalIdx && goalAxis && nextDir !== goalAxis) {
+        stepCost += ROUTE_BEND_COST;
       }
       const nextG = current.g + stepCost;
       const nextKey = makeStateKey(edge.to, nextDir);
@@ -650,7 +662,7 @@ export class PolylinePathStrategy implements PathStrategy {
 
     // Generic multi-obstacle A* (no parent/target specialization)
     if (!selfLoop && dist < OBSTACLE_ROUTING_DISTANCE) {
-      const routed = buildRoutedPolyline(from, to, fromDir, toDir, obstacles);
+      const routed = buildRoutedPolyline(from, to, fromDir, toDir, obstacles, endStubLength);
       if (routed) {
         return finish('buildRoutedPolyline', routed);
       }
@@ -658,7 +670,10 @@ export class PolylinePathStrategy implements PathStrategy {
 
     // One-sided or partial dirs / directed without specialized obstacles
     if (fromDir || toDir) {
-      return finish('calculateDirectedPath', this.calculateDirectedPath(from, to, fromDir, toDir));
+      return finish(
+        'calculateDirectedPath',
+        this.calculateDirectedPath(from, to, fromDir, toDir, endStubLength)
+      );
     }
 
     // Classic manhattan when dirs are absent
@@ -670,7 +685,13 @@ export class PolylinePathStrategy implements PathStrategy {
     return finish('manhattan-v', [from, { x: from.x, y: midY }, { x: to.x, y: midY }, to]);
   }
 
-  private calculateDirectedPath(from: Point, to: Point, fromDir?: string, toDir?: string): Point[] {
+  private calculateDirectedPath(
+    from: Point,
+    to: Point,
+    fromDir: string | undefined,
+    toDir: string | undefined,
+    endStubLength: number
+  ): Point[] {
     const points: Point[] = [from];
 
     // Determine first segment based on fromDir
@@ -680,7 +701,6 @@ export class PolylinePathStrategy implements PathStrategy {
     const toVertical = toDir === 'top' || toDir === 'bottom';
 
     if (fromVertical && toVertical) {
-      // Both vertical: route with horizontal middle segment
       const midY = (from.y + to.y) / 2;
       const exitY =
         fromDir === 'top'
@@ -688,18 +708,27 @@ export class PolylinePathStrategy implements PathStrategy {
           : Math.max(from.y + MIN_SEGMENT_LENGTH, midY);
       const entryY =
         toDir === 'top'
-          ? Math.min(to.y - MIN_SEGMENT_LENGTH, midY)
-          : Math.max(to.y + MIN_SEGMENT_LENGTH, midY);
-
-      if (Math.abs(exitY - entryY) < 1) {
-        points.push({ x: from.x, y: exitY });
-        points.push({ x: to.x, y: exitY });
+          ? Math.min(to.y - endStubLength, midY)
+          : Math.max(to.y + endStubLength, midY);
+      const facing =
+        (fromDir === 'bottom' && toDir === 'top' && to.y > from.y) ||
+        (fromDir === 'top' && toDir === 'bottom' && to.y < from.y);
+      if (facing) {
+        const y = endStubMeet(from.y, to.y, endStubLength);
+        points.push({ x: from.x, y }, { x: to.x, y });
+      } else if (fromDir === toDir) {
+        const y = fromDir === 'top' ? Math.min(exitY, entryY) : Math.max(exitY, entryY);
+        points.push({ x: from.x, y }, { x: to.x, y });
       } else {
-        points.push({ x: from.x, y: exitY });
-        points.push({ x: to.x, y: exitY });
+        const midX = (from.x + to.x) / 2;
+        points.push(
+          { x: from.x, y: exitY },
+          { x: midX, y: exitY },
+          { x: midX, y: entryY },
+          { x: to.x, y: entryY }
+        );
       }
     } else if (fromHorizontal && toHorizontal) {
-      // Both horizontal: route with vertical middle segment
       const midX = (from.x + to.x) / 2;
       const exitX =
         fromDir === 'left'
@@ -707,35 +736,43 @@ export class PolylinePathStrategy implements PathStrategy {
           : Math.max(from.x + MIN_SEGMENT_LENGTH, midX);
       const entryX =
         toDir === 'left'
-          ? Math.min(to.x - MIN_SEGMENT_LENGTH, midX)
-          : Math.max(to.x + MIN_SEGMENT_LENGTH, midX);
-
-      if (Math.abs(exitX - entryX) < 1) {
-        points.push({ x: exitX, y: from.y });
-        points.push({ x: exitX, y: to.y });
+          ? Math.min(to.x - endStubLength, midX)
+          : Math.max(to.x + endStubLength, midX);
+      const facing =
+        (fromDir === 'right' && toDir === 'left' && to.x > from.x) ||
+        (fromDir === 'left' && toDir === 'right' && to.x < from.x);
+      if (facing) {
+        const x = endStubMeet(from.x, to.x, endStubLength);
+        points.push({ x, y: from.y }, { x, y: to.y });
+      } else if (fromDir === toDir) {
+        const x = fromDir === 'left' ? Math.min(exitX, entryX) : Math.max(exitX, entryX);
+        points.push({ x, y: from.y }, { x, y: to.y });
       } else {
-        points.push({ x: exitX, y: from.y });
-        points.push({ x: exitX, y: to.y });
+        const midY = (from.y + to.y) / 2;
+        points.push(
+          { x: exitX, y: from.y },
+          { x: exitX, y: midY },
+          { x: entryX, y: midY },
+          { x: entryX, y: to.y }
+        );
       }
     } else if (fromVertical && toHorizontal) {
-      // Exit along fromDir first; horizontal approach jog stays in the mid-gap.
-      const exitY =
-        fromDir === 'top' ? from.y - MIN_SEGMENT_LENGTH : from.y + MIN_SEGMENT_LENGTH;
-      const entryX =
-        toDir === 'left' ? to.x - MIN_SEGMENT_LENGTH : to.x + MIN_SEGMENT_LENGTH;
+      const exitY = fromDir === 'top' ? from.y - MIN_SEGMENT_LENGTH : from.y + MIN_SEGMENT_LENGTH;
       const jogX = (from.x + to.x) / 2;
       const approachX =
-        Math.abs(jogX - to.x) >= MIN_SEGMENT_LENGTH
-          ? jogX
-          : entryX;
+        toDir === 'left'
+          ? Math.min(jogX, to.x - endStubLength)
+          : Math.max(jogX, to.x + endStubLength);
       points.push({ x: from.x, y: exitY });
       points.push({ x: approachX, y: exitY });
       points.push({ x: approachX, y: to.y });
     } else if (fromHorizontal && toVertical) {
-      // Exit along fromDir first; horizontal jog in mid-gap, then vertical into target.
-      const exitX =
-        fromDir === 'left' ? from.x - MIN_SEGMENT_LENGTH : from.x + MIN_SEGMENT_LENGTH;
-      const jogY = (from.y + to.y) / 2;
+      const exitX = fromDir === 'left' ? from.x - MIN_SEGMENT_LENGTH : from.x + MIN_SEGMENT_LENGTH;
+      const midY = (from.y + to.y) / 2;
+      const jogY =
+        toDir === 'top'
+          ? Math.min(midY, to.y - endStubLength)
+          : Math.max(midY, to.y + endStubLength);
       points.push({ x: exitX, y: from.y });
       points.push({ x: exitX, y: jogY });
       points.push({ x: to.x, y: jogY });
@@ -747,7 +784,7 @@ export class PolylinePathStrategy implements PathStrategy {
     }
 
     points.push(to);
-    return points;
+    return simplifyPath(points);
   }
 
   hitTest(point: Point, path: Point[], tolerance: number): boolean {

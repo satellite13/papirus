@@ -221,3 +221,70 @@ describe('endStubMeet / clampFacingExitEntry', () => {
     }
   });
 });
+
+describe('end stub (buildRoutedPolyline, no roles)', () => {
+  it('exactStub geometry without roles and without fromDir', () => {
+    const sc = scenarios.exactStub;
+    const raw = (r: { x: number; y: number; width: number; height: number }) => ({
+      x: r.x - 4,
+      y: r.y - 4,
+      width: r.width + 8,
+      height: r.height + 8,
+    });
+    const path = new PolylinePathStrategy().calculatePath(sc.from, sc.to, undefined, 'top', {
+      obstacles: [raw(sc.a), raw(sc.b)],
+    });
+    const seg = lastSegment(path);
+    expect(seg.axis).toBe('v');
+    expect(seg.len, JSON.stringify(path)).toBeCloseTo(16, 3);
+  });
+});
+
+describe('end stub (calculateDirectedPath, no obstacles)', () => {
+  const s = new PolylinePathStrategy();
+  const route = (from: P, to: P, fromDir: string, toDir: string) =>
+    s.calculatePath(from, to, fromDir, toDir);
+
+  // Without obstacles the Task 6 post-pass may turn these into an L (longer stub) —
+  // assert the lower bound and the approach side, not an exact length.
+  it('vertical → horizontal: stub before a near target', () => {
+    const path = route({ x: 0, y: 0 }, { x: 30, y: 50 }, 'bottom', 'left');
+    const seg = lastSegment(path);
+    expect(seg.axis).toBe('h');
+    expect(seg.len).toBeGreaterThanOrEqual(16);
+    expect(path[path.length - 2]!.x).toBeLessThan(30);
+  });
+
+  it('horizontal → vertical: jog keeps the stub', () => {
+    const path = route({ x: 0, y: 0 }, { x: 100, y: 20 }, 'right', 'top');
+    const seg = lastSegment(path);
+    expect(seg.axis).toBe('v');
+    expect(seg.len).toBeGreaterThanOrEqual(16);
+    expect(path[path.length - 2]!.y).toBeLessThan(20);
+  });
+
+  it('facing vertical: meet keeps the stub, tight gap uses the middle', () => {
+    expect(lastSegment(route({ x: 0, y: 0 }, { x: 100, y: 30 }, 'bottom', 'top'))).toEqual({
+      len: 16,
+      axis: 'v',
+    });
+    expect(lastSegment(route({ x: 0, y: 0 }, { x: 100, y: 20 }, 'bottom', 'top'))).toEqual({
+      len: 10,
+      axis: 'v',
+    });
+  });
+
+  it('bottom → bottom approaches from below, not through the target', () => {
+    const path = route({ x: 0, y: 0 }, { x: 100, y: 100 }, 'bottom', 'bottom');
+    const pre = path[path.length - 2]!;
+    expect(pre.y).toBeGreaterThan(100);
+    expect(lastSegment(path)).toEqual({ len: 16, axis: 'v' });
+  });
+
+  it('facing horizontal mirrors the vertical rule', () => {
+    expect(lastSegment(route({ x: 0, y: 0 }, { x: 30, y: 100 }, 'right', 'left'))).toEqual({
+      len: 16,
+      axis: 'h',
+    });
+  });
+});

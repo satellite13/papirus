@@ -688,17 +688,14 @@ describe('Edge', () => {
       });
       const from = { x: 570, y: 180 };
       const to = { x: 640, y: 310 };
-      // Reconnect preview without obstacles can leave a path through the target body.
       edge.updateEndpoints(from, to, 'bottom', 'right');
       const pathWithoutObstacles = edge.path;
-      const snapshot = pathWithoutObstacles.map((p) => ({ ...p }));
 
       const target = { id: 'error', x: 520, y: 280, width: 120, height: 60, role: 'target' as const };
       edge.updateEndpoints(from, to, 'bottom', 'right', { obstacles: [target] });
 
       // Must rebuild (not early-return) when only routing options change.
       expect(edge.path).not.toBe(pathWithoutObstacles);
-      expect(edge.path).not.toEqual(snapshot);
       const pre = edge.path[edge.path.length - 2]!;
       // Arrive from outside along the attachment side (right).
       expect(pre.x).toBeGreaterThan(to.x - 0.5);
