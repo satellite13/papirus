@@ -1,6 +1,12 @@
 import type { Point } from '@/types';
 import type { PathStrategy, PathStrategyOptions, PathObstacle } from './PathStrategy';
-import { endStubMeet, routeOrthogonalAround, type Side } from './routeOrthogonalAround';
+import { reduceOrthogonalBends } from './reduceOrthogonalBends';
+import {
+  endStubMeet,
+  routeOrthogonalAround,
+  type RouteRect,
+  type Side,
+} from './routeOrthogonalAround';
 import { ROUTE_BEND_COST } from './routeCost';
 import { distance, distanceToSegment } from '@/utils/geometry';
 import { isHorizontal, isVertical, isOppositeDirections } from '@/utils/direction';
@@ -104,6 +110,39 @@ function resolveRoutingRoles(
   });
 
   return { parent, source, target, others };
+}
+
+const REDUCE_MARGIN = 4;
+
+function reduceRouteBends(
+  from: Point,
+  to: Point,
+  path: Point[],
+  obstacles: PathObstacle[]
+): Point[] {
+  if (path.length <= 3) return path;
+  const roles = resolveRoutingRoles(from, to, obstacles);
+  const source = roles.source;
+  // Padded obstacles put `to` inside the rect, not on its outline — fall back to containment.
+  const target =
+    roles.target ?? smallestContaining(to, obstacles, new Set(source ? [source] : []));
+  const checks: RouteRect[] = [];
+  for (const o of obstacles) {
+    if (o !== source && o !== target) {
+      const hasFrom = pointInObstacle(from, o);
+      const hasTo = pointInObstacle(to, o);
+      if (hasFrom && hasTo) continue;
+      // Leaving a container through its wall: the router's exit must stay intact.
+      if (hasFrom || hasTo) return path;
+    }
+    checks.push({
+      x: o.x - REDUCE_MARGIN,
+      y: o.y - REDUCE_MARGIN,
+      width: o.width + REDUCE_MARGIN * 2,
+      height: o.height + REDUCE_MARGIN * 2,
+    });
+  }
+  return reduceOrthogonalBends(path, checks);
 }
 
 const MIN_SEGMENT_LENGTH = 20;
@@ -509,7 +548,8 @@ export class PolylinePathStrategy implements PathStrategy {
     const dist = distance(from, to);
     const selfLoop = _options?.selfLoop ?? false;
     const obstacles = _options?.obstacles ?? [];
-    const finish = (via: string, path: Point[]): Point[] => {
+    const finish = (via: string, rawPath: Point[]): Point[] => {
+      const path = reduceRouteBends(from, to, rawPath, obstacles);
       const roles = resolveRoutingRoles(from, to, obstacles);
       routeDebug('polyline.via', {
         via,
