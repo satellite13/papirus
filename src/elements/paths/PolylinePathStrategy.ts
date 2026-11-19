@@ -119,6 +119,7 @@ const OBSTACLE_ROUTING_DISTANCE = 1200;
 const OBSTACLE_MARGIN = 12;
 const ROUTE_EXIT_DISTANCE = 32;
 const ROUTE_TARGET_MARGIN = 4;
+const ALIGNED_BEHIND_DETOUR = 48;
 
 function expandForRouting(
   obstacles: PathObstacle[],
@@ -211,6 +212,29 @@ function moveOutsideObstacles(
     candidate = moveByDir(point, dir, dist);
   }
   return candidate;
+}
+
+/**
+ * Interior vertices from `from` to `to` arriving along the outward normal of `toDir`
+ * from outside, with the fewest bends and an end stub ≥ `endStubLength`.
+ */
+function approachAlongNormal(from: Point, to: Point, toDir: Side, endStubLength: number): Point[] {
+  const horizontal = toDir === 'left' || toDir === 'right';
+  const sign = toDir === 'left' || toDir === 'top' ? -1 : 1;
+  const at = (a: number, b: number): Point => (horizontal ? { x: a, y: b } : { x: b, y: a });
+  const fromA = horizontal ? from.x : from.y;
+  const fromB = horizontal ? from.y : from.x;
+  const toA = horizontal ? to.x : to.y;
+  const toB = horizontal ? to.y : to.x;
+  const ahead = (fromA - toA) * sign;
+  const aligned = Math.abs(fromB - toB) < 0.001;
+  if (aligned && ahead >= 0) return [];
+  if (ahead >= endStubLength) return [at(fromA, toB)];
+  const entryA = toA + sign * endStubLength;
+  if (!aligned) return [at(entryA, fromB), at(entryA, toB)];
+  // Directly behind: target size is unknown here, step aside before passing it.
+  const detourB = toB + ALIGNED_BEHIND_DETOUR;
+  return [at(fromA, detourB), at(entryA, detourB), at(entryA, toB)];
 }
 
 function routeAxis(dir: string | undefined): 'h' | 'v' | null {
@@ -776,6 +800,8 @@ export class PolylinePathStrategy implements PathStrategy {
       points.push({ x: exitX, y: from.y });
       points.push({ x: exitX, y: jogY });
       points.push({ x: to.x, y: jogY });
+    } else if (isSide(toDir)) {
+      points.push(...approachAlongNormal(from, to, toDir, endStubLength));
     } else {
       // Fallback: one corner
       const midX = (from.x + to.x) / 2;
@@ -784,7 +810,8 @@ export class PolylinePathStrategy implements PathStrategy {
     }
 
     points.push(to);
-    return simplifyPath(points);
+    const simplified = simplifyPath(points);
+    return simplified.length < 2 ? [from, to] : simplified;
   }
 
   hitTest(point: Point, path: Point[], tolerance: number): boolean {

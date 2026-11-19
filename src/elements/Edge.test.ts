@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { Edge } from './Edge';
 import { mockCanvasContext } from '@/test/testUtils';
+import { crosses } from '@/test/routingScenarios';
 
 describe('Edge', () => {
   it('recalculates path and hit tests', () => {
@@ -688,14 +689,20 @@ describe('Edge', () => {
       });
       const from = { x: 570, y: 180 };
       const to = { x: 640, y: 310 };
+      // Reconnect preview without obstacles routes straight through the blocker.
       edge.updateEndpoints(from, to, 'bottom', 'right');
       const pathWithoutObstacles = edge.path;
+      const snapshot = pathWithoutObstacles.map((p) => ({ ...p }));
 
       const target = { id: 'error', x: 520, y: 280, width: 120, height: 60, role: 'target' as const };
-      edge.updateEndpoints(from, to, 'bottom', 'right', { obstacles: [target] });
+      const blocker = { id: 'blocker', x: 590, y: 190, width: 40, height: 30 };
+      expect(crosses(pathWithoutObstacles, blocker)).toBe(true);
+      edge.updateEndpoints(from, to, 'bottom', 'right', { obstacles: [target, blocker] });
 
       // Must rebuild (not early-return) when only routing options change.
       expect(edge.path).not.toBe(pathWithoutObstacles);
+      expect(edge.path).not.toEqual(snapshot);
+      expect(crosses(edge.path, blocker), JSON.stringify(edge.path)).toBe(false);
       const pre = edge.path[edge.path.length - 2]!;
       // Arrive from outside along the attachment side (right).
       expect(pre.x).toBeGreaterThan(to.x - 0.5);

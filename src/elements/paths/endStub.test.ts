@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { DEFAULT_END_STUB } from '@/constants';
+import { countBends } from './routeCost';
 import { clampFacingExitEntry, endStubMeet } from './routeOrthogonalAround';
 import { PolylinePathStrategy } from './PolylinePathStrategy';
 import { crosses, routeScenario, scenarios } from '@/test/routingScenarios';
@@ -286,5 +287,85 @@ describe('end stub (calculateDirectedPath, no obstacles)', () => {
       len: 16,
       axis: 'h',
     });
+  });
+});
+
+describe('end stub (calculateDirectedPath, toDir only)', () => {
+  const s = new PolylinePathStrategy();
+  const to = { x: 0, y: 0 };
+  const normal: Record<string, P> = {
+    left: { x: -1, y: 0 },
+    right: { x: 1, y: 0 },
+    top: { x: 0, y: -1 },
+    bottom: { x: 0, y: 1 },
+  };
+  // `ahead` along the outward normal of toDir, `across` perpendicular to it.
+  const offsets = [
+    { name: 'front', ahead: 100, across: 50, bends: 1 },
+    { name: 'front aligned', ahead: 100, across: 0, bends: 0 },
+    { name: 'front close', ahead: 8, across: 60, bends: 2 },
+    { name: 'side', ahead: 0, across: 100, bends: 2 },
+    { name: 'behind', ahead: -100, across: -50, bends: 2 },
+    { name: 'behind aligned', ahead: -100, across: 0, bends: 3 },
+  ];
+
+  for (const toDir of ['left', 'right', 'top', 'bottom']) {
+    const n = normal[toDir]!;
+    for (const o of offsets) {
+      it(`${toDir}, from ${o.name}: arrives from outside along the normal`, () => {
+        const from = { x: n.x * o.ahead + n.y * o.across, y: n.y * o.ahead + n.x * o.across };
+        const path = s.calculatePath(from, to, undefined, toDir);
+        const msg = JSON.stringify(path);
+        expect(path[0], msg).toEqual(from);
+        expect(path[path.length - 1], msg).toEqual(to);
+        for (let i = 1; i < path.length; i++) {
+          const a = path[i - 1]!;
+          const b = path[i]!;
+          expect(a.x === b.x || a.y === b.y, `diagonal: ${msg}`).toBe(true);
+          expect(a.x === b.x && a.y === b.y, `duplicate: ${msg}`).toBe(false);
+        }
+        const pre = path[path.length - 2]!;
+        expect((pre.x - to.x) * n.x + (pre.y - to.y) * n.y, msg).toBeGreaterThan(0);
+        const seg = lastSegment(path);
+        expect(seg.axis, msg).toBe(axisOfSide(toDir));
+        expect(seg.len, msg).toBeGreaterThanOrEqual(DEFAULT_END_STUB);
+        expect(countBends(path), msg).toBe(o.bends);
+        if (o.bends >= 2) expect(seg.len, msg).toBeCloseTo(DEFAULT_END_STUB, 3);
+        // Earlier segments never pass through the attachment point.
+        for (let i = 1; i < path.length - 1; i++) {
+          const a = path[i - 1]!;
+          const b = path[i]!;
+          const onSeg =
+            Math.min(a.x, b.x) <= to.x &&
+            to.x <= Math.max(a.x, b.x) &&
+            Math.min(a.y, b.y) <= to.y &&
+            to.y <= Math.max(a.y, b.y);
+          expect(onSeg, `through target: ${msg}`).toBe(false);
+        }
+      });
+    }
+  }
+
+  it('review probe: left attachment is approached from the left', () => {
+    const path = s.calculatePath({ x: 200, y: 0 }, { x: 0, y: 100 }, undefined, 'left');
+    expect(path[path.length - 2]!.x).toBeLessThan(0);
+    expect(lastSegment(path)).toEqual({ len: 16, axis: 'h' });
+  });
+});
+
+describe('calculateDirectedPath degenerate input', () => {
+  it('from == to keeps at least two points', () => {
+    const s = new PolylinePathStrategy();
+    const p = { x: 10, y: 10 };
+    for (const [fromDir, toDir] of [
+      ['bottom', 'top'],
+      ['right', 'left'],
+      ['bottom', 'left'],
+      [undefined, 'top'],
+      ['left', undefined],
+    ] as const) {
+      const path = s.calculatePath(p, p, fromDir, toDir);
+      expect(path.length, `${fromDir}→${toDir}: ${JSON.stringify(path)}`).toBeGreaterThanOrEqual(2);
+    }
   });
 });
