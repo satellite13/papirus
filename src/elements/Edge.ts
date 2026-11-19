@@ -30,7 +30,11 @@ import {
 } from '@/constants';
 import { traceRoundedPolyline } from '@/utils/roundedPolyline';
 import { collapseColinearPoints } from '@/utils/orthogonalSegmentDrag';
-import { getCanvasMarkerLength, renderEdgeMarkers } from './edge/EdgeMarkerRenderer';
+import {
+  getCanvasMarkerLength,
+  renderEdgeMarkers,
+  resolveEndStubLength,
+} from './edge/EdgeMarkerRenderer';
 import {
   getEdgeLabelPosition,
   getEdgeLabelRotation,
@@ -259,6 +263,7 @@ export class Edge extends Element {
   set arrowType(value: ArrowType) {
     if (this._arrowType !== value) {
       this._arrowType = value;
+      this.recalculatePath();
       this.markDirty();
     }
   }
@@ -272,6 +277,7 @@ export class Edge extends Element {
 
   set startMarker(value: ArrowMarkerConfig | undefined) {
     this._startMarker = value;
+    this.recalculatePath();
     this.markDirty();
   }
 
@@ -284,6 +290,7 @@ export class Edge extends Element {
 
   set endMarker(value: ArrowMarkerConfig | undefined) {
     this._endMarker = value;
+    this.recalculatePath();
     this.markDirty();
   }
 
@@ -589,6 +596,11 @@ export class Edge extends Element {
         controlPoints: this._controlPoints,
         editablePolyline: this.isEditablePolyline(),
         selfLoop: this._from.nodeId === this._to.nodeId,
+        endStubLength: resolveEndStubLength({
+          startMarker: this._startMarker,
+          endMarker: this._endMarker,
+          arrowType: this._arrowType,
+        }),
       }
     );
     if (

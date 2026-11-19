@@ -2,6 +2,8 @@ import { describe, it, expect, vi } from 'vitest';
 import { Edge } from './Edge';
 import { mockCanvasContext } from '@/test/testUtils';
 import { crosses } from '@/test/routingScenarios';
+import { PolylinePathStrategy } from './paths';
+import { getMarkerVisualLength, resolveEndStubLength } from './edge/EdgeMarkerRenderer';
 
 describe('Edge', () => {
   it('recalculates path and hit tests', () => {
@@ -829,5 +831,104 @@ describe('Edge', () => {
     edge.render(ctx);
 
     expect(vi.mocked(ctx.arcTo).mock.calls.length).toBeGreaterThan(0);
+  });
+});
+
+describe('Edge end stub length', () => {
+  it('follows the visible end marker size', () => {
+    expect(getMarkerVisualLength({ type: 'arrow' })).toBe(12);
+    expect(getMarkerVisualLength({ type: 'open' })).toBe(12);
+    expect(getMarkerVisualLength({ type: 'circle' })).toBe(12);
+    expect(getMarkerVisualLength({ type: 'none' })).toBe(0);
+    const r = (m: Parameters<typeof resolveEndStubLength>[0]) => resolveEndStubLength(m);
+    expect(r({ endMarker: { type: 'arrow' }, arrowType: 'single' })).toBe(16);
+    expect(r({ endMarker: { type: 'open' }, arrowType: 'single' })).toBe(16);
+    expect(r({ endMarker: { type: 'diamond' }, arrowType: 'single' })).toBe(18);
+    expect(r({ endMarker: { type: 'circle' }, arrowType: 'single' })).toBe(16);
+    expect(r({ endMarker: { type: 'arrow', size: 20 }, arrowType: 'single' })).toBe(24);
+    expect(r({ endMarker: { type: 'none' }, arrowType: 'single' })).toBe(12);
+    expect(r({ startMarker: { type: 'diamond' }, arrowType: 'single' })).toBe(12);
+    expect(r({ arrowType: 'single' })).toBe(14);
+    expect(r({ arrowType: 'none' })).toBe(12);
+  });
+
+  it('passes endStubLength to the strategy and recalculates on marker changes', () => {
+    const spy = vi.spyOn(PolylinePathStrategy.prototype, 'calculatePath');
+    const edge = new Edge({
+      from: { nodeId: 'a' },
+      to: { nodeId: 'b' },
+      type: 'polyline',
+      endMarker: { type: 'diamond' },
+    });
+    edge.updateEndpoints({ x: 0, y: 0 }, { x: 100, y: 50 }, 'right', 'left');
+    expect(spy.mock.calls.at(-1)?.[4]?.endStubLength).toBe(18);
+
+    spy.mockClear();
+    edge.endMarker = { type: 'arrow' };
+    expect(spy).toHaveBeenCalled();
+    expect(spy.mock.calls.at(-1)?.[4]?.endStubLength).toBe(16);
+
+    spy.mockClear();
+    edge.endMarker = undefined;
+    edge.startMarker = undefined;
+    edge.arrowType = 'none';
+    expect(spy).toHaveBeenCalled();
+    expect(spy.mock.calls.at(-1)?.[4]?.endStubLength).toBe(12);
+    spy.mockRestore();
+  });
+
+  it('keeps the end stub at the marker length after a marker change on a routed edge', () => {
+    const edge = new Edge({
+      from: { nodeId: 'a' },
+      to: { nodeId: 'b' },
+      type: 'polyline',
+      endMarker: { type: 'arrow' },
+    });
+    edge.updateEndpoints({ x: 0, y: 0 }, { x: 100, y: 50 }, 'right', 'left');
+    const stub = (): number => {
+      const p = edge.path;
+      const last = p.at(-1)!;
+      const prev = p.at(-2)!;
+      return Math.abs(last.x - prev.x) + Math.abs(last.y - prev.y);
+    };
+    const before = edge.path.map((p) => ({ ...p }));
+
+    expect(stub()).toBeLessThan(64);
+
+    edge.endMarker = { type: 'arrow', size: 60 };
+    expect(stub()).toBeGreaterThanOrEqual(64);
+    expect(edge.path).not.toEqual(before);
+  });
+
+  it('marker changes keep editable-polyline control points', () => {
+    const controlPoints = [
+      { x: 50, y: 0 },
+      { x: 50, y: 40 },
+    ];
+    const edge = new Edge({
+      from: { nodeId: 'a' },
+      to: { nodeId: 'b' },
+      type: 'editable-polyline',
+      controlPoints,
+    });
+    edge.updateEndpoints({ x: 0, y: 0 }, { x: 100, y: 40 }, 'right', 'left');
+    const before = edge.path.map((p) => ({ ...p }));
+
+    edge.endMarker = { type: 'diamond', size: 40 };
+    edge.startMarker = { type: 'circle' };
+    edge.arrowType = 'none';
+
+    expect(edge.controlPoints).toEqual(controlPoints);
+    expect(edge.path).toEqual(before);
+  });
+
+  it('marker setters work before the edge has endpoints', () => {
+    const edge = new Edge({ from: { nodeId: 'a' }, to: { nodeId: 'b' }, type: 'polyline' });
+    expect(() => {
+      edge.endMarker = { type: 'diamond' };
+      edge.startMarker = { type: 'arrow' };
+      edge.arrowType = 'none';
+    }).not.toThrow();
+    expect(edge.endMarker).toEqual({ type: 'diamond' });
   });
 });

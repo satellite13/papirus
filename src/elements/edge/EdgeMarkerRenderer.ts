@@ -1,4 +1,4 @@
-import { ARROW_ANGLE, ARROW_SIZE, MARKER_SIZES } from '@/constants';
+import { ARROW_ANGLE, ARROW_SIZE, END_STUB_EXTRA, END_STUB_MIN, MARKER_SIZES } from '@/constants';
 import type { ArrowMarkerConfig, ArrowType, EdgePathType, Point } from '@/types';
 import {
   calculateArrowMarkerPoints,
@@ -32,6 +32,28 @@ export function getCanvasMarkerLength(config: ArrowMarkerConfig): number {
     default:
       return 0;
   }
+}
+
+/** Drawn length of the marker along the path (unlike getCanvasMarkerLength, `open` counts). */
+export function getMarkerVisualLength(config: ArrowMarkerConfig): number {
+  if (config.type === 'none') return 0;
+  const size = config.size ?? MARKER_SIZES[config.type] ?? ARROW_SIZE;
+  return config.type === 'circle' || config.type === 'square' ? size * 2 : size;
+}
+
+/** Mirrors renderEdgeMarkers: configured markers win over the legacy arrowType head. */
+export function resolveEndStubLength(markers: {
+  startMarker?: ArrowMarkerConfig;
+  endMarker?: ArrowMarkerConfig;
+  arrowType: ArrowType;
+}): number {
+  let markerLength: number;
+  if (markers.startMarker !== undefined || markers.endMarker !== undefined) {
+    markerLength = markers.endMarker ? getMarkerVisualLength(markers.endMarker) : 0;
+  } else {
+    markerLength = markers.arrowType === 'none' ? 0 : ARROW_SIZE;
+  }
+  return Math.max(END_STUB_MIN, markerLength + END_STUB_EXTRA);
 }
 
 export function renderEdgeMarkers(
