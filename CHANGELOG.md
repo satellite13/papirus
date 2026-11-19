@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.21] - 2026-11-19
+
+### Fixed
+- Dragging on a polyline segment body inserts a bend and moves it. Crossing the drag threshold no longer cancels the pending insert.
+
 ## [0.9.20] - 2026-11-19
 
 ### Added

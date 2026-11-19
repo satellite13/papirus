@@ -565,7 +565,11 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
       const dx = event.worldX - this.pendingSegmentInsert.startX;
       const dy = event.worldY - this.pendingSegmentInsert.startY;
       if (dx * dx + dy * dy > DRAG_START_THRESHOLD * DRAG_START_THRESHOLD) {
+        // Drag past the click threshold: insert the bend now and keep dragging it.
+        // Cancelling here dropped insert-then-drag (magnet / undo tests).
+        const pending = this.pendingSegmentInsert;
         this.cancelPendingSegmentInsert();
+        this.beginInsertBend(pending.edge, pending.segmentIndex, pending.point);
       }
     }
 
