@@ -23,7 +23,61 @@ function hits(path: { x: number; y: number }[], obstacles: RouteRect[]): boolean
   return false;
 }
 
+function hasReversal(path: { x: number; y: number }[]): boolean {
+  let prev: { dx: number; dy: number } | null = null;
+  for (let i = 1; i < path.length; i++) {
+    const dx = Math.sign(path[i]!.x - path[i - 1]!.x);
+    const dy = Math.sign(path[i]!.y - path[i - 1]!.y);
+    if (dx === 0 && dy === 0) continue;
+    if (prev && prev.dx === -dx && prev.dy === -dy) return true;
+    prev = { dx, dy };
+  }
+  return false;
+}
+
 describe('reduceOrthogonalBends', () => {
+  it('never reverses into the end stub', () => {
+    const path = [
+      { x: 0, y: 0 },
+      { x: 20, y: 0 },
+      { x: 20, y: 90 },
+      { x: 100, y: 90 },
+      { x: 130, y: 90 },
+      { x: 130, y: 84 },
+      { x: 100, y: 84 },
+      { x: 100, y: 100 },
+    ];
+    const obstacles: RouteRect[] = [
+      { x: 76, y: 96, width: 48, height: 48 },
+      { x: 40, y: 70, width: 40, height: 18 },
+      { x: 90, y: 20, width: 20, height: 40 },
+    ];
+    const result = reduceOrthogonalBends(path, obstacles);
+    const last = [result[result.length - 2]!, result[result.length - 1]!];
+    expect(last[0]!.x).toBe(100);
+    expect(last[1]!.y - last[0]!.y).toBeGreaterThanOrEqual(16);
+    expect(hasReversal(result)).toBe(false);
+    expect(hits(result, obstacles.slice(1))).toBe(false);
+  });
+
+  it('never reverses out of the start stub', () => {
+    const path = [
+      { x: 0, y: 0 },
+      { x: 20, y: 0 },
+      { x: 20, y: -50 },
+      { x: -60, y: -50 },
+      { x: -60, y: 0 },
+      { x: -100, y: 0 },
+      { x: -100, y: 30 },
+      { x: -100, y: 50 },
+    ];
+    const result = reduceOrthogonalBends(path, []);
+    expect(result[1]!.y).toBe(0);
+    expect(result[1]!.x).toBeGreaterThan(0);
+    expect(hasReversal(result)).toBe(false);
+    expect(countBends(result)).toBeLessThan(countBends(path));
+  });
+
   it('collapses a staircase into an L', () => {
     expect(reduceOrthogonalBends(staircase, [])).toEqual([
       { x: 0, y: 0 },
@@ -49,6 +103,24 @@ describe('reduceOrthogonalBends', () => {
     expect(first[1]!.x).toBeGreaterThan(0);
     expect(last[0]!.x).toBe(100);
     expect(last[1]!.y - last[0]!.y).toBeGreaterThanOrEqual(16);
+  });
+
+  it('cuts a loop that returns to the same point without duplicate vertices', () => {
+    const loop = [
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+      { x: 10, y: 10 },
+      { x: 30, y: 10 },
+      { x: 30, y: -10 },
+      { x: 10, y: -10 },
+      { x: 10, y: 0 },
+      { x: 10, y: 30 },
+    ];
+    expect(reduceOrthogonalBends(loop, [])).toEqual([
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+      { x: 10, y: 30 },
+    ]);
   });
 
   it('leaves a minimal path unchanged (only colinear cleanup)', () => {

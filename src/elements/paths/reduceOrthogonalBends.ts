@@ -40,6 +40,25 @@ function bridgeHits(chain: readonly Point[], obstacles: readonly RouteRect[]): b
   return false;
 }
 
+function samePoint(a: Point, b: Point): boolean {
+  return Math.abs(a.x - b.x) < EPS && Math.abs(a.y - b.y) < EPS;
+}
+
+/** `countBends` treats a 180° turn as no bend, so the cost alone would accept it. */
+function hasReversal(chain: readonly Point[]): boolean {
+  let prevDx = 0;
+  let prevDy = 0;
+  for (let i = 1; i < chain.length; i++) {
+    const dx = chain[i]!.x - chain[i - 1]!.x;
+    const dy = chain[i]!.y - chain[i - 1]!.y;
+    if (Math.abs(dx) < EPS && Math.abs(dy) < EPS) continue;
+    if (prevDx * dx + prevDy * dy < 0) return true;
+    prevDx = dx;
+    prevDy = dy;
+  }
+  return false;
+}
+
 function improveOnce(path: Point[], obstacles: readonly RouteRect[]): Point[] | null {
   const n = path.length;
   let best: Point[] | null = null;
@@ -50,7 +69,9 @@ function improveOnce(path: Point[], obstacles: readonly RouteRect[]): Point[] | 
       const b = path[j]!;
       for (const bridge of bridges(a, b)) {
         if (bridgeHits([a, ...bridge, b], obstacles)) continue;
-        const candidate = [...path.slice(0, i + 1), ...bridge, ...path.slice(j)];
+        if (hasReversal([path[i - 1]!, a, ...bridge, b, path[j + 1]!])) continue;
+        const tail = samePoint(a, b) ? path.slice(j + 1) : path.slice(j);
+        const candidate = [...path.slice(0, i + 1), ...bridge, ...tail];
         const cost = orthogonalRouteCost(candidate);
         if (cost < bestCost - EPS) {
           best = candidate;
@@ -64,8 +85,9 @@ function improveOnce(path: Point[], obstacles: readonly RouteRect[]): Point[] | 
 
 /**
  * Replaces interior sub-chains with a straight run or an L when that lowers
- * `orthogonalRouteCost` without crossing obstacles. `path[0..1]` and
- * `path[n-2..n-1]` stay in place, so the end directions are preserved.
+ * `orthogonalRouteCost` without crossing obstacles or turning back. The first
+ * and last segments keep their direction and can only grow (when a neighbour
+ * ends up on the same axis and merges into them).
  */
 export function reduceOrthogonalBends(path: Point[], obstacles: RouteRect[]): Point[] {
   if (path.length <= 3 || !isOrthogonal(path)) return path;
