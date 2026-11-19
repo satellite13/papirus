@@ -346,8 +346,8 @@ const nodeDefinitions = [
     key: 'process',
     type: 'rectangle',
     options: {
-      x: 300, y: 100,
-      width: 140, height: 60,
+      x: 300, y: 98,
+      width: 140, height: 64,
       label: { text: 'Process', inset: 8 },
       anchorPoints: { top: 3, right: 1, bottom: 3, left: 1 },
       style: { cornerRadius: 4 },
