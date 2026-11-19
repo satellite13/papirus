@@ -23,16 +23,25 @@ function hits(path: { x: number; y: number }[], obstacles: RouteRect[]): boolean
   return false;
 }
 
-function hasReversal(path: { x: number; y: number }[]): boolean {
+function reversalCount(path: readonly { x: number; y: number }[]): number {
+  let n = 0;
   let prev: { dx: number; dy: number } | null = null;
   for (let i = 1; i < path.length; i++) {
     const dx = Math.sign(path[i]!.x - path[i - 1]!.x);
     const dy = Math.sign(path[i]!.y - path[i - 1]!.y);
     if (dx === 0 && dy === 0) continue;
-    if (prev && prev.dx === -dx && prev.dy === -dy) return true;
+    if (prev && prev.dx === -dx && prev.dy === -dy) n++;
     prev = { dx, dy };
   }
-  return false;
+  return n;
+}
+
+function hasReversal(path: { x: number; y: number }[]): boolean {
+  return reversalCount(path) > 0;
+}
+
+function direction(a: { x: number; y: number }, b: { x: number; y: number }) {
+  return { dx: Math.sign(b.x - a.x), dy: Math.sign(b.y - a.y) };
 }
 
 describe('reduceOrthogonalBends', () => {
@@ -78,7 +87,7 @@ describe('reduceOrthogonalBends', () => {
     expect(countBends(result)).toBeLessThan(countBends(path));
   });
 
-  it('keeps an existing U-turn at a stub instead of flipping the stub direction', () => {
+  it('never flips a stub direction or adds a U-turn to an input that has one', () => {
     const startSpike = [
       { x: 200, y: 300 },
       { x: 232, y: 300 },
@@ -88,17 +97,28 @@ describe('reduceOrthogonalBends', () => {
       { x: 280, y: 80 },
     ];
     const obstacles: RouteRect[] = [{ x: 156, y: 136, width: 208, height: 148 }];
-    const result = reduceOrthogonalBends(startSpike, obstacles);
-    expect(result[1]).toEqual({ x: 232, y: 300 });
-    expect(hits(result, obstacles)).toBe(false);
-
     const bothSpikes = [
       { x: 100, y: 120 },
       { x: 80, y: 120 },
       { x: 176, y: 120 },
       { x: 160, y: 120 },
     ];
-    expect(reduceOrthogonalBends(bothSpikes, [])).toEqual(bothSpikes);
+    for (const [path, obs] of [
+      [startSpike, obstacles],
+      [bothSpikes, []],
+    ] as const) {
+      const result = reduceOrthogonalBends([...path], [...obs]);
+      const n = path.length;
+      const m = result.length;
+      expect(result[0]).toEqual(path[0]);
+      expect(result[m - 1]).toEqual(path[n - 1]);
+      expect(direction(result[0]!, result[1]!)).toEqual(direction(path[0]!, path[1]!));
+      expect(direction(result[m - 2]!, result[m - 1]!)).toEqual(
+        direction(path[n - 2]!, path[n - 1]!)
+      );
+      expect(reversalCount(result)).toBeLessThanOrEqual(reversalCount(path));
+      expect(hits(result, [...obs])).toBe(false);
+    }
   });
 
   it('collapses a staircase into an L', () => {

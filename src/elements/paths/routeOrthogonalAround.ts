@@ -764,9 +764,32 @@ function minRemainingBends(
 const AXIS_STATE: Record<Axis, number> = { h: 0, v: 1 };
 const NO_AXIS_STATE = 2;
 
+/** Signed directions of the stubs around the searched mid path. */
+export type MidPathStubs = {
+  /** Direction the start stub travels (`fromDir`): the first edge must not turn back. */
+  startDir?: Side;
+  /** Outward side at the target (`toDir`): the last edge must not move outward. */
+  goalDir?: Side;
+};
+
+function sideDot(side: Side, dx: number, dy: number): number {
+  switch (side) {
+    case 'top':
+      return -dy;
+    case 'bottom':
+      return dy;
+    case 'left':
+      return -dx;
+    case 'right':
+      return dx;
+  }
+}
+
 /**
  * A* over the corner graph: edge length + ROUTE_BEND_COST per axis change, plus one
  * more when the last edge arrives across `goalAxis`. A null axis means "free".
+ * Axis state alone makes a 180° turn at a stub free; `stubs` forbids it (ignored on
+ * a free end).
  */
 export function searchMidPath(
   nodes: Point[],
@@ -774,9 +797,21 @@ export function searchMidPath(
   startIdx: number,
   goalIdx: number,
   startAxis: Axis | null,
-  goalAxis: Axis | null
+  goalAxis: Axis | null,
+  stubs?: MidPathStubs
 ): Point[] | null {
   const goal = nodes[goalIdx]!;
+  const startDir = startAxis !== null ? stubs?.startDir : undefined;
+  const goalDir = goalAxis !== null ? stubs?.goalDir : undefined;
+  const turnsBack = (from: number, to: number): boolean => {
+    if (startDir === undefined && goalDir === undefined) return false;
+    const a = nodes[from]!;
+    const b = nodes[to]!;
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    if (startDir !== undefined && from === startIdx && sideDot(startDir, dx, dy) < 0) return true;
+    return goalDir !== undefined && to === goalIdx && sideDot(goalDir, dx, dy) > 0;
+  };
   // Admissible and consistent: edges cost ≥ their Manhattan length, and every remaining
   // path needs at least minRemainingBends axis changes (the goal-axis surcharge counts as one).
   const heuristic = (node: number, dir: Axis | null): number => {
@@ -826,6 +861,7 @@ export function searchMidPath(
       const nextDir = edge.dir;
       const nextState = edge.to * 3 + AXIS_STATE[nextDir];
       if (closed[nextState]) continue;
+      if (turnsBack(current.node, edge.to)) continue;
       let stepCost = edge.length;
       if (current.dir !== null && current.dir !== nextDir) stepCost += ROUTE_BEND_COST;
       // Arriving across the entry axis means one more bend into the end stub.

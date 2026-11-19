@@ -457,7 +457,11 @@ function buildRoutedPolyline(
     startIdx,
     goalIdx,
     routeAxis(effectiveFromDir),
-    routeAxis(effectiveToDir)
+    routeAxis(effectiveToDir),
+    {
+      startDir: isSide(effectiveFromDir) ? effectiveFromDir : undefined,
+      goalDir: isSide(effectiveToDir) ? effectiveToDir : undefined,
+    }
   );
   if (!routed) {
     return null;

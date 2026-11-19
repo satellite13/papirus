@@ -298,6 +298,41 @@ describe('searchMidPath cost model', () => {
     expect(searchMidPath(g, edges, 0, 3, 'h', 'v')).toEqual([g[0], g[4], g[5], g[2], g[3]]);
   });
 
+  describe('stub directions', () => {
+    // Start (0,0) exits upwards. Going back down to y=30 first and straight across
+    // to the goal ties with crossing at y=0 and descending: same length, same bends.
+    const g = [
+      { x: 0, y: 0 },
+      { x: 0, y: 30 },
+      { x: 100, y: 30 },
+      { x: 100, y: 0 },
+    ];
+    const links: Array<[number, number, 'h' | 'v']> = [
+      [0, 1, 'v'],
+      [1, 2, 'h'],
+      [0, 3, 'h'],
+      [3, 2, 'v'],
+    ];
+
+    it('never turns back against the start stub', () => {
+      const path = searchMidPath(g, linkGraph(g, links), 0, 2, 'v', 'v', { startDir: 'top' });
+      expect(path).toEqual([g[0], g[3], g[2]]);
+    });
+
+    it('never reaches the goal moving outward from the target', () => {
+      // Goal (100,0) is the entry above a target (outward side 'top'). The cheap
+      // route climbs into it from (100,30), i.e. outward; the only other one wraps.
+      const path = searchMidPath(g, linkGraph(g, links), 1, 3, 'h', 'v', { goalDir: 'top' });
+      expect(path).toEqual([g[1], g[0], g[3]]);
+    });
+
+    it('ignores the stub direction on a free end', () => {
+      const edges = linkGraph(g, [[0, 1, 'v']]);
+      expect(searchMidPath(g, edges, 0, 1, null, null, { startDir: 'top' })).toEqual([g[0], g[1]]);
+      expect(searchMidPath(g, edges, 0, 1, 'v', null, { startDir: 'top' })).toBeNull();
+    });
+  });
+
   it('expands few states on an open lattice (bend-aware heuristic)', () => {
     // 41×41 open grid; the optimum is one bend. A plain Manhattan heuristic ties every
     // one-bend state with the optimum and expands most of the grid.
