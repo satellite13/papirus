@@ -254,6 +254,49 @@ describe('searchMidPath cost model', () => {
     ]);
     expect(searchMidPath(sq, edges, 0, 2, 'h', 'v')).toEqual([sq[0], sq[3], sq[2]]);
   });
+
+  it('pays for arriving across the goal axis', () => {
+    // Both routes leave along the start axis. Short: 1 bend, arrives v (+1 at the goal),
+    // 10 px longer. Long: 2 bends, arrives h. Only the goal penalty tips it to the long one.
+    const g = [
+      { x: 0, y: 0 },
+      { x: 50, y: 0 },
+      { x: 100, y: 0 },
+      { x: 50, y: 100 },
+      { x: 100, y: 100 },
+    ];
+    const edges = linkGraph(g, [
+      [0, 1, 'h'],
+      [1, 2, 'h', 60],
+      [2, 4, 'v'],
+      [1, 3, 'v'],
+      [3, 4, 'h'],
+    ]);
+    expect(searchMidPath(g, edges, 0, 4, 'h', 'h')).toEqual([g[0], g[1], g[3], g[4]]);
+  });
+
+  it('pays for turning right at the start node', () => {
+    // Both routes arrive along the goal axis. One turns at the start (+1) and is 10 px
+    // longer; the other keeps the start axis with the same inner bends. Only the start
+    // penalty tips it to the latter.
+    const g = [
+      { x: 0, y: 0 },
+      { x: 0, y: 50 },
+      { x: 100, y: 50 },
+      { x: 100, y: 100 },
+      { x: 50, y: 0 },
+      { x: 50, y: 50 },
+    ];
+    const edges = linkGraph(g, [
+      [0, 1, 'v', 60],
+      [1, 5, 'h'],
+      [5, 2, 'h'],
+      [2, 3, 'v'],
+      [0, 4, 'h'],
+      [4, 5, 'v'],
+    ]);
+    expect(searchMidPath(g, edges, 0, 3, 'h', 'v')).toEqual([g[0], g[4], g[5], g[2], g[3]]);
+  });
 });
 
 describe('contourProximityPenalty', () => {
