@@ -1,4 +1,5 @@
 import type { Point } from '@/types';
+import { DEFAULT_END_STUB, END_STUB_FACING_START_MIN } from '@/constants';
 import { ROUTE_BEND_COST, orthogonalRouteCost } from './routeCost';
 
 export type Side = 'top' | 'right' | 'bottom' | 'left';
@@ -28,6 +29,8 @@ export type RouteOrthogonalAroundInput = {
   others?: RouteRect[];
   margin?: number;
   exitDistance?: number;
+  /** Stub before `to` when the route turns there; default DEFAULT_END_STUB. */
+  endStubLength?: number;
 };
 
 const DEFAULT_MARGIN = 12;
@@ -428,11 +431,11 @@ function canAlignSameSideExits(
 function computeEndEntry(
   to: Point,
   toDir: Side,
-  exitDistance: number,
+  endStubLength: number,
   rawTarget?: RouteRect,
   rawNeighbor?: RouteRect
 ): Point {
-  const stub = moveByDir(to, toDir, exitDistance);
+  const stub = moveByDir(to, toDir, endStubLength);
   if (!rawTarget || !rawNeighbor) return stub;
 
   // Prefer the visual mid-gap over a fixed stub when the approach faces a neighbor.
@@ -466,9 +469,24 @@ function computeEndEntry(
 }
 
 /**
- * When nodes face each other closer than 2×exitDistance, fixed stubs cross
- * (startExit past endEntry). That draws a U-turn "tail" at the first bend.
- * Meet both stubs on the mid-gap instead.
+ * Coordinate of the turn between facing endpoints on the approach axis.
+ * Mid-gap when it leaves `endStubLength`; otherwise `endStubLength` before `to`
+ * while the source side keeps END_STUB_FACING_START_MIN; else mid-gap (no loop back).
+ */
+export function endStubMeet(fromC: number, toC: number, endStubLength: number): number {
+  const gap = Math.abs(toC - fromC);
+  const mid = (fromC + toC) / 2;
+  if (gap / 2 >= endStubLength) return mid;
+  if (gap >= endStubLength + END_STUB_FACING_START_MIN) {
+    return toC - Math.sign(toC - fromC) * endStubLength;
+  }
+  return mid;
+}
+
+/**
+ * When nodes face each other closer than exitDistance + endStubLength, fixed stubs
+ * cross (startExit past endEntry). That draws a U-turn "tail" at the first bend.
+ * Meet both stubs on one line instead (see endStubMeet).
  */
 export function clampFacingExitEntry(
   from: Point,
@@ -476,35 +494,24 @@ export function clampFacingExitEntry(
   fromDir: Side,
   toDir: Side,
   startExit: Point,
-  endEntry: Point
+  endEntry: Point,
+  endStubLength: number = DEFAULT_END_STUB
 ): { startExit: Point; endEntry: Point } {
   if (fromDir === 'bottom' && toDir === 'top' && to.y > from.y && startExit.y > endEntry.y) {
-    const midY = (from.y + to.y) / 2;
-    return {
-      startExit: { x: startExit.x, y: midY },
-      endEntry: { x: endEntry.x, y: midY },
-    };
+    const y = endStubMeet(from.y, to.y, endStubLength);
+    return { startExit: { x: startExit.x, y }, endEntry: { x: endEntry.x, y } };
   }
   if (fromDir === 'top' && toDir === 'bottom' && to.y < from.y && startExit.y < endEntry.y) {
-    const midY = (from.y + to.y) / 2;
-    return {
-      startExit: { x: startExit.x, y: midY },
-      endEntry: { x: endEntry.x, y: midY },
-    };
+    const y = endStubMeet(from.y, to.y, endStubLength);
+    return { startExit: { x: startExit.x, y }, endEntry: { x: endEntry.x, y } };
   }
   if (fromDir === 'right' && toDir === 'left' && to.x > from.x && startExit.x > endEntry.x) {
-    const midX = (from.x + to.x) / 2;
-    return {
-      startExit: { x: midX, y: startExit.y },
-      endEntry: { x: midX, y: endEntry.y },
-    };
+    const x = endStubMeet(from.x, to.x, endStubLength);
+    return { startExit: { x, y: startExit.y }, endEntry: { x, y: endEntry.y } };
   }
   if (fromDir === 'left' && toDir === 'right' && to.x < from.x && startExit.x < endEntry.x) {
-    const midX = (from.x + to.x) / 2;
-    return {
-      startExit: { x: midX, y: startExit.y },
-      endEntry: { x: midX, y: endEntry.y },
-    };
+    const x = endStubMeet(from.x, to.x, endStubLength);
+    return { startExit: { x, y: startExit.y }, endEntry: { x, y: endEntry.y } };
   }
   return { startExit, endEntry };
 }
@@ -876,6 +883,7 @@ function routeMidPath(
 export function routeOrthogonalAround(input: RouteOrthogonalAroundInput): Point[] {
   const margin = input.margin ?? DEFAULT_MARGIN;
   const exitDistance = input.exitDistance ?? DEFAULT_EXIT;
+  const endStubLength = input.endStubLength ?? DEFAULT_END_STUB;
   const others = input.others ?? [];
 
   // Both endpoints inside parent → internal edge: stay in the container and dodge
@@ -904,7 +912,7 @@ export function routeOrthogonalAround(input: RouteOrthogonalAroundInput): Point[
   let rawEndEntry = computeEndEntry(
     input.to,
     input.toDir,
-    exitDistance,
+    endStubLength,
     peeledTargetNeighbor?.a,
     peeledTargetNeighbor?.b
   );
@@ -912,7 +920,7 @@ export function routeOrthogonalAround(input: RouteOrthogonalAroundInput): Point[
   if (
     others.some((o) => segmentIntersectsOpenInterior(rawEndEntry, input.to, expandRect(o, margin)))
   ) {
-    rawEndEntry = computeEndEntry(input.to, input.toDir, exitDistance);
+    rawEndEntry = computeEndEntry(input.to, input.toDir, endStubLength);
   }
 
   // Same-side elbows (left→left / top→top): clear siblings AND the target/source
@@ -994,7 +1002,8 @@ export function routeOrthogonalAround(input: RouteOrthogonalAroundInput): Point[
     input.fromDir,
     input.toDir,
     rawStartExit,
-    rawEndEntry
+    rawEndEntry,
+    endStubLength
   );
 
   let sourceObs = input.source ? expandRect(input.source, margin) : undefined;
@@ -1057,10 +1066,10 @@ export function routeOrthogonalAround(input: RouteOrthogonalAroundInput): Point[
   ).slice(1, -1);
 
   // If mid already ends on the approach ray outside `to`, skip endEntry — otherwise
-  // a fixed exitDistance stub overshoots and simplify has to cut a visible spur.
+  // a fixed end stub overshoots and simplify has to cut a visible spur.
   const lastMid = mid[mid.length - 1];
   const alreadyApproaching =
-    !!lastMid && isOnApproachOutside(lastMid, input.to, input.toDir, 1);
+    !!lastMid && isOnApproachOutside(lastMid, input.to, input.toDir, endStubLength);
 
   const raw = [
     input.from,

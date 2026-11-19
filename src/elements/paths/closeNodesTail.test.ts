@@ -35,7 +35,7 @@ describe('close stacked nodes (no exit stub / tail)', () => {
     return false;
   }
 
-  it('clampFacingExitEntry meets stubs in the mid-gap when they would cross', () => {
+  it('clampFacingExitEntry keeps the end stub when stubs would cross', () => {
     const clamped = clampFacingExitEntry(
       { x: 160, y: 160 },
       { x: 180, y: 185 },
@@ -44,8 +44,8 @@ describe('close stacked nodes (no exit stub / tail)', () => {
       { x: 160, y: 180 },
       { x: 180, y: 165 }
     );
-    expect(clamped.startExit.y).toBe(172.5);
-    expect(clamped.endEntry.y).toBe(172.5);
+    expect(clamped.startExit.y).toBe(169);
+    expect(clamped.endEntry.y).toBe(169);
     expect(clamped.startExit.y).toBeLessThanOrEqual(clamped.endEntry.y);
   });
 

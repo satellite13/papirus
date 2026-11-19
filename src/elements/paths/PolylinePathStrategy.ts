@@ -4,6 +4,7 @@ import { routeOrthogonalAround, type Side } from './routeOrthogonalAround';
 import { distance, distanceToSegment } from '@/utils/geometry';
 import { isHorizontal, isVertical, isOppositeDirections } from '@/utils/direction';
 import { routeDebug } from '@/utils/routeDebug';
+import { DEFAULT_END_STUB } from '@/constants';
 
 function isSide(v: string | undefined): v is Side {
   return v === 'top' || v === 'right' || v === 'bottom' || v === 'left';
@@ -459,6 +460,7 @@ export class PolylinePathStrategy implements PathStrategy {
     _options?: PathStrategyOptions
   ): Point[] {
     const controlPoints = _options?.controlPoints;
+    const endStubLength = _options?.endStubLength ?? DEFAULT_END_STUB;
     if (_options?.editablePolyline) {
       const path =
         controlPoints && controlPoints.length > 0
@@ -627,6 +629,7 @@ export class PolylinePathStrategy implements PathStrategy {
             others,
             margin: 4,
             exitDistance: 20,
+            endStubLength,
           })
         );
       }
