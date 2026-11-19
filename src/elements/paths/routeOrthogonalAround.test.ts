@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { routeOrthogonalAround } from './routeOrthogonalAround';
+import {
+  contourProximityPenalty,
+  routeOrthogonalAround,
+  searchMidPath,
+  type GraphEdge,
+} from './routeOrthogonalAround';
+import { ROUTE_BEND_COST } from './routeCost';
 
 const parent = { id: 'parent', x: 160, y: 200, width: 220, height: 160 };
 const target = { id: 'bp', x: 40, y: 40, width: 400, height: 50 };
@@ -188,4 +194,74 @@ describe('routeOrthogonalAround side matrix', () => {
       });
     }
   }
+});
+
+function linkGraph(
+  nodes: { x: number; y: number }[],
+  links: Array<[number, number, 'h' | 'v', number?]>
+): Map<number, GraphEdge[]> {
+  const edges = new Map<number, GraphEdge[]>();
+  for (const [a, b, dir, len] of links) {
+    const length = len ?? Math.abs(nodes[a]!.x - nodes[b]!.x) + Math.abs(nodes[a]!.y - nodes[b]!.y);
+    edges.set(a, [...(edges.get(a) ?? []), { to: b, dir, length }]);
+    edges.set(b, [...(edges.get(b) ?? []), { to: a, dir, length }]);
+  }
+  return edges;
+}
+
+describe('searchMidPath cost model', () => {
+  // 0 → 5 directly (0 bends, inflated length) vs detour 0-1-2-3-4-5 (4 bends, 320 px).
+  const nodes = [
+    { x: 0, y: 0 },
+    { x: 100, y: 0 },
+    { x: 100, y: 10 },
+    { x: 200, y: 10 },
+    { x: 200, y: 0 },
+    { x: 300, y: 0 },
+  ];
+  const detour: Array<[number, number, 'h' | 'v']> = [
+    [0, 1, 'h'],
+    [1, 2, 'v'],
+    [2, 3, 'h'],
+    [3, 4, 'v'],
+    [4, 5, 'h'],
+  ];
+
+  it('takes a longer straight run while it costs less than the bends it saves', () => {
+    const edges = linkGraph(nodes, [...detour, [0, 5, 'h', 800]]);
+    expect(searchMidPath(nodes, edges, 0, 5, 'h', 'h')).toEqual([nodes[0], nodes[5]]);
+  });
+
+  it('accepts bends when the straight run is longer than their cost', () => {
+    const edges = linkGraph(nodes, [...detour, [0, 5, 'h', 1000]]);
+    expect(searchMidPath(nodes, edges, 0, 5, 'h', 'h')).toEqual(nodes);
+  });
+
+  it('counts the turn at the start stub and the arrival axis', () => {
+    // start axis h, goal axis v: (0,0)→(100,0)→(100,100) is 1 bend;
+    // (0,0)→(0,100)→(100,100) turns at the start and arrives horizontally.
+    const sq = [
+      { x: 0, y: 0 },
+      { x: 0, y: 100 },
+      { x: 100, y: 100 },
+      { x: 100, y: 0 },
+    ];
+    const edges = linkGraph(sq, [
+      [0, 1, 'v'],
+      [1, 2, 'h'],
+      [0, 3, 'h'],
+      [3, 2, 'v'],
+    ]);
+    expect(searchMidPath(sq, edges, 0, 2, 'h', 'v')).toEqual([sq[0], sq[3], sq[2]]);
+  });
+});
+
+describe('contourProximityPenalty', () => {
+  it('an 800 px hug costs less than one bend', () => {
+    const penalty = contourProximityPenalty({ x: 0, y: 0 }, { x: 800, y: 0 }, [
+      { x: 0, y: 1, width: 800, height: 50 },
+    ]);
+    expect(penalty).toBeGreaterThan(0);
+    expect(penalty).toBeLessThan(ROUTE_BEND_COST);
+  });
 });

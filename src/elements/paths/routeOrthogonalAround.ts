@@ -1,4 +1,5 @@
 import type { Point } from '@/types';
+import { ROUTE_BEND_COST, orthogonalRouteCost } from './routeCost';
 
 export type Side = 'top' | 'right' | 'bottom' | 'left';
 
@@ -31,10 +32,16 @@ export type RouteOrthogonalAroundInput = {
 
 const DEFAULT_MARGIN = 12;
 const DEFAULT_EXIT = 20;
-const BEND_PENALTY = 0.001;
-/** Prefer mid-gap over hugging obstacle borders (same Manhattan, fewer bends). */
+/** Prefer mid-gap over hugging obstacle borders among routes with equal bends. */
 const CONTOUR_BAND = 18;
-const CONTOUR_PENALTY = 140;
+/** Tie-breaker only: an 800 px hug costs one bend. */
+const CONTOUR_COST_PER_PX = 0.2;
+
+type Axis = 'h' | 'v';
+
+function axisOf(side: Side): Axis {
+  return side === 'left' || side === 'right' ? 'h' : 'v';
+}
 
 function expandRect(r: RouteRect, m: number): RouteRect {
   return { ...r, x: r.x - m, y: r.y - m, width: r.width + 2 * m, height: r.height + 2 * m };
@@ -209,7 +216,7 @@ function manhattan(a: Point, b: Point): number {
 
 /**
  * Extra cost when a segment runs parallel to an obstacle edge inside CONTOUR_BAND.
- * Scaled by segment length so a long “lick” along a wide BP costs far more than a short stub.
+ * Scaled by segment length; kept below a bend for realistic lengths.
  */
 export function contourProximityPenalty(a: Point, b: Point, obstacles: RouteRect[]): number {
   if (obstacles.length === 0) return 0;
@@ -238,8 +245,7 @@ export function contourProximityPenalty(a: Point, b: Point, obstacles: RouteRect
   }
   if (!Number.isFinite(minDist) || minDist >= CONTOUR_BAND) return 0;
   const proximity = 1 - minDist / CONTOUR_BAND;
-  // Per-pixel crawl cost: a long glued jog must lose to an outer route.
-  return segLen * (CONTOUR_PENALTY / 10) * proximity;
+  return segLen * CONTOUR_COST_PER_PX * proximity;
 }
 
 /** Push along dir until outside expanded blocker (and at least exitDistance). */
@@ -624,7 +630,7 @@ function collectLatticeCoords(
   };
 }
 
-type GraphEdge = { to: number; dir: 'h' | 'v'; length: number };
+export type GraphEdge = { to: number; dir: 'h' | 'v'; length: number };
 
 function buildCornerGraph(
   startExit: Point,
@@ -708,24 +714,24 @@ function buildCornerGraph(
   return { nodes, edges, startIdx, goalIdx };
 }
 
-type DirState = 'h' | 'v' | 's';
-
-function searchMidPath(
+export function searchMidPath(
   nodes: Point[],
   edges: Map<number, GraphEdge[]>,
   startIdx: number,
-  goalIdx: number
+  goalIdx: number,
+  startAxis: Axis,
+  goalAxis: Axis
 ): Point[] | null {
-  type QueueState = { node: number; dir: DirState; g: number; f: number; key: string };
-  const makeStateKey = (node: number, dir: DirState): string => `${node}:${dir}`;
+  type QueueState = { node: number; dir: Axis; g: number; f: number; key: string };
+  const makeStateKey = (node: number, dir: Axis): string => `${node}:${dir}`;
   const open: QueueState[] = [];
   const best = new Map<string, number>();
   const prev = new Map<string, string>();
-  const startKey = makeStateKey(startIdx, 's');
+  const startKey = makeStateKey(startIdx, startAxis);
   best.set(startKey, 0);
   open.push({
     node: startIdx,
-    dir: 's',
+    dir: startAxis,
     g: 0,
     f: manhattan(nodes[startIdx]!, nodes[goalIdx]!),
     key: startKey,
@@ -746,9 +752,9 @@ function searchMidPath(
     for (const edge of edges.get(current.node) ?? []) {
       const nextDir = edge.dir;
       let stepCost = edge.length;
-      if (current.dir !== 's' && current.dir !== nextDir) {
-        stepCost += BEND_PENALTY;
-      }
+      if (current.dir !== nextDir) stepCost += ROUTE_BEND_COST;
+      // Arriving across the entry axis means one more bend into the end stub.
+      if (edge.to === goalIdx && nextDir !== goalAxis) stepCost += ROUTE_BEND_COST;
       const nextG = current.g + stepCost;
       const nextKey = makeStateKey(edge.to, nextDir);
       if (nextG >= (best.get(nextKey) ?? Infinity)) continue;
@@ -791,7 +797,13 @@ function orthogonalElbow(startExit: Point, endEntry: Point): Point[] {
   return [startExit, { x: startExit.x, y: endEntry.y }, endEntry];
 }
 
-function fallbackOuterRoute(startExit: Point, endEntry: Point, obstacles: RouteRect[]): Point[] {
+function fallbackOuterRoute(
+  from: Point,
+  to: Point,
+  startExit: Point,
+  endEntry: Point,
+  obstacles: RouteRect[]
+): Point[] {
   if (obstacles.length === 0) {
     return orthogonalElbow(startExit, endEntry);
   }
@@ -814,27 +826,27 @@ function fallbackOuterRoute(startExit: Point, endEntry: Point, obstacles: RouteR
   ];
 
   let best: Point[] | null = null;
-  let bestLen = Infinity;
+  let bestCost = Infinity;
   for (const candidate of candidates) {
     const simplified = simplifyPath(candidate);
     if (!pathIsValid(simplified, obstacles)) continue;
-    const len = simplified.reduce((sum, p, i) => {
-      if (i === 0) return 0;
-      return sum + manhattan(simplified[i - 1]!, p);
-    }, 0);
-    if (len < bestLen) {
-      bestLen = len;
+    const cost = orthogonalRouteCost([from, ...simplified, to]);
+    if (cost < bestCost) {
+      bestCost = cost;
       best = simplified;
     }
   }
-
   // Last resort: orthogonal elbow even if it clips — never a diagonal.
   return best ?? orthogonalElbow(startExit, endEntry);
 }
 
 function routeMidPath(
+  from: Point,
+  to: Point,
   startExit: Point,
   endEntry: Point,
+  startAxis: Axis,
+  goalAxis: Axis,
   obstacles: RouteRect[],
   parent?: RouteRect,
   target?: RouteRect,
@@ -847,11 +859,18 @@ function routeMidPath(
 
   const graph = buildCornerGraph(startExit, endEntry, obstacles, parent, target, margin);
   if (graph) {
-    const mid = searchMidPath(graph.nodes, graph.edges, graph.startIdx, graph.goalIdx);
+    const mid = searchMidPath(
+      graph.nodes,
+      graph.edges,
+      graph.startIdx,
+      graph.goalIdx,
+      startAxis,
+      goalAxis
+    );
     if (mid && pathIsValid(mid, obstacles)) return mid;
   }
 
-  return fallbackOuterRoute(startExit, endEntry, obstacles);
+  return fallbackOuterRoute(from, to, startExit, endEntry, obstacles);
 }
 
 export function routeOrthogonalAround(input: RouteOrthogonalAroundInput): Point[] {
@@ -889,6 +908,12 @@ export function routeOrthogonalAround(input: RouteOrthogonalAroundInput): Point[
     peeledTargetNeighbor?.a,
     peeledTargetNeighbor?.b
   );
+  // Mid-gap ignores siblings: one standing in the gap would swallow the entry point.
+  if (
+    others.some((o) => segmentIntersectsOpenInterior(rawEndEntry, input.to, expandRect(o, margin)))
+  ) {
+    rawEndEntry = computeEndEntry(input.to, input.toDir, exitDistance);
+  }
 
   // Same-side elbows (left→left / top→top): clear siblings AND the target/source
   // so a wrap does not drop a straight segment through an endpoint node.
@@ -1019,8 +1044,12 @@ export function routeOrthogonalAround(input: RouteOrthogonalAroundInput): Point[
   const latticeB = peeledLattice?.b ?? input.target;
 
   const mid = routeMidPath(
+    input.from,
+    input.to,
     startExit,
     endEntry,
+    axisOf(input.fromDir),
+    axisOf(input.toDir),
     obstacles,
     latticeA,
     latticeB,
