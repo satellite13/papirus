@@ -262,9 +262,9 @@ export class Edge extends Element {
 
   set arrowType(value: ArrowType) {
     if (this._arrowType !== value) {
-      this._arrowType = value;
-      this.recalculatePath();
-      this.markDirty();
+      this.updateMarkers(() => {
+        this._arrowType = value;
+      });
     }
   }
 
@@ -276,9 +276,9 @@ export class Edge extends Element {
   }
 
   set startMarker(value: ArrowMarkerConfig | undefined) {
-    this._startMarker = value;
-    this.recalculatePath();
-    this.markDirty();
+    this.updateMarkers(() => {
+      this._startMarker = value;
+    });
   }
 
   /**
@@ -289,9 +289,27 @@ export class Edge extends Element {
   }
 
   set endMarker(value: ArrowMarkerConfig | undefined) {
-    this._endMarker = value;
-    this.recalculatePath();
+    this.updateMarkers(() => {
+      this._endMarker = value;
+    });
+  }
+
+  /** Markers feed routing only through the end stub; hosts reassign them on every sync. */
+  private updateMarkers(assign: () => void): void {
+    const before = this.endStubLength();
+    assign();
+    if (this.endStubLength() !== before) {
+      this.recalculatePath();
+    }
     this.markDirty();
+  }
+
+  private endStubLength(): number {
+    return resolveEndStubLength({
+      startMarker: this._startMarker,
+      endMarker: this._endMarker,
+      arrowType: this._arrowType,
+    });
   }
 
   /**
@@ -596,11 +614,7 @@ export class Edge extends Element {
         controlPoints: this._controlPoints,
         editablePolyline: this.isEditablePolyline(),
         selfLoop: this._from.nodeId === this._to.nodeId,
-        endStubLength: resolveEndStubLength({
-          startMarker: this._startMarker,
-          endMarker: this._endMarker,
-          arrowType: this._arrowType,
-        }),
+        endStubLength: this.endStubLength(),
       }
     );
     if (

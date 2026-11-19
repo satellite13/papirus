@@ -877,6 +877,30 @@ describe('Edge end stub length', () => {
     spy.mockRestore();
   });
 
+  it('re-routes on a marker change only when the end stub length changes', () => {
+    const spy = vi.spyOn(PolylinePathStrategy.prototype, 'calculatePath');
+    const edge = new Edge({
+      from: { nodeId: 'a' },
+      to: { nodeId: 'b' },
+      type: 'polyline',
+      endMarker: { type: 'arrow', size: 12 },
+      startMarker: { type: 'none' },
+    });
+    edge.updateEndpoints({ x: 0, y: 0 }, { x: 100, y: 50 }, 'right', 'left');
+    spy.mockClear();
+
+    edge.style = { strokeColor: '#ff0000' };
+    edge.endMarker = { type: 'arrow', size: 12, strokeColor: '#ff0000', fillColor: '#ff0000' };
+    edge.startMarker = { type: 'diamond' };
+    edge.arrowType = 'none';
+    expect(spy).not.toHaveBeenCalled();
+
+    edge.endMarker = { type: 'diamond' };
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy.mock.calls.at(-1)?.[4]?.endStubLength).toBe(18);
+    spy.mockRestore();
+  });
+
   it('keeps the end stub at the marker length after a marker change on a routed edge', () => {
     const edge = new Edge({
       from: { nodeId: 'a' },
