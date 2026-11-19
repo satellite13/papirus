@@ -4,10 +4,10 @@ import { reduceOrthogonalBends } from './reduceOrthogonalBends';
 import {
   endStubMeet,
   routeOrthogonalAround,
+  searchMidPath,
   type RouteRect,
   type Side,
 } from './routeOrthogonalAround';
-import { ROUTE_BEND_COST } from './routeCost';
 import { distance, distanceToSegment } from '@/utils/geometry';
 import { isHorizontal, isVertical, isOppositeDirections } from '@/utils/direction';
 import { routeDebug } from '@/utils/routeDebug';
@@ -451,71 +451,17 @@ function buildRoutedPolyline(
     }
   }
 
-  type DirState = 'h' | 'v' | 's';
-  type QueueState = { node: number; dir: DirState; g: number; f: number; key: string };
-  const makeStateKey = (node: number, dir: DirState): string => `${node}:${dir}`;
-  const open: QueueState[] = [];
-  const best = new Map<string, number>();
-  const prev = new Map<string, string>();
-  const startAxis = routeAxis(effectiveFromDir);
-  const goalAxis = routeAxis(effectiveToDir);
-  const startDir: DirState = startAxis ?? 's';
-  const startKey = makeStateKey(startIdx, startDir);
-  best.set(startKey, 0);
-  open.push({
-    node: startIdx,
-    dir: startDir,
-    g: 0,
-    f: manhattan(nodes[startIdx]!, nodes[goalIdx]!),
-    key: startKey,
-  });
-
-  let goalKey: string | null = null;
-  while (open.length > 0) {
-    let bestIdx = 0;
-    for (let i = 1; i < open.length; i++) {
-      if (open[i]!.f < open[bestIdx]!.f) bestIdx = i;
-    }
-    const current = open.splice(bestIdx, 1)[0]!;
-    if (current.node === goalIdx) {
-      goalKey = current.key;
-      break;
-    }
-
-    for (const edge of edges.get(current.node) ?? []) {
-      const nextDir = edge.dir;
-      let stepCost = edge.length;
-      if (current.dir !== 's' && current.dir !== nextDir) {
-        stepCost += ROUTE_BEND_COST;
-      }
-      if (edge.to === goalIdx && goalAxis && nextDir !== goalAxis) {
-        stepCost += ROUTE_BEND_COST;
-      }
-      const nextG = current.g + stepCost;
-      const nextKey = makeStateKey(edge.to, nextDir);
-      if (nextG >= (best.get(nextKey) ?? Infinity)) {
-        continue;
-      }
-      best.set(nextKey, nextG);
-      prev.set(nextKey, current.key);
-      const h = manhattan(nodes[edge.to]!, nodes[goalIdx]!);
-      open.push({ node: edge.to, dir: nextDir, g: nextG, f: nextG + h, key: nextKey });
-    }
-  }
-
-  if (!goalKey) {
+  const routed = searchMidPath(
+    nodes,
+    edges,
+    startIdx,
+    goalIdx,
+    routeAxis(effectiveFromDir),
+    routeAxis(effectiveToDir)
+  );
+  if (!routed) {
     return null;
   }
-
-  const routed: Point[] = [];
-  let cursor: string | undefined = goalKey;
-  while (cursor) {
-    const [nodePart] = cursor.split(':');
-    const node = nodes[Number(nodePart)]!;
-    routed.push({ x: node.x, y: node.y });
-    cursor = prev.get(cursor);
-  }
-  routed.reverse();
 
   const internal = simplifyPath(routed).filter(
     (_, idx, arr) => idx !== 0 && idx !== arr.length - 1

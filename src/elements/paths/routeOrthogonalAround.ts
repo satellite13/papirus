@@ -1,6 +1,7 @@
 import type { Point } from '@/types';
 import { DEFAULT_END_STUB, END_STUB_FACING_START_MIN } from '@/constants';
 import { ROUTE_BEND_COST, orthogonalRouteCost } from './routeCost';
+import { MinHeap } from './minHeap';
 
 export type Side = 'top' | 'right' | 'bottom' | 'left';
 
@@ -653,145 +654,206 @@ function buildCornerGraph(
   margin?: number
 ): { nodes: Point[]; edges: Map<number, GraphEdge[]>; startIdx: number; goalIdx: number } | null {
   const { xs, ys } = collectLatticeCoords(startExit, endEntry, obstacles, parent, target, margin);
-  const nodes: Point[] = [];
-  const nodeIndex = new Map<string, number>();
-  const nodeKey = (x: number, y: number): string => `${x}|${y}`;
+  const nx = xs.length;
+  const ny = ys.length;
+  const xAt = new Map(xs.map((x, i) => [x, i]));
+  const yAt = new Map(ys.map((y, i) => [y, i]));
+  const cell = (ix: number, iy: number): number => ix * ny + iy;
 
-  const addNode = (x: number, y: number): void => {
-    const key = nodeKey(x, y);
-    if (nodeIndex.has(key)) return;
-    const point = { x, y };
-    if (obstacles.some((o) => pointInOpenInterior(point, o))) return;
-    nodeIndex.set(key, nodes.length);
-    nodes.push(point);
-  };
-
-  for (const x of xs) {
-    for (const y of ys) {
-      addNode(x, y);
+  // Obstacle edges are lattice lines, so open-interior tests reduce to index ranges.
+  // blockedV / blockedH mark the lattice step from a cell to its +y / +x neighbour.
+  const blockedCell = new Uint8Array(nx * ny);
+  const blockedV = new Uint8Array(nx * ny);
+  const blockedH = new Uint8Array(nx * ny);
+  for (const o of obstacles) {
+    const x0 = xAt.get(o.x);
+    const x1 = xAt.get(o.x + o.width);
+    const y0 = yAt.get(o.y);
+    const y1 = yAt.get(o.y + o.height);
+    if (x0 === undefined || x1 === undefined || y0 === undefined || y1 === undefined) continue;
+    for (let ix = x0 + 1; ix < x1; ix++) {
+      for (let iy = y0 + 1; iy < y1; iy++) blockedCell[cell(ix, iy)] = 1;
+      for (let iy = y0; iy < y1; iy++) blockedV[cell(ix, iy)] = 1;
+    }
+    for (let iy = y0 + 1; iy < y1; iy++) {
+      for (let ix = x0; ix < x1; ix++) blockedH[cell(ix, iy)] = 1;
     }
   }
-  addNode(startExit.x, startExit.y);
-  addNode(endEntry.x, endEntry.y);
 
-  const startIdx = nodeIndex.get(nodeKey(startExit.x, startExit.y));
-  const goalIdx = nodeIndex.get(nodeKey(endEntry.x, endEntry.y));
-  if (startIdx == null || goalIdx == null) return null;
+  const nodes: Point[] = [];
+  const nodeAt = new Int32Array(nx * ny).fill(-1);
+  for (let ix = 0; ix < nx; ix++) {
+    for (let iy = 0; iy < ny; iy++) {
+      if (blockedCell[cell(ix, iy)]) continue;
+      nodeAt[cell(ix, iy)] = nodes.length;
+      nodes.push({ x: xs[ix]!, y: ys[iy]! });
+    }
+  }
+
+  const nodeOf = (p: Point): number => {
+    const ix = xAt.get(p.x);
+    const iy = yAt.get(p.y);
+    return ix === undefined || iy === undefined ? -1 : nodeAt[cell(ix, iy)]!;
+  };
+  const startIdx = nodeOf(startExit);
+  const goalIdx = nodeOf(endEntry);
+  if (startIdx < 0 || goalIdx < 0) return null;
 
   const edges = new Map<number, GraphEdge[]>();
-  const pushEdge = (a: number, b: number, dir: 'h' | 'v', length: number): void => {
-    const list = edges.get(a) ?? [];
-    list.push({ to: b, dir, length });
-    edges.set(a, list);
+  for (let i = 0; i < nodes.length; i++) edges.set(i, []);
+  const link = (a: number, b: number, dir: 'h' | 'v', near: RouteRect[]): void => {
+    const pa = nodes[a]!;
+    const pb = nodes[b]!;
+    const length = manhattan(pa, pb) + contourProximityPenalty(pa, pb, near);
+    edges.get(a)!.push({ to: b, dir, length });
+    edges.get(b)!.push({ to: a, dir, length });
   };
+  const nearLine = (
+    c: number,
+    lo: (o: RouteRect) => number,
+    size: (o: RouteRect) => number
+  ): RouteRect[] =>
+    obstacles.filter(
+      (o) => Math.min(Math.abs(c - lo(o)), Math.abs(c - lo(o) - size(o))) < CONTOUR_BAND
+    );
 
-  const byX = new Map<number, number[]>();
-  const byY = new Map<number, number[]>();
-  for (let i = 0; i < nodes.length; i++) {
-    const node = nodes[i]!;
-    const xsList = byX.get(node.x) ?? [];
-    xsList.push(i);
-    byX.set(node.x, xsList);
-    const ysList = byY.get(node.y) ?? [];
-    ysList.push(i);
-    byY.set(node.y, ysList);
-  }
-
-  for (const list of byX.values()) {
-    list.sort((a, b) => nodes[a]!.y - nodes[b]!.y);
-    for (let i = 1; i < list.length; i++) {
-      const a = nodes[list[i - 1]!]!;
-      const b = nodes[list[i]!]!;
-      if (!segmentHitsObstacles(a, b, obstacles)) {
-        const length = manhattan(a, b) + contourProximityPenalty(a, b, obstacles);
-        pushEdge(list[i - 1]!, list[i]!, 'v', length);
-        pushEdge(list[i]!, list[i - 1]!, 'v', length);
-      }
+  for (let ix = 0; ix < nx; ix++) {
+    const near = nearLine(
+      xs[ix]!,
+      (o) => o.x,
+      (o) => o.width
+    );
+    for (let iy = 1; iy < ny; iy++) {
+      const a = nodeAt[cell(ix, iy - 1)]!;
+      const b = nodeAt[cell(ix, iy)]!;
+      if (a >= 0 && b >= 0 && !blockedV[cell(ix, iy - 1)]) link(a, b, 'v', near);
     }
   }
-
-  for (const list of byY.values()) {
-    list.sort((a, b) => nodes[a]!.x - nodes[b]!.x);
-    for (let i = 1; i < list.length; i++) {
-      const a = nodes[list[i - 1]!]!;
-      const b = nodes[list[i]!]!;
-      if (!segmentHitsObstacles(a, b, obstacles)) {
-        const length = manhattan(a, b) + contourProximityPenalty(a, b, obstacles);
-        pushEdge(list[i - 1]!, list[i]!, 'h', length);
-        pushEdge(list[i]!, list[i - 1]!, 'h', length);
-      }
+  for (let iy = 0; iy < ny; iy++) {
+    const near = nearLine(
+      ys[iy]!,
+      (o) => o.y,
+      (o) => o.height
+    );
+    for (let ix = 1; ix < nx; ix++) {
+      const a = nodeAt[cell(ix - 1, iy)]!;
+      const b = nodeAt[cell(ix, iy)]!;
+      if (a >= 0 && b >= 0 && !blockedH[cell(ix - 1, iy)]) link(a, b, 'h', near);
     }
   }
 
   return { nodes, edges, startIdx, goalIdx };
 }
 
+/**
+ * Fewest axis changes along [dir, ...remaining edge axes, goalAxis] when the remaining
+ * edges must move along `needH` / `needV`. A null end imposes nothing.
+ */
+function minRemainingBends(
+  dir: Axis | null,
+  needH: boolean,
+  needV: boolean,
+  goalAxis: Axis | null
+): number {
+  if (needH && needV) return dir !== null && dir === goalAxis ? 2 : 1;
+  if (!needH && !needV) return 0;
+  const axis: Axis = needH ? 'h' : 'v';
+  return (dir !== null && dir !== axis ? 1 : 0) + (goalAxis !== null && goalAxis !== axis ? 1 : 0);
+}
+
+const AXIS_STATE: Record<Axis, number> = { h: 0, v: 1 };
+const NO_AXIS_STATE = 2;
+
+/**
+ * A* over the corner graph: edge length + ROUTE_BEND_COST per axis change, plus one
+ * more when the last edge arrives across `goalAxis`. A null axis means "free".
+ */
 export function searchMidPath(
   nodes: Point[],
   edges: Map<number, GraphEdge[]>,
   startIdx: number,
   goalIdx: number,
-  startAxis: Axis,
-  goalAxis: Axis
+  startAxis: Axis | null,
+  goalAxis: Axis | null
 ): Point[] | null {
-  type QueueState = { node: number; dir: Axis; g: number; f: number; key: string };
-  const makeStateKey = (node: number, dir: Axis): string => `${node}:${dir}`;
-  const open: QueueState[] = [];
-  const best = new Map<string, number>();
-  const prev = new Map<string, string>();
-  const startKey = makeStateKey(startIdx, startAxis);
-  best.set(startKey, 0);
+  const goal = nodes[goalIdx]!;
+  // Admissible and consistent: edges cost ≥ their Manhattan length, and every remaining
+  // path needs at least minRemainingBends axis changes (the goal-axis surcharge counts as one).
+  const heuristic = (node: number, dir: Axis | null): number => {
+    const p = nodes[node]!;
+    if (node === goalIdx) return 0;
+    const bends = minRemainingBends(dir, p.x !== goal.x, p.y !== goal.y, goalAxis);
+    return manhattan(p, goal) + bends * ROUTE_BEND_COST;
+  };
+
+  type QueueState = {
+    state: number;
+    node: number;
+    dir: Axis | null;
+    g: number;
+    f: number;
+    seq: number;
+  };
+  const stateCount = nodes.length * 3;
+  const bestG = new Float64Array(stateCount).fill(Infinity);
+  const prevState = new Int32Array(stateCount).fill(-1);
+  const closed = new Uint8Array(stateCount);
+  const open = new MinHeap<QueueState>((a, b) => a.f < b.f || (a.f === b.f && a.seq < b.seq));
+  let seq = 0;
+
+  const startState = startIdx * 3 + (startAxis ? AXIS_STATE[startAxis] : NO_AXIS_STATE);
+  bestG[startState] = 0;
   open.push({
+    state: startState,
     node: startIdx,
     dir: startAxis,
     g: 0,
-    f: manhattan(nodes[startIdx]!, nodes[goalIdx]!),
-    key: startKey,
+    f: heuristic(startIdx, startAxis),
+    seq: seq++,
   });
 
-  let goalKey: string | null = null;
-  while (open.length > 0) {
-    let bestIdx = 0;
-    for (let i = 1; i < open.length; i++) {
-      if (open[i]!.f < open[bestIdx]!.f) bestIdx = i;
-    }
-    const current = open.splice(bestIdx, 1)[0]!;
+  let goalState = -1;
+  while (open.size > 0) {
+    const current = open.pop()!;
+    if (closed[current.state]) continue;
+    closed[current.state] = 1;
     if (current.node === goalIdx) {
-      goalKey = current.key;
+      goalState = current.state;
       break;
     }
 
     for (const edge of edges.get(current.node) ?? []) {
       const nextDir = edge.dir;
+      const nextState = edge.to * 3 + AXIS_STATE[nextDir];
+      if (closed[nextState]) continue;
       let stepCost = edge.length;
-      if (current.dir !== nextDir) stepCost += ROUTE_BEND_COST;
+      if (current.dir !== null && current.dir !== nextDir) stepCost += ROUTE_BEND_COST;
       // Arriving across the entry axis means one more bend into the end stub.
-      if (edge.to === goalIdx && nextDir !== goalAxis) stepCost += ROUTE_BEND_COST;
+      if (edge.to === goalIdx && goalAxis !== null && nextDir !== goalAxis) {
+        stepCost += ROUTE_BEND_COST;
+      }
       const nextG = current.g + stepCost;
-      const nextKey = makeStateKey(edge.to, nextDir);
-      if (nextG >= (best.get(nextKey) ?? Infinity)) continue;
-      best.set(nextKey, nextG);
-      prev.set(nextKey, current.key);
+      if (nextG >= bestG[nextState]!) continue;
+      bestG[nextState] = nextG;
+      prevState[nextState] = current.state;
       open.push({
+        state: nextState,
         node: edge.to,
         dir: nextDir,
         g: nextG,
-        f: nextG + manhattan(nodes[edge.to]!, nodes[goalIdx]!),
-        key: nextKey,
+        f: nextG + heuristic(edge.to, nextDir),
+        seq: seq++,
       });
     }
   }
 
-  if (!goalKey) return null;
+  if (goalState < 0) return null;
 
   const path: Point[] = [];
-  let key: string | undefined = goalKey;
-  while (key) {
-    const nodeIdx = Number(key.split(':')[0]);
-    path.unshift(nodes[nodeIdx]!);
-    key = prev.get(key);
+  for (let s = goalState; s >= 0; s = prevState[s]!) {
+    path.push(nodes[Math.floor(s / 3)]!);
   }
-  return path;
+  return path.reverse();
 }
 
 function pathIsValid(path: Point[], obstacles: RouteRect[]): boolean {
@@ -900,16 +962,8 @@ export function routeOrthogonalAround(input: RouteOrthogonalAroundInput): Point[
 
   // Clear the outer blocker first (container), else the source node itself.
   const exitBlocker = internalParent ? input.source : (input.parent ?? input.source);
-  let rawStartExit = computeStartExit(
-    input.from,
-    input.fromDir,
-    exitBlocker,
-    margin,
-    exitDistance
-  );
-  const gapNeighbor = internalParent
-    ? input.source
-    : (input.parent ?? input.source);
+  let rawStartExit = computeStartExit(input.from, input.fromDir, exitBlocker, margin, exitDistance);
+  const gapNeighbor = internalParent ? input.source : (input.parent ?? input.source);
   const peeledTargetNeighbor =
     input.target && gapNeighbor ? peelForFacingGap(input.target, gapNeighbor) : null;
 
@@ -1012,8 +1066,7 @@ export function routeOrthogonalAround(input: RouteOrthogonalAroundInput): Point[
   );
 
   let sourceObs = input.source ? expandRect(input.source, margin) : undefined;
-  let parentObs =
-    input.parent && !internalParent ? expandRect(input.parent, margin) : undefined;
+  let parentObs = input.parent && !internalParent ? expandRect(input.parent, margin) : undefined;
   let targetObs = input.target ? expandRect(input.target, margin) : undefined;
 
   const openCorridor = (
@@ -1076,16 +1129,8 @@ export function routeOrthogonalAround(input: RouteOrthogonalAroundInput): Point[
   const alreadyApproaching =
     !!lastMid && isOnApproachOutside(lastMid, input.to, input.toDir, endStubLength);
 
-  const raw = [
-    input.from,
-    startExit,
-    ...mid,
-    ...(alreadyApproaching ? [] : [endEntry]),
-    input.to,
-  ];
-  return simplifyPath(
-    ensureOrthogonalPath(raw, { exitDir: input.fromDir, enterDir: input.toDir })
-  );
+  const raw = [input.from, startExit, ...mid, ...(alreadyApproaching ? [] : [endEntry]), input.to];
+  return simplifyPath(ensureOrthogonalPath(raw, { exitDir: input.fromDir, enterDir: input.toDir }));
 }
 
 /** Elbow that leaves `prev` along `dir` first (source exit). */
@@ -1120,17 +1165,13 @@ export interface EnsureOrthogonalOptions {
 }
 
 /** Insert elbows so no consecutive points form a diagonal (safety net). */
-export function ensureOrthogonalPath(
-  path: Point[],
-  options?: EnsureOrthogonalOptions
-): Point[] {
+export function ensureOrthogonalPath(path: Point[], options?: EnsureOrthogonalOptions): Point[] {
   if (path.length < 2) return path;
   const out: Point[] = [path[0]!];
   for (let i = 1; i < path.length; i++) {
     const prev = out[out.length - 1]!;
     const next = path[i]!;
-    const axisAligned =
-      Math.abs(prev.x - next.x) < 0.001 || Math.abs(prev.y - next.y) < 0.001;
+    const axisAligned = Math.abs(prev.x - next.x) < 0.001 || Math.abs(prev.y - next.y) < 0.001;
     if (!axisAligned) {
       const isFirst = out.length === 1;
       const isLast = i === path.length - 1;

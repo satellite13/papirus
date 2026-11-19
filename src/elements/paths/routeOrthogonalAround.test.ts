@@ -5,7 +5,7 @@ import {
   searchMidPath,
   type GraphEdge,
 } from './routeOrthogonalAround';
-import { ROUTE_BEND_COST } from './routeCost';
+import { ROUTE_BEND_COST, countBends } from './routeCost';
 
 const parent = { id: 'parent', x: 160, y: 200, width: 220, height: 160 };
 const target = { id: 'bp', x: 40, y: 40, width: 400, height: 50 };
@@ -296,6 +296,37 @@ describe('searchMidPath cost model', () => {
       [4, 5, 'v'],
     ]);
     expect(searchMidPath(g, edges, 0, 3, 'h', 'v')).toEqual([g[0], g[4], g[5], g[2], g[3]]);
+  });
+
+  it('expands few states on an open lattice (bend-aware heuristic)', () => {
+    // 41×41 open grid; the optimum is one bend. A plain Manhattan heuristic ties every
+    // one-bend state with the optimum and expands most of the grid.
+    const size = 41;
+    const grid: { x: number; y: number }[] = [];
+    for (let ix = 0; ix < size; ix++) {
+      for (let iy = 0; iy < size; iy++) grid.push({ x: ix * 10, y: iy * 10 });
+    }
+    const id = (ix: number, iy: number) => ix * size + iy;
+    const links: Array<[number, number, 'h' | 'v']> = [];
+    for (let ix = 0; ix < size; ix++) {
+      for (let iy = 0; iy < size; iy++) {
+        if (iy + 1 < size) links.push([id(ix, iy), id(ix, iy + 1), 'v']);
+        if (ix + 1 < size) links.push([id(ix, iy), id(ix + 1, iy), 'h']);
+      }
+    }
+    class CountingMap<K, V> extends Map<K, V> {
+      gets = 0;
+      override get(key: K): V | undefined {
+        this.gets++;
+        return super.get(key);
+      }
+    }
+    const edges = new CountingMap<number, GraphEdge[]>(linkGraph(grid, links));
+    const goal = id(size - 1, size - 1);
+    const path = searchMidPath(grid, edges, 0, goal, 'h', 'v');
+    expect(countBends(path!)).toBe(1);
+    expect(path![path!.length - 2]!.x).toBe(grid[goal]!.x);
+    expect(edges.gets).toBeLessThan(4 * size);
   });
 });
 
