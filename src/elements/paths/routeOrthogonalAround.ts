@@ -443,25 +443,30 @@ function computeEndEntry(
   const mid = facingGapMid(rawTarget, rawNeighbor);
   if (!mid) return stub;
 
+  // Peel is symmetric, so mirroring `to` (on the target edge) across the mid-gap
+  // gives the neighbor edge on the same footing.
+  const meetY = (): number => endStubMeet(2 * mid.y - to.y, to.y, endStubLength);
+  const meetX = (): number => endStubMeet(2 * mid.x - to.x, to.x, endStubLength);
+
   switch (toDir) {
     case 'bottom':
       if (mid.y > to.y && rawNeighbor.y >= rawTarget.y + rawTarget.height) {
-        return { x: to.x, y: mid.y };
+        return { x: to.x, y: meetY() };
       }
       break;
     case 'top':
       if (mid.y < to.y && rawNeighbor.y + rawNeighbor.height <= rawTarget.y) {
-        return { x: to.x, y: mid.y };
+        return { x: to.x, y: meetY() };
       }
       break;
     case 'right':
       if (mid.x > to.x && rawNeighbor.x >= rawTarget.x + rawTarget.width) {
-        return { x: mid.x, y: to.y };
+        return { x: meetX(), y: to.y };
       }
       break;
     case 'left':
       if (mid.x < to.x && rawNeighbor.x + rawNeighbor.width <= rawTarget.x) {
-        return { x: mid.x, y: to.y };
+        return { x: meetX(), y: to.y };
       }
       break;
   }

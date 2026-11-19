@@ -6,16 +6,59 @@ import { crosses, routeScenario, scenarios } from '@/test/routingScenarios';
 
 type P = { x: number; y: number };
 
+/** Straight run into the last point; collinear vertices left by simplify are skipped. */
 function lastSegment(path: P[]): { len: number; axis: 'h' | 'v' | 'diag' } {
-  const a = path[path.length - 2]!;
   const b = path[path.length - 1]!;
-  const dx = Math.abs(a.x - b.x);
-  const dy = Math.abs(a.y - b.y);
-  return { len: dx + dy, axis: dy < 0.001 ? 'h' : dx < 0.001 ? 'v' : 'diag' };
+  let i = path.length - 2;
+  const first = path[i]!;
+  const dx0 = Math.abs(first.x - b.x);
+  const dy0 = Math.abs(first.y - b.y);
+  const axis = dy0 < 0.001 ? 'h' : dx0 < 0.001 ? 'v' : 'diag';
+  if (axis !== 'diag') {
+    while (i > 0) {
+      const prev = path[i - 1]!;
+      const onAxis = axis === 'h' ? Math.abs(prev.y - b.y) < 0.001 : Math.abs(prev.x - b.x) < 0.001;
+      if (!onAxis) break;
+      i--;
+    }
+  }
+  const a = path[i]!;
+  return { len: Math.abs(a.x - b.x) + Math.abs(a.y - b.y), axis };
 }
 
-const axisOfSide = (side: string): 'h' | 'v' =>
-  side === 'left' || side === 'right' ? 'h' : 'v';
+function hasUTurn(path: P[]): boolean {
+  for (let i = 0; i + 2 < path.length; i++) {
+    const a = path[i]!;
+    const b = path[i + 1]!;
+    const c = path[i + 2]!;
+    const v1x = b.x - a.x;
+    const v1y = b.y - a.y;
+    const v2x = c.x - b.x;
+    const v2y = c.y - b.y;
+    const len1 = Math.hypot(v1x, v1y);
+    const len2 = Math.hypot(v2x, v2y);
+    if (len1 > 0.5 && len2 > 0.5 && v1x * v2x + v1y * v2y < -0.01 * len1 * len2) return true;
+  }
+  return false;
+}
+
+type R = { id: string; x: number; y: number; width: number; height: number };
+
+function routeNodes(a: R, b: R, from: P, to: P, fromDir: string, toDir: string): P[] {
+  const pad = (n: R, role: 'source' | 'target') => ({
+    id: n.id,
+    x: n.x - 4,
+    y: n.y - 4,
+    width: n.width + 8,
+    height: n.height + 8,
+    role,
+  });
+  return new PolylinePathStrategy().calculatePath(from, to, fromDir, toDir, {
+    obstacles: [pad(a, 'source'), pad(b, 'target')],
+  });
+}
+
+const axisOfSide = (side: string): 'h' | 'v' => (side === 'left' || side === 'right' ? 'h' : 'v');
 
 describe('end stub (routeOrthogonalAround)', () => {
   for (const [name, sc] of Object.entries(scenarios)) {
@@ -39,6 +82,67 @@ describe('end stub (routeOrthogonalAround)', () => {
     expect(seg.len, JSON.stringify(path)).toBeGreaterThanOrEqual(DEFAULT_END_STUB - 0.001);
     for (const r of [sc.a, sc.b, ...sc.others]) {
       expect(crosses(path, r), `crosses ${r.id}: ${JSON.stringify(path)}`).toBe(false);
+    }
+  });
+
+  it('right → top under the source: mid-gap entry never shortens the stub when it fits', () => {
+    const a = { id: 'a', x: 100, y: 100, width: 100, height: 60 };
+    for (const gap of [24, 28, 31]) {
+      const b = { id: 'b', x: 120, y: 160 + gap, width: 160, height: 60 };
+      const to = { x: 180, y: b.y };
+      const path = routeNodes(a, b, { x: 200, y: 130 }, to, 'right', 'top');
+      const seg = lastSegment(path);
+      const msg = `gap ${gap}: ${JSON.stringify(path)}`;
+      expect(seg.axis, msg).toBe('v');
+      expect(seg.len, msg).toBeCloseTo(DEFAULT_END_STUB, 3);
+      expect(crosses(path, a), msg).toBe(false);
+      expect(crosses(path, b), msg).toBe(false);
+      expect(path[path.length - 1]).toEqual(to);
+    }
+  });
+
+  it('bottom → left beside the source: mid-gap entry never shortens the stub when it fits', () => {
+    const a = { id: 'a', x: 100, y: 100, width: 100, height: 60 };
+    for (const gap of [24, 28, 31]) {
+      const b = { id: 'b', x: 200 + gap, y: 120, width: 100, height: 60 };
+      const to = { x: b.x, y: 150 };
+      const path = routeNodes(a, b, { x: 150, y: 160 }, to, 'bottom', 'left');
+      const seg = lastSegment(path);
+      const msg = `gap ${gap}: ${JSON.stringify(path)}`;
+      expect(seg.axis, msg).toBe('h');
+      expect(seg.len, msg).toBeCloseTo(DEFAULT_END_STUB, 3);
+      expect(crosses(path, a), msg).toBe(false);
+      expect(crosses(path, b), msg).toBe(false);
+      expect(path[path.length - 1]).toEqual(to);
+    }
+  });
+
+  it('very small gap keeps the mid-gap entry: no U-turn, no node crossing', () => {
+    const a = { id: 'a', x: 100, y: 100, width: 100, height: 60 };
+    const cases = [
+      {
+        b: { id: 'b', x: 120, y: 176, width: 160, height: 60 },
+        from: { x: 200, y: 130 },
+        to: { x: 180, y: 176 },
+        fromDir: 'right',
+        toDir: 'top',
+      },
+      {
+        b: { id: 'b', x: 216, y: 120, width: 100, height: 60 },
+        from: { x: 150, y: 160 },
+        to: { x: 216, y: 150 },
+        fromDir: 'bottom',
+        toDir: 'left',
+      },
+    ];
+    for (const c of cases) {
+      const path = routeNodes(a, c.b, c.from, c.to, c.fromDir, c.toDir);
+      const msg = `${c.fromDir}→${c.toDir}: ${JSON.stringify(path)}`;
+      expect(lastSegment(path).axis, msg).toBe(axisOfSide(c.toDir));
+      expect(hasUTurn(path), msg).toBe(false);
+      expect(crosses(path, a), msg).toBe(false);
+      expect(crosses(path, c.b), msg).toBe(false);
+      expect(path[path.length - 1]).toEqual(c.to);
     }
   });
 
