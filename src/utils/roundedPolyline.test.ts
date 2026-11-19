@@ -120,7 +120,7 @@ describe('roundedPolylineToSvgD', () => {
   });
 
   it('omits fillets when radius clamps to zero on tiny segments', () => {
-    const d = roundedPolylineToSvgD(
+    roundedPolylineToSvgD(
       [
         { x: 0, y: 0 },
         { x: 0.5, y: 0 },

@@ -720,7 +720,7 @@ export class SvgExporter {
       .map((segment) =>
         roundBends
           ? roundedPolylineToSvgD(segment, EDGE_BEND_RADIUS)
-          : (() => {
+          : ((): string => {
               let d = `M ${segment[0]!.x} ${segment[0]!.y}`;
               for (let i = 1; i < segment.length; i++) {
                 d += ` L ${segment[i]!.x} ${segment[i]!.y}`;
