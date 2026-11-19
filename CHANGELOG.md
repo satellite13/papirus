@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Drag edge labels to update `labelPosition` / `labelOffset` (`labelDragStart` / `labelDragEnd`). Click a segment body (not the mid-handle) inserts a bend (replaces mid-segment `+`).
 - Deselecting an `editable-polyline` drops colinear bends on straight H/V runs (undoable).
 
+### Changed
+- Auto `polyline` routing minimizes bends first, then length (one bend ≈ 160 px), counting turns at the exit/entry stubs; a post-pass removes leftover staircases without crossing nodes.
+- The route ends with a perpendicular stub of the end marker's visible size + 4 px (min 12 px; 14 px for the legacy `arrowType` arrow) when it turns before the target. Close facing nodes turn mid-gap, so the stub may be shorter. Changing `endMarker` / `startMarker` / `arrowType` re-routes the edge.
+- Without obstacles, a known target side (even alone) is approached from outside along its normal.
+
 ## [0.9.19] - 2026-11-09
 
 ### Fixed
