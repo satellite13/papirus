@@ -43,7 +43,7 @@ const CONTOUR_COST_PER_PX = 0.2;
 
 type Axis = 'h' | 'v';
 
-function axisOf(side: Side): Axis {
+export function axisOf(side: Side): Axis {
   return side === 'left' || side === 'right' ? 'h' : 'v';
 }
 

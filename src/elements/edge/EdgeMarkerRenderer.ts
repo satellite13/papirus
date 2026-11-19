@@ -37,7 +37,8 @@ export function getCanvasMarkerLength(config: ArrowMarkerConfig): number {
 /** Drawn length of the marker along the path (unlike getCanvasMarkerLength, `open` counts). */
 export function getMarkerVisualLength(config: ArrowMarkerConfig): number {
   if (config.type === 'none') return 0;
-  const size = config.size ?? MARKER_SIZES[config.type] ?? ARROW_SIZE;
+  const raw = config.size ?? MARKER_SIZES[config.type] ?? ARROW_SIZE;
+  const size = Number.isFinite(raw) && raw > 0 ? raw : 0;
   return config.type === 'circle' || config.type === 'square' ? size * 2 : size;
 }
 

@@ -86,15 +86,14 @@ function improveOnce(path: Point[], obstacles: readonly RouteRect[]): Point[] | 
       const a = path[i]!;
       const b = path[j]!;
       for (const bridge of bridges(a, b)) {
-        if (bridgeHits([a, ...bridge, b], obstacles)) continue;
-        if (hasReversal([path[i - 1]!, a, ...bridge, b, path[j + 1]!])) continue;
         const tail = samePoint(a, b) ? path.slice(j + 1) : path.slice(j);
         const candidate = [...path.slice(0, i + 1), ...bridge, ...tail];
         const cost = orthogonalRouteCost(candidate);
-        if (cost < bestCost - EPS) {
-          best = candidate;
-          bestCost = cost;
-        }
+        if (cost >= bestCost - EPS) continue;
+        if (hasReversal([path[i - 1]!, a, ...bridge, b, path[j + 1]!])) continue;
+        if (bridgeHits([a, ...bridge, b], obstacles)) continue;
+        best = candidate;
+        bestCost = cost;
       }
     }
   }

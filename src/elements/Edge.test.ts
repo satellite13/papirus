@@ -840,6 +840,8 @@ describe('Edge end stub length', () => {
     expect(getMarkerVisualLength({ type: 'open' })).toBe(12);
     expect(getMarkerVisualLength({ type: 'circle' })).toBe(12);
     expect(getMarkerVisualLength({ type: 'none' })).toBe(0);
+    expect(getMarkerVisualLength({ type: 'arrow', size: NaN })).toBe(0);
+    expect(getMarkerVisualLength({ type: 'circle', size: -6 })).toBe(0);
     const r = (m: Parameters<typeof resolveEndStubLength>[0]) => resolveEndStubLength(m);
     expect(r({ endMarker: { type: 'arrow' }, arrowType: 'single' })).toBe(16);
     expect(r({ endMarker: { type: 'open' }, arrowType: 'single' })).toBe(16);
@@ -847,6 +849,7 @@ describe('Edge end stub length', () => {
     expect(r({ endMarker: { type: 'circle' }, arrowType: 'single' })).toBe(16);
     expect(r({ endMarker: { type: 'arrow', size: 20 }, arrowType: 'single' })).toBe(24);
     expect(r({ endMarker: { type: 'none' }, arrowType: 'single' })).toBe(12);
+    expect(r({ endMarker: { type: 'arrow', size: NaN }, arrowType: 'single' })).toBe(12);
     expect(r({ startMarker: { type: 'diamond' }, arrowType: 'single' })).toBe(12);
     expect(r({ arrowType: 'single' })).toBe(14);
     expect(r({ arrowType: 'none' })).toBe(12);

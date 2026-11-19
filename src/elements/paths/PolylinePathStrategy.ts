@@ -2,6 +2,7 @@ import type { Point } from '@/types';
 import type { PathStrategy, PathStrategyOptions, PathObstacle } from './PathStrategy';
 import { reduceOrthogonalBends } from './reduceOrthogonalBends';
 import {
+  axisOf,
   endStubMeet,
   routeOrthogonalAround,
   searchMidPath,
@@ -112,7 +113,8 @@ function resolveRoutingRoles(
   return { parent, source, target, others };
 }
 
-const REDUCE_MARGIN = 4;
+/** Diagram obstacles already pad ~8px; 4 more ≈ 12px clearance around a node. */
+const NODE_CLEARANCE = 4;
 
 function reduceRouteBends(
   from: Point,
@@ -136,10 +138,10 @@ function reduceRouteBends(
       if (hasFrom || hasTo) return path;
     }
     checks.push({
-      x: o.x - REDUCE_MARGIN,
-      y: o.y - REDUCE_MARGIN,
-      width: o.width + REDUCE_MARGIN * 2,
-      height: o.height + REDUCE_MARGIN * 2,
+      x: o.x - NODE_CLEARANCE,
+      y: o.y - NODE_CLEARANCE,
+      width: o.width + NODE_CLEARANCE * 2,
+      height: o.height + NODE_CLEARANCE * 2,
     });
   }
   return reduceOrthogonalBends(path, checks);
@@ -157,7 +159,6 @@ const OPPOSITE_BYPASS_ARC = 48;
 const OBSTACLE_ROUTING_DISTANCE = 1200;
 const OBSTACLE_MARGIN = 12;
 const ROUTE_EXIT_DISTANCE = 32;
-const ROUTE_TARGET_MARGIN = 4;
 const ALIGNED_BEHIND_DETOUR = 48;
 
 function expandForRouting(
@@ -165,7 +166,7 @@ function expandForRouting(
   target: PathObstacle | undefined
 ): PathObstacle[] {
   return obstacles.map((o) => {
-    const m = o === target ? ROUTE_TARGET_MARGIN : OBSTACLE_MARGIN;
+    const m = o === target ? NODE_CLEARANCE : OBSTACLE_MARGIN;
     return { ...o, x: o.x - m, y: o.y - m, width: o.width + m * 2, height: o.height + m * 2 };
   });
 }
@@ -274,12 +275,6 @@ function approachAlongNormal(from: Point, to: Point, toDir: Side, endStubLength:
   // Directly behind: target size is unknown here, step aside before passing it.
   const detourB = toB + ALIGNED_BEHIND_DETOUR;
   return [at(fromA, detourB), at(entryA, detourB), at(entryA, toB)];
-}
-
-function routeAxis(dir: string | undefined): 'h' | 'v' | null {
-  if (isHorizontal(dir)) return 'h';
-  if (isVertical(dir)) return 'v';
-  return null;
 }
 
 function inferExitDir(from: Point, to: Point): string {
@@ -451,17 +446,16 @@ function buildRoutedPolyline(
     }
   }
 
+  const startDir = isSide(effectiveFromDir) ? effectiveFromDir : undefined;
+  const goalDir = isSide(effectiveToDir) ? effectiveToDir : undefined;
   const routed = searchMidPath(
     nodes,
     edges,
     startIdx,
     goalIdx,
-    routeAxis(effectiveFromDir),
-    routeAxis(effectiveToDir),
-    {
-      startDir: isSide(effectiveFromDir) ? effectiveFromDir : undefined,
-      goalDir: isSide(effectiveToDir) ? effectiveToDir : undefined,
-    }
+    startDir ? axisOf(startDir) : null,
+    goalDir ? axisOf(goalDir) : null,
+    { startDir, goalDir }
   );
   if (!routed) {
     return null;
@@ -637,7 +631,6 @@ export class PolylinePathStrategy implements PathStrategy {
     }
 
     // Nested / target-aware case: dedicated router (parent and/or target present).
-    // Diagram obstacles already pad ~8px; margin 4 ≈ 12px total clearance.
     if (!selfLoop && isSide(fromDir) && isSide(toDir)) {
       const { parent, source, target, others } = resolveRoutingRoles(from, to, obstacles);
       const approachDir = resolveApproachDir(from, to, toDir, target);
@@ -653,7 +646,7 @@ export class PolylinePathStrategy implements PathStrategy {
             source,
             target,
             others,
-            margin: 4,
+            margin: NODE_CLEARANCE,
             exitDistance: 20,
             endStubLength,
           })
