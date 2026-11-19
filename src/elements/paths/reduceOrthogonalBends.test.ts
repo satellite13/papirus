@@ -78,6 +78,29 @@ describe('reduceOrthogonalBends', () => {
     expect(countBends(result)).toBeLessThan(countBends(path));
   });
 
+  it('keeps an existing U-turn at a stub instead of flipping the stub direction', () => {
+    const startSpike = [
+      { x: 200, y: 300 },
+      { x: 232, y: 300 },
+      { x: 147, y: 300 },
+      { x: 147, y: 96 },
+      { x: 280, y: 96 },
+      { x: 280, y: 80 },
+    ];
+    const obstacles: RouteRect[] = [{ x: 156, y: 136, width: 208, height: 148 }];
+    const result = reduceOrthogonalBends(startSpike, obstacles);
+    expect(result[1]).toEqual({ x: 232, y: 300 });
+    expect(hits(result, obstacles)).toBe(false);
+
+    const bothSpikes = [
+      { x: 100, y: 120 },
+      { x: 80, y: 120 },
+      { x: 176, y: 120 },
+      { x: 160, y: 120 },
+    ];
+    expect(reduceOrthogonalBends(bothSpikes, [])).toEqual(bothSpikes);
+  });
+
   it('collapses a staircase into an L', () => {
     expect(reduceOrthogonalBends(staircase, [])).toEqual([
       { x: 0, y: 0 },

@@ -1,5 +1,4 @@
 import type { Point } from '@/types';
-import { collapseColinearPoints } from '@/utils/orthogonalSegmentDrag';
 import { orthogonalRouteCost } from './routeCost';
 import { segmentIntersectsOpenInterior, type RouteRect } from './routeOrthogonalAround';
 
@@ -59,6 +58,25 @@ function hasReversal(chain: readonly Point[]): boolean {
   return false;
 }
 
+/** Drops pass-through vertices only; a U-turn vertex is kept so stubs never flip direction. */
+function collapseStraightRuns(path: readonly Point[]): Point[] {
+  const out: Point[] = [path[0]!];
+  for (let i = 1; i < path.length - 1; i++) {
+    const prev = out[out.length - 1]!;
+    const cur = path[i]!;
+    const next = path[i + 1]!;
+    const inX = cur.x - prev.x;
+    const inY = cur.y - prev.y;
+    const outX = next.x - cur.x;
+    const outY = next.y - cur.y;
+    const colinear = Math.abs(inX * outY - inY * outX) < EPS;
+    if (colinear && inX * outX + inY * outY > 0) continue;
+    out.push(cur);
+  }
+  out.push(path[path.length - 1]!);
+  return out;
+}
+
 function improveOnce(path: Point[], obstacles: readonly RouteRect[]): Point[] | null {
   const n = path.length;
   let best: Point[] | null = null;
@@ -97,5 +115,5 @@ export function reduceOrthogonalBends(path: Point[], obstacles: RouteRect[]): Po
     if (!improved) break;
     current = improved;
   }
-  return collapseColinearPoints(current, EPS);
+  return collapseStraightRuns(dedupe(current));
 }
