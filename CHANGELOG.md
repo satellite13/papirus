@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.22] - 2026-11-23
+
+### Fixed
+- Locked edge ports (`anchor:<side>:<n>`) keep their side direction when the node has no matching anchors (e.g. zero ports on that side). Polyline routes between nodes inside a group no longer leave the container via the wrong exit.
+
 ## [0.9.21] - 2026-11-19
 
 ### Fixed

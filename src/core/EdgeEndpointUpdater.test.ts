@@ -411,6 +411,106 @@ describe('EdgeEndpointUpdater edge attachments', () => {
     }
   });
 
+  it('keeps a stale locked-port route inside a shared container when nodes expose no ports', () => {
+    const noAnchors = { top: 0, right: 0, bottom: 0, left: 0 };
+    const parent = new RectangleNode({
+      id: 'parent',
+      x: 158,
+      y: 122,
+      width: 394,
+      height: 383,
+    });
+    const source = new RectangleNode({
+      id: 'source',
+      x: 290,
+      y: 142,
+      width: 140,
+      height: 110,
+      anchorPoints: noAnchors,
+    });
+    const target = new RectangleNode({
+      id: 'target',
+      x: 289,
+      y: 368,
+      width: 142,
+      height: 90,
+      anchorPoints: noAnchors,
+    });
+    const nodes = new Map([
+      ['parent', parent],
+      ['source', source],
+      ['target', target],
+    ]);
+    const edge = new Edge({
+      id: 'e-inside-parent',
+      from: { nodeId: 'source', portId: 'anchor:bottom:0' },
+      to: { nodeId: 'target', portId: 'anchor:top:0' },
+      type: 'polyline',
+      lockAnchors: true,
+    });
+    const updater = new EdgeEndpointUpdater({
+      getNodes: () => nodes,
+      getEdges: () => new Map([['e-inside-parent', edge]]),
+      getNodeObstacles: () => [
+        { id: 'parent', x: parent.x, y: parent.y, width: parent.width, height: parent.height },
+        { id: 'source', x: source.x, y: source.y, width: source.width, height: source.height },
+        { id: 'target', x: target.x, y: target.y, width: target.width, height: target.height },
+      ],
+    });
+
+    updater.updateAll();
+
+    expect(source.getAnchors()).toEqual([]);
+    expect(target.getAnchors()).toEqual([]);
+    for (const point of edge.path) {
+      expect(point.x).toBeGreaterThanOrEqual(parent.x);
+      expect(point.x).toBeLessThanOrEqual(parent.x + parent.width);
+      expect(point.y).toBeGreaterThanOrEqual(parent.y);
+      expect(point.y).toBeLessThanOrEqual(parent.y + parent.height);
+    }
+  });
+
+  it('keeps the stored side when a stale port points away from the other node', () => {
+    const noAnchors = { top: 0, right: 0, bottom: 0, left: 0 };
+    const source = new RectangleNode({
+      id: 'source',
+      x: 100,
+      y: 200,
+      width: 100,
+      height: 60,
+      anchorPoints: noAnchors,
+    });
+    const target = new RectangleNode({
+      id: 'target',
+      x: 100,
+      y: 20,
+      width: 100,
+      height: 60,
+      anchorPoints: noAnchors,
+    });
+    const edge = new Edge({
+      id: 'e-stale-side',
+      from: { nodeId: 'source', portId: 'anchor:bottom:0' },
+      to: { nodeId: 'target' },
+      type: 'straight',
+      lockAnchors: true,
+    });
+    const updater = new EdgeEndpointUpdater({
+      getNodes: () =>
+        new Map([
+          ['source', source],
+          ['target', target],
+        ]),
+      getEdges: () => new Map([['e-stale-side', edge]]),
+      getNodeObstacles: () => [],
+    });
+
+    updater.updateAll();
+
+    expect(edge.path[0]!.x).toBeCloseTo(source.getCenter().x, 0);
+    expect(edge.path[0]!.y).toBeCloseTo(source.y + source.height, 0);
+  });
+
   it('keeps user outline on target top (wrap-around, no snap to facing bottom)', () => {
     const os = new RectangleNode({ id: 'os', x: 80, y: 150, width: 200, height: 60 });
     const device = new RectangleNode({ id: 'device', x: 80, y: 240, width: 200, height: 60 });

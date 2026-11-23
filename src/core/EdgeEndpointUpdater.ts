@@ -306,6 +306,21 @@ export class EdgeEndpointUpdater {
     return best;
   }
 
+  private pointOnSide(node: Node, side: Side): Point {
+    const bounds = node.getBounds();
+    const center = node.getCenter();
+    const offset = Math.max(bounds.width, bounds.height, 1);
+    const target =
+      side === 'top'
+        ? { x: center.x, y: bounds.y - offset }
+        : side === 'right'
+          ? { x: bounds.x + bounds.width + offset, y: center.y }
+          : side === 'bottom'
+            ? { x: center.x, y: bounds.y + bounds.height + offset }
+            : { x: bounds.x - offset, y: center.y };
+    return node.getClosestPointOnOutline(target).point;
+  }
+
   private setEndpointSidePort(
     edge: Edge,
     end: 'from' | 'to',
@@ -339,11 +354,20 @@ export class EdgeEndpointUpdater {
     toward: Point | undefined,
     lockAnchors: boolean
   ): ResolvedEnd {
-    if (lockAnchors && isNodeEdgeEndpoint(endpoint) && endpoint.portId) {
+    const lockedPortSide =
+      lockAnchors && isNodeEdgeEndpoint(endpoint) ? this.portSide(endpoint.portId) : undefined;
+    if (lockedPortSide && isNodeEdgeEndpoint(endpoint) && endpoint.portId) {
       const anchorId = endpoint.portId.slice(ANCHOR_PORT_PREFIX.length);
       const point = node.getAnchorPointById(anchorId);
       if (point) {
-        return { point, direction: anchorId.split(':')[0] };
+        return { point, direction: lockedPortSide };
+      }
+      if (toward) {
+        const fallback = this.nearestAnchorOnSide(node, lockedPortSide, toward);
+        return {
+          point: fallback?.point ?? this.pointOnSide(node, lockedPortSide),
+          direction: lockedPortSide,
+        };
       }
     }
 
