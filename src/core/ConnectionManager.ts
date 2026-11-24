@@ -586,8 +586,7 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
       const { edge, run, trackMidpoint } = this.activeSegmentDrag;
       const vertices = edge.getPathVertices();
       const rawPoint = this.snapPoint({ x: event.worldX, y: event.worldY });
-      const currentRun =
-        resolveOrthogonalRun(vertices, run, trackMidpoint) ?? run;
+      const currentRun = resolveOrthogonalRun(vertices, run, trackMidpoint) ?? run;
       const next = moveOrthogonalRun(vertices, currentRun, rawPoint);
       if (next) {
         edge.controlPoints = next;
@@ -653,9 +652,7 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
       !this._connectionValidator(this.sourceNode.id, rawNode.id);
     const searchGroupFill =
       !!rawNode &&
-      (forbiddenFill ||
-        this.nodeContainsSource(rawNode) ||
-        this.nodeLooksLikeContainer(rawNode));
+      (forbiddenFill || this.nodeContainsSource(rawNode) || this.nodeLooksLikeContainer(rawNode));
     let targetNode = this.getNodeAtPoint(cursorPoint, false);
 
     if (this.attachToOutline) {
@@ -871,10 +868,17 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
         node = this.renderer.getNode(this.reconnectingTargetNodeId) ?? null;
       }
       if (!reconnected && node) {
-        if (this.attachToOutline && this.reconnectingOutlineParam !== null) {
+        if (this.attachToOutline) {
+          // A drop inside the shape is farther than the outline snap, so the
+          // move handler clears the param and would otherwise lock the nearest
+          // port. Project onto the contour before the history event.
+          const outlineParam =
+            this.reconnectingOutlineParam !== null
+              ? this.reconnectingOutlineParam
+              : node.getClosestPointOnOutline(point).param;
           const endpoint: EdgeEndpoint = {
             nodeId: node.id,
-            outlineParam: this.reconnectingOutlineParam,
+            outlineParam,
           };
           if (this.reconnectingEndpoint === 'start') {
             this.reconnectingEdge.from = endpoint;
@@ -943,9 +947,7 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
           }
         : {
             nodeId: this.sourceNode.id,
-            portId: this.sourceAnchorId
-              ? `${ANCHOR_PORT_PREFIX}${this.sourceAnchorId}`
-              : undefined,
+            portId: this.sourceAnchorId ? `${ANCHOR_PORT_PREFIX}${this.sourceAnchorId}` : undefined,
           };
       const to: EdgeEndpoint = {
         edgeId: edgeDrop.edgeId,
@@ -1485,15 +1487,14 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     }
 
     const vertices = edge.getPathVertices();
-    const resolved =
-      resolveOrthogonalRun(vertices, run, seedMid) ?? {
-        axis: run.axis,
-        startIndex: Math.min(run.startIndex, Math.max(0, vertices.length - 2)),
-        endIndex: Math.min(
-          Math.max(run.endIndex, run.startIndex + 1),
-          Math.max(1, vertices.length - 1)
-        ),
-      };
+    const resolved = resolveOrthogonalRun(vertices, run, seedMid) ?? {
+      axis: run.axis,
+      startIndex: Math.min(run.startIndex, Math.max(0, vertices.length - 2)),
+      endIndex: Math.min(
+        Math.max(run.endIndex, run.startIndex + 1),
+        Math.max(1, vertices.length - 1)
+      ),
+    };
 
     this.activeSegmentDrag = {
       edge,
@@ -1569,10 +1570,7 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
    * Hit any path segment (orthogonal or diagonal) for bend insertion.
    * Skips mid-handle hotspots of orthogonal runs (those are for segment drag).
    */
-  private hitSegmentBody(
-    edge: Edge,
-    point: Point
-  ): { segmentIndex: number; point: Point } | null {
+  private hitSegmentBody(edge: Edge, point: Point): { segmentIndex: number; point: Point } | null {
     const vertices = this.getRoutableVertices(edge);
     const tolerance = Math.max((edge.style.strokeWidth ?? 2) * 2, 8);
     const segmentRadius = EDGE_ADD_CONTROL_RADIUS / Math.max(this.renderer.zoom, 0.0001);
@@ -1651,12 +1649,7 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
 
       const vertices = this.getRoutableVertices(edge);
       for (const run of listOrthogonalRuns(vertices)) {
-        this.drawSegmentHandle(
-          ctx,
-          orthogonalRunMidpoint(vertices, run),
-          segmentRadius,
-          run.axis
-        );
+        this.drawSegmentHandle(ctx, orthogonalRunMidpoint(vertices, run), segmentRadius, run.axis);
       }
       for (let i = 0; i < vertices.length - 1; i++) {
         const start = vertices[i]!;
@@ -2093,9 +2086,7 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
       // Port-mode "+" on an anchor that coincides with a selected edge end is the same clash.
       const nearSelectedEndpoint = this.isNearSelectedEdgeEndpoint(point);
       this.hoverAnchorId =
-        handleHit || nearSelectedEndpoint
-          ? null
-          : (this.getAnchorAtPoint(node, point)?.id ?? null);
+        handleHit || nearSelectedEndpoint ? null : (this.getAnchorAtPoint(node, point)?.id ?? null);
       this.hoverOutlineHandle = handleHit !== null && !nearSelectedEndpoint;
       if (this.attachToOutline) {
         this.hoverOutlineSide = this.outlineConnectHandleFor(node, point).side;

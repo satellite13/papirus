@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { DiagramRenderer } from './DiagramRenderer';
 import { RectangleNode } from '../elements/nodes/RectangleNode';
+import { CustomShapeNode } from '../elements/nodes/CustomShapeNode';
 import { DiamondNode } from '../elements/nodes/DiamondNode';
 import { Edge } from '../elements/Edge';
 import { EDGE_SEGMENT_INSERT_CLICK_DELAY_MS } from '../constants';
@@ -459,6 +460,189 @@ describe('ConnectionManager', () => {
     expect(edge.from.outlineParam).toBeDefined();
   });
 
+  it('projects an interior drop onto the node outline before history when anchors are locked', () => {
+    const canvas = createCanvas(500, 240);
+    const renderer = new DiagramRenderer(canvas, { width: 500, height: 240, retina: false });
+    const interaction = renderer.enableInteractions({ attachToOutline: true });
+
+    const nodeA = new RectangleNode({ x: 20, y: 80, width: 80, height: 60 });
+    const nodeB = new RectangleNode({ x: 220, y: 20, width: 220, height: 180 });
+    renderer.addNode(nodeA);
+    renderer.addNode(nodeB);
+
+    const edge = new Edge({
+      from: { nodeId: nodeA.id, portId: 'anchor:right:0' },
+      to: { nodeId: nodeB.id, portId: 'anchor:left:0' },
+      type: 'orthogonal',
+      lockAnchors: true,
+    });
+    renderer.addEdge(edge);
+    renderer.render();
+    interaction.selection.select(edge.id);
+
+    const handle = { ...edge.endPoint };
+    const inside = { x: nodeB.x + nodeB.width / 2, y: nodeB.y + nodeB.height / 2 };
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', {
+        clientX: handle.x,
+        clientY: handle.y,
+        button: 0,
+        bubbles: true,
+      })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mousemove', {
+        clientX: inside.x,
+        clientY: inside.y,
+        button: 0,
+        buttons: 1,
+        bubbles: true,
+      })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mouseup', { clientX: inside.x, clientY: inside.y, button: 0, bubbles: true })
+    );
+
+    expect(edge.to.nodeId).toBe(nodeB.id);
+    expect(edge.to.portId).toBeUndefined();
+    expect(edge.to.outlineParam).toEqual(expect.any(Number));
+    expect(interaction.history.canUndo).toBe(true);
+    interaction.history.undo();
+    expect(edge.to.portId).toBe('anchor:left:0');
+    expect(edge.to.outlineParam).toBeUndefined();
+  });
+
+  it('keeps a locked port when outline attachment is off', () => {
+    const canvas = createCanvas(500, 240);
+    const renderer = new DiagramRenderer(canvas, { width: 500, height: 240, retina: false });
+    const interaction = renderer.enableInteractions({ attachToOutline: false });
+
+    const nodeA = new RectangleNode({ x: 20, y: 80, width: 80, height: 60 });
+    const nodeB = new RectangleNode({ x: 220, y: 20, width: 220, height: 180 });
+    renderer.addNode(nodeA);
+    renderer.addNode(nodeB);
+
+    const edge = new Edge({
+      from: { nodeId: nodeA.id, portId: 'anchor:right:0' },
+      to: { nodeId: nodeB.id, portId: 'anchor:left:0' },
+      type: 'orthogonal',
+      lockAnchors: true,
+    });
+    renderer.addEdge(edge);
+    renderer.render();
+    interaction.selection.select(edge.id);
+
+    const handle = { ...edge.endPoint };
+    const inside = { x: nodeB.x + nodeB.width / 2, y: nodeB.y + nodeB.height / 2 };
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', {
+        clientX: handle.x,
+        clientY: handle.y,
+        button: 0,
+        bubbles: true,
+      })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mousemove', {
+        clientX: inside.x,
+        clientY: inside.y,
+        button: 0,
+        buttons: 1,
+        bubbles: true,
+      })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mouseup', { clientX: inside.x, clientY: inside.y, button: 0, bubbles: true })
+    );
+
+    expect(edge.to.nodeId).toBe(nodeB.id);
+    expect(edge.to.outlineParam).toBeUndefined();
+    expect(edge.to.portId).toEqual(expect.stringMatching(/^anchor:/));
+  });
+
+  it('projects an interior drop onto a beveled custom shape outline', () => {
+    const canvas = createCanvas(500, 240);
+    const renderer = new DiagramRenderer(canvas, { width: 500, height: 240, retina: false });
+    const interaction = renderer.enableInteractions({ attachToOutline: true });
+
+    if (typeof globalThis.Path2D === 'undefined') {
+      class Path2DPolyfill {
+        moveTo(): void {}
+        lineTo(): void {}
+        closePath(): void {}
+      }
+      vi.stubGlobal('Path2D', Path2DPolyfill);
+    }
+    const nodeA = new RectangleNode({ x: 20, y: 80, width: 80, height: 60 });
+    const nodeB = new CustomShapeNode({
+      x: 220,
+      y: 20,
+      width: 220,
+      height: 180,
+      shapeType: 'beveled-rectangle',
+      path: (width, height) => {
+        const path = new Path2D();
+        const cut = 12;
+        path.moveTo(cut, 0);
+        path.lineTo(width - cut, 0);
+        path.lineTo(width, cut);
+        path.lineTo(width, height - cut);
+        path.lineTo(width - cut, height);
+        path.lineTo(cut, height);
+        path.lineTo(0, height - cut);
+        path.lineTo(0, cut);
+        path.closePath();
+        return path;
+      },
+    });
+    vi.spyOn(nodeB, 'hitTest').mockImplementation(
+      (point) =>
+        point.x >= nodeB.x &&
+        point.x <= nodeB.x + nodeB.width &&
+        point.y >= nodeB.y &&
+        point.y <= nodeB.y + nodeB.height
+    );
+    renderer.addNode(nodeA);
+    renderer.addNode(nodeB);
+
+    const edge = new Edge({
+      from: { nodeId: nodeA.id, portId: 'anchor:right:0' },
+      to: { nodeId: nodeB.id, portId: 'anchor:left:0' },
+      type: 'orthogonal',
+      lockAnchors: true,
+    });
+    renderer.addEdge(edge);
+    renderer.render();
+    interaction.selection.select(edge.id);
+
+    const handle = { ...edge.endPoint };
+    const inside = { x: nodeB.x + nodeB.width / 2, y: nodeB.y + nodeB.height / 2 };
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', {
+        clientX: handle.x,
+        clientY: handle.y,
+        button: 0,
+        bubbles: true,
+      })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mousemove', {
+        clientX: inside.x,
+        clientY: inside.y,
+        button: 0,
+        buttons: 1,
+        bubbles: true,
+      })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mouseup', { clientX: inside.x, clientY: inside.y, button: 0, bubbles: true })
+    );
+
+    expect(edge.to.nodeId).toBe(nodeB.id);
+    expect(edge.to.portId).toBeUndefined();
+    expect(edge.to.outlineParam).toEqual(expect.any(Number));
+  });
+
   it('keeps a start point slid along the outline when anchors are locked', () => {
     const canvas = createCanvas(400, 240);
     const renderer = new DiagramRenderer(canvas, { width: 400, height: 240, retina: false });
@@ -831,7 +1015,7 @@ describe('ConnectionManager', () => {
     );
 
     expect(renderer.edges.size).toBe(2);
-    const created = Array.from(renderer.edges.values()).find(edge => edge.id !== host.id)!;
+    const created = Array.from(renderer.edges.values()).find((edge) => edge.id !== host.id)!;
     expect(created.from.nodeId).toBe(note.id);
     expect(created.to.edgeId).toBe(host.id);
     expect(created.to.pathParam).toBeGreaterThan(0.2);
@@ -894,7 +1078,7 @@ describe('ConnectionManager', () => {
       })
     );
 
-    const created = Array.from(renderer.edges.values()).find(edge => edge.id !== host.id);
+    const created = Array.from(renderer.edges.values()).find((edge) => edge.id !== host.id);
     expect(created?.from.nodeId).toBe(source.id);
     expect(created?.to.nodeId).toBe(group.id);
     expect(created?.to.edgeId).toBeUndefined();
@@ -954,7 +1138,7 @@ describe('ConnectionManager', () => {
       })
     );
 
-    const created = Array.from(renderer.edges.values()).find(edge => edge.id !== host.id);
+    const created = Array.from(renderer.edges.values()).find((edge) => edge.id !== host.id);
     expect(created?.from.nodeId).toBe(note.id);
     expect(created?.to.edgeId).toBe(host.id);
     expect(created?.to.nodeId).toBeUndefined();
@@ -1011,7 +1195,7 @@ describe('ConnectionManager', () => {
       })
     );
 
-    const created = Array.from(renderer.edges.values()).find(edge => edge.id !== host.id);
+    const created = Array.from(renderer.edges.values()).find((edge) => edge.id !== host.id);
     expect(created?.from.nodeId).toBe(note.id);
     expect(created?.to.edgeId).toBe(host.id);
     expect(created?.to.nodeId).toBeUndefined();
@@ -1071,7 +1255,7 @@ describe('ConnectionManager', () => {
       })
     );
 
-    const created = Array.from(renderer.edges.values()).find(edge => edge.id !== host.id);
+    const created = Array.from(renderer.edges.values()).find((edge) => edge.id !== host.id);
     expect(created?.from.nodeId).toBe(note.id);
     expect(created?.to.edgeId).toBe(host.id);
     expect(created?.to.nodeId).toBeUndefined();
@@ -1132,7 +1316,7 @@ describe('ConnectionManager', () => {
       })
     );
 
-    const created = Array.from(renderer.edges.values()).find(edge => edge.id !== host.id);
+    const created = Array.from(renderer.edges.values()).find((edge) => edge.id !== host.id);
     expect(created?.from.nodeId).toBe(note.id);
     expect(created?.to.edgeId).toBe(host.id);
     expect(created?.to.nodeId).toBeUndefined();
@@ -1198,7 +1382,7 @@ describe('ConnectionManager', () => {
       })
     );
 
-    const created = Array.from(renderer.edges.values()).find(edge => edge.id !== host.id);
+    const created = Array.from(renderer.edges.values()).find((edge) => edge.id !== host.id);
     expect(created?.from.nodeId).toBe(confirm.id);
     expect(created?.to.edgeId).toBe(host.id);
     expect(created?.to.nodeId).toBeUndefined();
@@ -1267,7 +1451,7 @@ describe('ConnectionManager', () => {
       })
     );
 
-    const created = Array.from(renderer.edges.values()).find(edge => edge.id !== host.id);
+    const created = Array.from(renderer.edges.values()).find((edge) => edge.id !== host.id);
     expect(created?.from.nodeId).toBe(confirm.id);
     expect(created?.to.edgeId).toBe(host.id);
     expect(created?.to.nodeId).toBeUndefined();
@@ -1338,7 +1522,7 @@ describe('ConnectionManager', () => {
       })
     );
 
-    const created = Array.from(renderer.edges.values()).find(edge => edge.id !== host.id);
+    const created = Array.from(renderer.edges.values()).find((edge) => edge.id !== host.id);
     expect(created?.from.nodeId).toBe(confirm.id);
     expect(created?.to.edgeId).toBe(host.id);
   });
@@ -1399,7 +1583,7 @@ describe('ConnectionManager', () => {
       })
     );
 
-    const created = Array.from(renderer.edges.values()).find(edge => edge.id !== host.id);
+    const created = Array.from(renderer.edges.values()).find((edge) => edge.id !== host.id);
     expect(created?.from.nodeId).toBe(confirm.id);
     expect(created?.to.nodeId).toBe(endError.id);
     expect(created?.to.edgeId).toBeUndefined();
@@ -1473,7 +1657,7 @@ describe('ConnectionManager', () => {
       })
     );
 
-    const created = Array.from(renderer.edges.values()).find(edge => edge.id !== host.id);
+    const created = Array.from(renderer.edges.values()).find((edge) => edge.id !== host.id);
     expect(created?.from.nodeId).toBe(confirm.id);
     expect(created?.to.edgeId).toBe(host.id);
     expect(created?.to.nodeId).toBeUndefined();
@@ -1542,7 +1726,7 @@ describe('ConnectionManager', () => {
       })
     );
 
-    const created = Array.from(renderer.edges.values()).find(edge => edge.id !== link1.id);
+    const created = Array.from(renderer.edges.values()).find((edge) => edge.id !== link1.id);
     expect(created?.from.nodeId).toBe(e.id);
     expect(created?.to.edgeId).toBe(link1.id);
     expect(created?.to.nodeId).toBeUndefined();
@@ -1610,7 +1794,7 @@ describe('ConnectionManager', () => {
       })
     );
 
-    const created = Array.from(renderer.edges.values()).find(edge => edge.id !== link1.id);
+    const created = Array.from(renderer.edges.values()).find((edge) => edge.id !== link1.id);
     expect(created?.from.nodeId).toBe(e.id);
     expect(created?.to.edgeId).toBe(link1.id);
     expect(created?.to.nodeId).toBeUndefined();
@@ -1677,7 +1861,7 @@ describe('ConnectionManager', () => {
       })
     );
 
-    const created = Array.from(renderer.edges.values()).find(edge => edge.id !== link1.id);
+    const created = Array.from(renderer.edges.values()).find((edge) => edge.id !== link1.id);
     expect(created?.from.nodeId).toBe(e.id);
     expect(created?.to.edgeId).toBe(link1.id);
   });
@@ -2104,7 +2288,7 @@ describe('ConnectionManager', () => {
       })
     );
 
-    expect(Array.from(renderer.edges.values()).some(edge => edge.id !== host.id)).toBe(false);
+    expect(Array.from(renderer.edges.values()).some((edge) => edge.id !== host.id)).toBe(false);
   });
 
   it('supports configurable connection preview path type', () => {
