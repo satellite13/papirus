@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.23] - 2026-11-24
+
 ### Fixed
 - With attach-to-outline on, dropping a reconnect inside a node projects the end onto that node's contour before the history event, instead of locking the nearest port.
 
