@@ -81,6 +81,7 @@ export type {
   NodeBadgeOption,
   ResizeHandle,
   AnchorPointsConfig,
+  LabelOverflow,
 } from './elements/Node';
 
 export { Port, resetPortIdCounter } from './elements/Port';

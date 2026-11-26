@@ -395,4 +395,111 @@ describe('Node', () => {
     node.renderResizeHandles(ctx);
     expect(ctx.rect).toHaveBeenCalled();
   });
+
+  describe('labelOverflow hide', () => {
+    function wideMeasure(ctx: CanvasRenderingContext2D): void {
+      ctx.measureText = ((text: string) => ({
+        width: text.length * 8,
+      })) as CanvasRenderingContext2D['measureText'];
+    }
+
+    it('keeps node size and hides an overflowing label instead of growing', () => {
+      const ctx = mockCanvasContext();
+      wideMeasure(ctx);
+      const node = new CircleNode({
+        x: 0,
+        y: 0,
+        width: 12,
+        height: 12,
+        label: 'Управленческая отчётность',
+        labelOverflow: 'hide',
+      });
+
+      node.render(ctx);
+
+      expect(node.width).toBe(12);
+      expect(node.height).toBe(12);
+      expect(node.labelHiddenByOverflow).toBe(true);
+      expect(ctx.fillText).not.toHaveBeenCalled();
+    });
+
+    it('renders the label when it fits the node', () => {
+      const ctx = mockCanvasContext();
+      wideMeasure(ctx);
+      const node = new CircleNode({
+        x: 0,
+        y: 0,
+        width: 120,
+        height: 120,
+        label: 'ok',
+        labelOverflow: 'hide',
+      });
+
+      node.render(ctx);
+
+      expect(node.labelHiddenByOverflow).toBe(false);
+      expect(ctx.fillText).toHaveBeenCalled();
+    });
+
+    it('defaults to grow and never reports a hidden label in grow mode', () => {
+      const ctx = mockCanvasContext();
+      wideMeasure(ctx);
+      const node = new CircleNode({
+        x: 0,
+        y: 0,
+        width: 12,
+        height: 12,
+        label: 'Управленческая отчётность',
+      });
+
+      expect(node.labelOverflow).toBe('grow');
+
+      node.render(ctx);
+
+      expect(node.labelHiddenByOverflow).toBe(false);
+      expect(node.width).toBeGreaterThan(12);
+    });
+
+    it('excludes the label from content min size in hide mode', () => {
+      const ctx = mockCanvasContext();
+      wideMeasure(ctx);
+      const grown = new CircleNode({
+        x: 0,
+        y: 0,
+        width: 12,
+        height: 12,
+        label: 'Бухучёт',
+      });
+      const hidden = new CircleNode({
+        x: 0,
+        y: 0,
+        width: 12,
+        height: 12,
+        label: 'Бухучёт',
+        labelOverflow: 'hide',
+      });
+
+      const grownMin = grown.getContentMinSize(ctx);
+      const hiddenMin = hidden.getContentMinSize(ctx);
+
+      expect(grownMin.width).toBeGreaterThan(12);
+      expect(hiddenMin.width).toBeLessThanOrEqual(12);
+      expect(hiddenMin.height).toBeLessThanOrEqual(12);
+    });
+
+    it('omits the overflowing label from SVG export in hide mode', () => {
+      const ctx = mockCanvasContext();
+      wideMeasure(ctx);
+      const node = new CircleNode({
+        x: 0,
+        y: 0,
+        width: 12,
+        height: 12,
+        label: 'Бухучёт',
+        labelOverflow: 'hide',
+      });
+
+      expect(node.getLabelBoundsForExport(ctx)).toBeNull();
+    });
+  });
 });

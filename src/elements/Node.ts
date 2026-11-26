@@ -82,7 +82,18 @@ export interface NodeOptions {
   labelPlacement?: LabelPlacement;
   /** Gap in px between the shape AABB and an external label. Default 4. */
   labelGap?: number;
+  /**
+   * Behavior when the centered label does not fit the node:
+   * - `grow` (default) — enlarge the node so the label fits (legacy behavior);
+   * - `hide` — keep the node size and do not render the overflowing label.
+   */
+  labelOverflow?: LabelOverflow;
 }
+
+/**
+ * Centered label overflow behavior — see {@link NodeOptions.labelOverflow}.
+ */
+export type LabelOverflow = 'grow' | 'hide';
 
 export type ResizeHandle = 'nw' | 'ne' | 'se' | 'sw';
 export type AnchorId = `${'top' | 'right' | 'bottom' | 'left'}:${number}`;
@@ -130,6 +141,8 @@ export abstract class Node extends Element {
   private _hoveredBadgeIndex = -1;
   protected _labelPlacement: LabelPlacement;
   protected _labelGap: number;
+  protected _labelOverflow: LabelOverflow;
+  private _labelHiddenByOverflow = false;
 
   protected constructor(options: NodeOptions) {
     super({
@@ -157,6 +170,7 @@ export abstract class Node extends Element {
       options.labelGap !== undefined && Number.isFinite(options.labelGap)
         ? Math.max(0, options.labelGap)
         : DEFAULT_LABEL_GAP;
+    this._labelOverflow = options.labelOverflow ?? 'grow';
 
     if (options.label !== undefined) {
       if (typeof options.label === 'string') {
@@ -243,6 +257,26 @@ export abstract class Node extends Element {
       this._labelGap = next;
       this.markDirty();
     }
+  }
+
+  get labelOverflow(): LabelOverflow {
+    return this._labelOverflow;
+  }
+
+  set labelOverflow(value: LabelOverflow) {
+    const next: LabelOverflow = value === 'hide' ? 'hide' : 'grow';
+    if (this._labelOverflow !== next) {
+      this._labelOverflow = next;
+      this.markDirty();
+    }
+  }
+
+  /**
+   * True when the centered label was not rendered on the last draw because it
+   * does not fit the node and {@link labelOverflow} is `hide`.
+   */
+  get labelHiddenByOverflow(): boolean {
+    return this._labelHiddenByOverflow;
   }
 
   usesExternalLabel(): boolean {
@@ -593,6 +627,12 @@ export abstract class Node extends Element {
     this._label.setAutoMaxWidth(wrapWidth);
     const labelSize = this._label.measure(ctx);
 
+    // Keep the exported SVG consistent with the canvas: the overflowing label
+    // is not drawn in `hide` mode.
+    if (this._labelOverflow === 'hide' && this.isLabelOverflowing(labelSize)) {
+      return null;
+    }
+
     const { labelBounds } = this.calculateContentLayout(
       bounds,
       iconBoxSize,
@@ -647,12 +687,20 @@ export abstract class Node extends Element {
     const labelSize = this._label ? this._label.measure(ctx) : undefined;
 
     if ((labelSize || iconBoxSize) && !externalLabel) {
-      this.ensureContentsFit(labelSize, iconBoxSize);
-      // Re-measure after potential resize
-      if (this._label && iconBoxSize) {
-        bounds = this.getBounds();
-        this._label.setAutoMaxWidth(this.getLabelWrapWidth(bounds));
+      if (this._labelOverflow === 'hide') {
+        // Keep the authored size; the overflowing label is simply not drawn.
+        this._labelHiddenByOverflow = this.isLabelOverflowing(labelSize);
+      } else {
+        this._labelHiddenByOverflow = false;
+        this.ensureContentsFit(labelSize, iconBoxSize);
+        // Re-measure after potential resize
+        if (this._label && iconBoxSize) {
+          bounds = this.getBounds();
+          this._label.setAutoMaxWidth(this.getLabelWrapWidth(bounds));
+        }
       }
+    } else {
+      this._labelHiddenByOverflow = false;
     }
 
     const { iconBounds, labelBounds } = this.calculateContentLayout(
@@ -665,7 +713,9 @@ export abstract class Node extends Element {
       this._icon.render(ctx, iconBounds);
     }
 
-    this.renderLabel(ctx, labelBounds);
+    if (!this._labelHiddenByOverflow) {
+      this.renderLabel(ctx, labelBounds);
+    }
     this.renderPorts(ctx);
   }
 
@@ -739,7 +789,10 @@ export abstract class Node extends Element {
    */
   getContentMinSize(ctx: CanvasRenderingContext2D, _availableWidth?: number): Size {
     const bounds = this.getBounds();
-    const labelSize = this._label ? this._label.measure(ctx) : undefined;
+    // In `hide` mode the label never forces a minimal size — the node may be
+    // resized below the text and the label is not rendered instead.
+    const labelSize =
+      this._label && this._labelOverflow !== 'hide' ? this._label.measure(ctx) : undefined;
     const iconBoxSize = this._icon ? this.getIconBoxSize() : undefined;
     return this.calculateContentMinSize(labelSize, iconBoxSize, bounds);
   }
@@ -1126,6 +1179,18 @@ export abstract class Node extends Element {
     if (minSize.height > bounds.height) {
       this.height = minSize.height;
     }
+  }
+
+  /**
+   * True when the measured label does not fit the label container of the
+   * current bounds. Used by the `hide` label overflow mode.
+   */
+  private isLabelOverflowing(labelSize?: Size): boolean {
+    if (!labelSize) {
+      return false;
+    }
+    const container = this.getLabelContainerBounds(this.getBounds());
+    return labelSize.width > container.width || labelSize.height > container.height;
   }
 
   private calculateContentMinSize(
