@@ -9,6 +9,8 @@
 
 ## [Unreleased]
 
+## [0.9.24] - 2026-11-26
+
 ### Добавлено
 - Узлы: опция `labelOverflow: 'hide'` — центрированная метка, не влезающая в фигуру, больше не растягивает узел, а не рисуется; доступна через `node.labelHiddenByOverflow` (тултип хоста), min-size и SVG-экспорт это учитывают.
 
@@ -570,7 +572,8 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.18...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.24...HEAD
+[0.9.24]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.23...v0.9.24
 [0.9.18]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.17...v0.9.18
 [0.9.17]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.16...v0.9.17
 [0.9.16]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.15...v0.9.16

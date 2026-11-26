@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.24] - 2026-11-26
+
 ### Added
 - Nodes: `labelOverflow: 'hide'` option — a centered label that does not fit the shape no longer stretches the node and is not rendered; the state is exposed via `node.labelHiddenByOverflow` (host hover tooltip), and min-size and SVG export respect the mode.
 
@@ -563,7 +565,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Edge animations (flow effect)
 - Context menu and search/filter
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.18...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.24...HEAD
+[0.9.24]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.23...v0.9.24
 [0.9.18]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.17...v0.9.18
 [0.9.17]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.16...v0.9.17
 [0.9.16]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.15...v0.9.16
