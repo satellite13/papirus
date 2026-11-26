@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Nodes: `labelOverflow: 'hide'` option — a centered label that does not fit the shape no longer stretches the node and is not rendered; the state is exposed via `node.labelHiddenByOverflow` (host hover tooltip), and min-size and SVG export respect the mode.
+
 ## [0.9.23] - 2026-11-24
 
 ### Fixed
