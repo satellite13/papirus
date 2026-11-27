@@ -95,7 +95,8 @@ describe('auto polyline routing performance', () => {
       times.push(performance.now() - t0);
     }
     times.sort((a, b) => a - b);
-    // ~45 ms locally; the unbounded search took > 1 s. Generous for slow CI runners.
-    expect(times[1]).toBeLessThan(400);
+    // ~45 ms locally; the unbounded search took > 1 s. CI with coverage can
+    // sit just over 400 ms on shared runners — keep headroom above that.
+    expect(times[1]).toBeLessThan(600);
   });
 });
