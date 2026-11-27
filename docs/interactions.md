@@ -147,6 +147,14 @@ interactions.connection.setAttachToOutline(true);  // привязка стре�
 - при drag точки работают осевые магниты (к вертикали/горизонтали соседних сегментов);
 - при drag узла ближайшая ортогональная точка перелома может сопровождать движение для сохранения геометрии.
 
+Точки редактирования можно полностью выключить:
+
+```ts
+interactions.connection.setEdgeEditPointsEnabled(false); // скрыть точки перелома и mid-handle
+```
+
+При выключенной опции ручки изломов, drag сегментов и вставка по клику скрыты/игнорируются; drag метки и переподключение концов работают. Опция также задаётся при создании: `renderer.enableInteractions({ edgeEditPointsEnabled: false })`.
+
 Undo/redo для правок контрольных точек выполняется через `ChangeEditablePolylineControlPointsCommand` (добавляется в `history` автоматически при интерактивном drag; можно использовать вручную при программных изменениях). Сдвиг метки — через `ChangeEdgeLabelLayoutCommand`.
 
 ### События `ConnectionManager`

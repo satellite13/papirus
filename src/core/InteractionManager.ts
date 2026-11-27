@@ -66,6 +66,11 @@ export interface InteractionManagerOptions {
   attachToOutline?: boolean;
   /** Preview path type while creating a new connection */
   previewPathType?: ConnectionPreviewPathType;
+  /**
+   * When false, editable-polyline editing points (bend handles, segment drag, insert
+   * handles) are hidden and bend gestures are ignored. Default: true.
+   */
+  edgeEditPointsEnabled?: boolean;
   /** When true, disable editing interactions and keep navigation/selection only */
   navigationOnly?: boolean;
   keymap?: Partial<InteractionKeymap>;
@@ -170,6 +175,7 @@ export class InteractionManager {
       gridSize: options.gridSize ?? 20,
       attachToOutline,
       previewPathType: options.previewPathType,
+      edgeEditPointsEnabled: options.edgeEditPointsEnabled,
       addEdge: (edge): void => {
         this.historyManager.execute({
           execute: (): void => this.renderer.addEdge(edge),

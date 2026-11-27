@@ -2731,4 +2731,139 @@ describe('ConnectionManager', () => {
       })
     );
   });
+
+  it('ignores bend gestures and hides edit points when edgeEditPointsEnabled is false', () => {
+    const canvas = createCanvas(500, 300);
+    const renderer = new DiagramRenderer(canvas, { width: 500, height: 300, retina: false });
+    const interaction = renderer.enableInteractions({
+      edgeEditPointsEnabled: false,
+      createEdge: (from, to) => new Edge({ from, to, type: 'editable-polyline' }),
+    });
+
+    const source = new RectangleNode({ x: 40, y: 100, width: 80, height: 40 });
+    const target = new RectangleNode({ x: 320, y: 100, width: 80, height: 40 });
+    renderer.addNode(source);
+    renderer.addNode(target);
+
+    const edge = new Edge({
+      from: { nodeId: source.id },
+      to: { nodeId: target.id },
+      type: 'editable-polyline',
+      controlPoints: [{ x: 200, y: 200 }],
+    });
+    renderer.addEdge(edge);
+    edge.updateEndpoints({ x: 120, y: 120 }, { x: 320, y: 200 });
+    edge.state = 'selected';
+
+    const onDragStart = vi.fn();
+    interaction.connection.on('controlPointDragStart', onDragStart);
+
+    // Drag the bend — must stay in place.
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', { clientX: 200, clientY: 200, button: 0, bubbles: true })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mousemove', {
+        clientX: 240,
+        clientY: 230,
+        button: 0,
+        buttons: 1,
+        bubbles: true,
+      })
+    );
+    canvas.dispatchEvent(new MouseEvent('mouseup', { clientX: 240, clientY: 230, bubbles: true }));
+
+    expect(onDragStart).not.toHaveBeenCalled();
+    expect(edge.controlPoints).toEqual([{ x: 200, y: 200 }]);
+
+    // Double click on the bend must not remove it either.
+    const removed = interaction.connection.handleDoubleClick({
+      worldX: 200,
+      worldY: 200,
+    } as Parameters<typeof interaction.connection.handleDoubleClick>[0]);
+    expect(removed).toBe(false);
+    expect(edge.controlPoints).toEqual([{ x: 200, y: 200 }]);
+  });
+
+  it('re-enabling edge edit points restores bend gestures', () => {
+    const canvas = createCanvas(500, 300);
+    const renderer = new DiagramRenderer(canvas, { width: 500, height: 300, retina: false });
+    const interaction = renderer.enableInteractions({
+      edgeEditPointsEnabled: false,
+      createEdge: (from, to) => new Edge({ from, to, type: 'editable-polyline' }),
+    });
+
+    const source = new RectangleNode({ x: 40, y: 100, width: 80, height: 40 });
+    const target = new RectangleNode({ x: 320, y: 100, width: 80, height: 40 });
+    renderer.addNode(source);
+    renderer.addNode(target);
+
+    const edge = new Edge({
+      from: { nodeId: source.id },
+      to: { nodeId: target.id },
+      type: 'editable-polyline',
+      controlPoints: [{ x: 200, y: 200 }],
+    });
+    renderer.addEdge(edge);
+    edge.updateEndpoints({ x: 120, y: 120 }, { x: 320, y: 200 });
+    edge.state = 'selected';
+
+    interaction.connection.setEdgeEditPointsEnabled(true);
+
+    const onDragStart = vi.fn();
+    interaction.connection.on('controlPointDragStart', onDragStart);
+
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', { clientX: 200, clientY: 200, button: 0, bubbles: true })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mousemove', {
+        clientX: 240,
+        clientY: 230,
+        button: 0,
+        buttons: 1,
+        bubbles: true,
+      })
+    );
+    canvas.dispatchEvent(new MouseEvent('mouseup', { clientX: 240, clientY: 230, bubbles: true }));
+
+    expect(onDragStart).toHaveBeenCalled();
+    expect(edge.controlPoints![0]).toEqual({ x: 240, y: 230 });
+  });
+
+  it('cancels a pending segment insert when edge edit points are disabled', () => {
+    vi.useFakeTimers();
+    const canvas = createCanvas(500, 300);
+    const renderer = new DiagramRenderer(canvas, { width: 500, height: 300, retina: false });
+    const interaction = renderer.enableInteractions({
+      createEdge: (from, to) => new Edge({ from, to, type: 'editable-polyline' }),
+    });
+
+    const source = new RectangleNode({ x: 40, y: 40, width: 60, height: 40 });
+    const target = new RectangleNode({ x: 300, y: 200, width: 60, height: 40 });
+    renderer.addNode(source);
+    renderer.addNode(target);
+
+    const edge = new Edge({
+      from: { nodeId: source.id },
+      to: { nodeId: target.id },
+      type: 'editable-polyline',
+    });
+    renderer.addEdge(edge);
+    edge.updateEndpoints({ x: 100, y: 60 }, { x: 300, y: 220 });
+    edge.state = 'selected';
+
+    // Click on the diagonal segment body arms a deferred bend insert.
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', { clientX: 140, clientY: 130, button: 0, bubbles: true })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mouseup', { clientX: 140, clientY: 130, button: 0, bubbles: true })
+    );
+
+    interaction.connection.setEdgeEditPointsEnabled(false);
+    vi.advanceTimersByTime(EDGE_SEGMENT_INSERT_CLICK_DELAY_MS + 1);
+    expect(edge.controlPoints ?? []).toHaveLength(0);
+    vi.useRealTimers();
+  });
 });

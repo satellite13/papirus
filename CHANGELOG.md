@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Edge edit points toggle: `connection.setEdgeEditPointsEnabled(false)` (or `edgeEditPointsEnabled: false` in `enableInteractions`) hides polyline editing points — bend handles, segment drag and insert handles — and ignores bend gestures; label drag and endpoint reconnection keep working.
+
 ## [0.9.24] - 2026-11-26
 
 ### Added

@@ -69,6 +69,12 @@ export interface ConnectionManagerOptions {
   attachToOutline?: boolean;
   /** Connection preview path type while dragging a new edge */
   previewPathType?: ConnectionPreviewPathType;
+  /**
+   * When false, editable-polyline editing points (bend handles, segment drag,
+   * insert handles) are hidden and bend gestures are ignored. Label drag and
+   * endpoint reconnection stay active. Default: true.
+   */
+  edgeEditPointsEnabled?: boolean;
 }
 
 /**
@@ -131,6 +137,7 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
   private gridSize: number;
   private attachToOutline: boolean;
   private previewPathType: ConnectionPreviewPathType;
+  private edgeEditPointsEnabled: boolean;
 
   constructor(options: ConnectionManagerOptions) {
     super();
@@ -141,6 +148,7 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     this.gridSize = options.gridSize ?? 20;
     this.attachToOutline = options.attachToOutline ?? false;
     this.previewPathType = options.previewPathType ?? 'bezier';
+    this.edgeEditPointsEnabled = options.edgeEditPointsEnabled ?? true;
   }
 
   /**
@@ -149,6 +157,23 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
   setAttachToOutline(enabled: boolean): void {
     this.attachToOutline = enabled;
     this.renderer.attachToOutline = enabled;
+  }
+
+  /**
+   * Show/hide editable polyline control points (bend handles, segment drag, insert
+   * handles). When disabled, no editing points are rendered on edges and new bend
+   * gestures are ignored; label drag and endpoint reconnection remain active.
+   */
+  setEdgeEditPointsEnabled(enabled: boolean): void {
+    if (this.edgeEditPointsEnabled === enabled) {
+      return;
+    }
+    this.edgeEditPointsEnabled = enabled;
+    if (!enabled) {
+      // A deferred single-click insert must not add a bend after the toggle goes off.
+      this.cancelPendingSegmentInsert();
+    }
+    this.renderer.markDirty();
   }
 
   /**
@@ -772,6 +797,9 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
    * Remove editable polyline bend by double click.
    */
   handleDoubleClick(event: InputEvent): boolean {
+    if (!this.edgeEditPointsEnabled) {
+      return false;
+    }
     const point = { x: event.worldX, y: event.worldY };
     const radius = EDGE_CONTROL_POINT_RADIUS / Math.max(this.renderer.zoom, 0.0001);
     const radiusSq = radius * radius;
@@ -1312,7 +1340,7 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
       }
 
       // 1) Bend vertices (editable-polyline only)
-      if (edge.isEditablePolyline()) {
+      if (this.edgeEditPointsEnabled && edge.isEditablePolyline()) {
         const controlPoints = edge.getEditableControlPoints();
         const beforePoints = edge.controlPoints?.length
           ? clonePoints(edge.controlPoints)
@@ -1342,14 +1370,16 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
       }
 
       // 2) Mid-segment handle → orthogonal run drag (colinear segments share one handle)
-      for (const run of listOrthogonalRuns(vertices)) {
-        const mid = orthogonalRunMidpoint(vertices, run);
-        const dx = point.x - mid.x;
-        const dy = point.y - mid.y;
-        if (dx * dx + dy * dy > segmentRadiusSq) {
-          continue;
+      if (this.edgeEditPointsEnabled) {
+        for (const run of listOrthogonalRuns(vertices)) {
+          const mid = orthogonalRunMidpoint(vertices, run);
+          const dx = point.x - mid.x;
+          const dy = point.y - mid.y;
+          if (dx * dx + dy * dy > segmentRadiusSq) {
+            continue;
+          }
+          return this.beginSegmentDrag(edge, run);
         }
-        return this.beginSegmentDrag(edge, run);
       }
 
       // 3) Label drag (selected edge with a label)
@@ -1365,16 +1395,18 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
       }
 
       // 4) Click on segment body → pending insert (committed after delay unless dblclick)
-      const hit = this.hitSegmentBody(edge, point);
-      if (hit) {
-        this.pendingSegmentInsert = {
-          edge,
-          segmentIndex: hit.segmentIndex,
-          point: this.snapPoint(hit.point),
-          startX: event.worldX,
-          startY: event.worldY,
-        };
-        return true;
+      if (this.edgeEditPointsEnabled) {
+        const hit = this.hitSegmentBody(edge, point);
+        if (hit) {
+          this.pendingSegmentInsert = {
+            edge,
+            segmentIndex: hit.segmentIndex,
+            point: this.snapPoint(hit.point),
+            startX: event.worldX,
+            startY: event.worldY,
+          };
+          return true;
+        }
       }
     }
 
@@ -1633,6 +1665,9 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
   }
 
   private renderEditablePolylineControls(ctx: CanvasRenderingContext2D): void {
+    if (!this.edgeEditPointsEnabled) {
+      return;
+    }
     const pointRadius = EDGE_CONTROL_POINT_RADIUS / Math.max(this.renderer.zoom, 0.0001);
     const segmentRadius = EDGE_ADD_CONTROL_RADIUS / Math.max(this.renderer.zoom, 0.0001);
 
