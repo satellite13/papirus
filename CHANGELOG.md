@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.25] - 2026-11-27
+
 ### Added
 - Draw.io-style face editing: dragging a straight (orthogonal) segment body — or a bend that sits inside a straight run — slides the whole face perpendicular to itself instead of kinking at the grab point. Corner bends keep free movement; Alt+drag keeps the legacy insert-a-bend-and-drag gesture; a plain click still adds a waypoint; diagonal segments keep insert-then-drag.
 - Edge edit points toggle: `connection.setEdgeEditPointsEnabled(false)` (or `edgeEditPointsEnabled: false` in `enableInteractions`) hides polyline editing points — bend handles, segment drag and insert handles — and ignores bend gestures; label drag and endpoint reconnection keep working.
@@ -569,7 +571,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Edge animations (flow effect)
 - Context menu and search/filter
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.24...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.25...HEAD
+[0.9.25]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.24...v0.9.25
 [0.9.24]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.23...v0.9.24
 [0.9.18]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.17...v0.9.18
 [0.9.17]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.16...v0.9.17

@@ -9,6 +9,8 @@
 
 ## [Unreleased]
 
+## [0.9.25] - 2026-11-27
+
 ### Добавлено
 - Редактирование грани как в draw.io: перетаскивание тела прямого (ортогонального) сегмента — или точки, лежащей внутри прямой грани, — двигает всю грань по перпендикуляру, а не гнёт линию в точке захвата. Углы двигаются свободно; Alt + перетаскивание сохраняет прежний жест «вставить излом и тянуть его»; одиночный клик по-прежнему ставит точку; диагонали остались с вставкой излома.
 - Переключатель точек редактирования связей: `connection.setEdgeEditPointsEnabled(false)` (или `edgeEditPointsEnabled: false` в `enableInteractions`) скрывает точки перелома — ручки изломов, drag сегментов и вставку — и игнорирует жесты изломов; drag метки и переподключение концов продолжают работать.
@@ -576,7 +578,8 @@
 - Анимации для рёбер (flow effect)
 - Контекстное меню и поиск/фильтрация
 
-[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.24...HEAD
+[Unreleased]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.25...HEAD
+[0.9.25]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.24...v0.9.25
 [0.9.24]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.23...v0.9.24
 [0.9.18]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.17...v0.9.18
 [0.9.17]: https://gitverse.ru/ngroznykh/papirus/compare/v0.9.16...v0.9.17
