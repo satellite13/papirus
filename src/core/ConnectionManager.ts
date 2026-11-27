@@ -590,11 +590,22 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
       const dx = event.worldX - this.pendingSegmentInsert.startX;
       const dy = event.worldY - this.pendingSegmentInsert.startY;
       if (dx * dx + dy * dy > DRAG_START_THRESHOLD * DRAG_START_THRESHOLD) {
-        // Drag past the click threshold: insert the bend now and keep dragging it.
-        // Cancelling here dropped insert-then-drag (magnet / undo tests).
         const pending = this.pendingSegmentInsert;
         this.cancelPendingSegmentInsert();
-        this.beginInsertBend(pending.edge, pending.segmentIndex, pending.point);
+        // Dragging a straight (orthogonal) face moves the whole run — draw.io
+        // style: the line slides as one piece instead of kinking at the grab
+        // point. Alt keeps the legacy insert-a-bend-and-drag gesture, and
+        // diagonal segments always insert a bend (the only way to reshape them).
+        const faceRun = event.altKey
+          ? null
+          : this.findOrthogonalRunForSegment(pending.edge, pending.segmentIndex);
+        if (faceRun) {
+          this.beginSegmentDrag(pending.edge, faceRun);
+        } else {
+          // Insert the bend now and keep dragging it. Cancelling here dropped
+          // insert-then-drag (magnet / undo tests).
+          this.beginInsertBend(pending.edge, pending.segmentIndex, pending.point);
+        }
       }
     }
 
@@ -1357,6 +1368,16 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
           if (!edge.controlPoints || edge.controlPoints.length === 0) {
             edge.controlPoints = controlPoints;
           }
+
+          // A bend that sits inside a straight run moves the whole face
+          // (draw.io-style) — the dot slides the entire colinear section, not
+          // just its own vertex. Corners keep free vertex movement; Alt+drag
+          // bends just this vertex (legacy kink gesture).
+          const faceRun = event.altKey ? null : this.findColinearFaceRun(edge, ci);
+          if (faceRun) {
+            return this.beginSegmentDrag(edge, faceRun);
+          }
+
           this.activeControlPointDrag = { edge, index: ci };
           this.emit('controlPointDragStart', edge, beforePoints, beforeType);
           this.renderer.markDirty();
@@ -1643,6 +1664,41 @@ export class ConnectionManager extends EventEmitter<ConnectionEvents> {
     let t = ((point.x - a.x) * dx + (point.y - a.y) * dy) / lenSq;
     t = Math.max(0, Math.min(1, t));
     return { x: a.x + t * dx, y: a.y + t * dy };
+  }
+
+  /** Orthogonal run that contains the given path segment, if any. */
+  private findOrthogonalRunForSegment(edge: Edge, segmentIndex: number): OrthogonalRun | null {
+    const vertices = this.getRoutableVertices(edge);
+    for (const run of listOrthogonalRuns(vertices)) {
+      if (segmentIndex >= run.startIndex && segmentIndex < run.endIndex) {
+        return run;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Orthogonal run through the given editable bend when the bend sits inside a
+   * straight section (both neighbours on the same axis) — dragging it slides
+   * the whole face. Returns null for corners and diagonal-adjacent bends.
+   */
+  private findColinearFaceRun(edge: Edge, bendIndex: number): OrthogonalRun | null {
+    const vertices = edge.getPathVertices();
+    const vertexIndex = bendIndex + 1;
+    if (vertexIndex < 1 || vertexIndex >= vertices.length - 1) {
+      return null;
+    }
+    const axisIn = segmentAxis(vertices[vertexIndex - 1]!, vertices[vertexIndex]!);
+    const axisOut = segmentAxis(vertices[vertexIndex]!, vertices[vertexIndex + 1]!);
+    if (!axisIn || axisIn !== axisOut) {
+      return null;
+    }
+    for (const run of listOrthogonalRuns(vertices)) {
+      if (run.axis === axisIn && run.startIndex < vertexIndex && vertexIndex < run.endIndex) {
+        return run;
+      }
+    }
+    return null;
   }
 
   private applyLabelDrag(edge: Edge, pointer: Point): void {

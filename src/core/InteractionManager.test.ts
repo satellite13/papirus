@@ -412,7 +412,7 @@ describe('InteractionManager', () => {
     expect(edge.controlPoints![1]).toEqual(before[1]);
   });
 
-  it('undo of insert-then-drag removes the inserted control point', () => {
+  it('undo of a segment face drag restores the previous control points', () => {
     const canvas = document.createElement('canvas');
     vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({
       left: 0,
@@ -444,21 +444,21 @@ describe('InteractionManager', () => {
     interaction.selection.select(edge.id);
 
     const beforeCount = edge.controlPoints!.length;
-    const insertX = (110 + 180) / 2;
-    const insertY = 100;
+    const grabX = (110 + 180) / 2;
+    const grabY = 100;
 
     canvas.dispatchEvent(
       new MouseEvent('mousedown', {
-        clientX: insertX,
-        clientY: insertY,
+        clientX: grabX,
+        clientY: grabY,
         button: 0,
         bubbles: true,
       })
     );
     canvas.dispatchEvent(
       new MouseEvent('mousemove', {
-        clientX: insertX,
-        clientY: insertY + 30,
+        clientX: grabX,
+        clientY: grabY + 30,
         button: 0,
         buttons: 1,
         bubbles: true,
@@ -466,16 +466,21 @@ describe('InteractionManager', () => {
     );
     canvas.dispatchEvent(
       new MouseEvent('mouseup', {
-        clientX: insertX,
-        clientY: insertY + 30,
+        clientX: grabX,
+        clientY: grabY + 30,
         button: 0,
         bubbles: true,
       })
     );
 
-    expect(edge.controlPoints!.length).toBeGreaterThan(beforeCount);
+    // The straight face slid to y=130; undo returns the original bend.
+    expect(edge.controlPoints).toEqual([
+      { x: 110, y: 130 },
+      { x: 250, y: 130 },
+    ]);
     interaction.history.undo();
     expect(edge.controlPoints).toHaveLength(beforeCount);
+    expect(edge.controlPoints).toEqual([{ x: 180, y: 100 }]);
   });
 
   it('undo restores control point removed by double click', () => {

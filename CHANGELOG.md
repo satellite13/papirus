@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Draw.io-style face editing: dragging a straight (orthogonal) segment body — or a bend that sits inside a straight run — slides the whole face perpendicular to itself instead of kinking at the grab point. Corner bends keep free movement; Alt+drag keeps the legacy insert-a-bend-and-drag gesture; a plain click still adds a waypoint; diagonal segments keep insert-then-drag.
 - Edge edit points toggle: `connection.setEdgeEditPointsEnabled(false)` (or `edgeEditPointsEnabled: false` in `enableInteractions`) hides polyline editing points — bend handles, segment drag and insert handles — and ignores bend gestures; label drag and endpoint reconnection keep working.
 
 ## [0.9.24] - 2026-11-26

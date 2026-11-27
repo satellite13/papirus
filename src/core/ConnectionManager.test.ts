@@ -814,7 +814,7 @@ describe('ConnectionManager', () => {
     expect(edge.startPoint.y).toBeLessThan(handle.y - 4);
   });
 
-  it('keeps a new editable bend pulled slightly off its segment', () => {
+  it('slides the whole straight face when dragging a segment body', () => {
     const canvas = createCanvas(400, 240);
     const renderer = new DiagramRenderer(canvas, { width: 400, height: 240, retina: false });
     const interaction = renderer.enableInteractions({ attachToOutline: true });
@@ -834,7 +834,65 @@ describe('ConnectionManager', () => {
     renderer.render();
     interaction.selection.select(edge.id);
 
-    // Midpoint of start → virtual center. The + sits on the straight segment.
+    // Grab the straight run away from its mid-handle and drag down: the whole
+    // face slides (draw.io-style) — no kink bend is inserted at the grab point.
+    const grab = { x: 80, y: 100 };
+    const draggedY = 94;
+
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', {
+        clientX: grab.x,
+        clientY: grab.y,
+        button: 0,
+        bubbles: true,
+      })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mousemove', {
+        clientX: grab.x,
+        clientY: draggedY,
+        button: 0,
+        buttons: 1,
+        bubbles: true,
+      })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mouseup', {
+        clientX: grab.x,
+        clientY: draggedY,
+        button: 0,
+        bubbles: true,
+      })
+    );
+
+    expect(edge.controlPoints).toEqual([
+      { x: 40, y: 94 },
+      { x: 200, y: 94 },
+    ]);
+  });
+
+  it('keeps an alt-drag bend pulled slightly off its segment', () => {
+    const canvas = createCanvas(400, 240);
+    const renderer = new DiagramRenderer(canvas, { width: 400, height: 240, retina: false });
+    const interaction = renderer.enableInteractions({ attachToOutline: true });
+
+    const nodeA = new RectangleNode({ x: 0, y: 80, width: 40, height: 40 });
+    const nodeB = new RectangleNode({ x: 200, y: 80, width: 40, height: 40 });
+    renderer.addNode(nodeA);
+    renderer.addNode(nodeB);
+
+    const edge = new Edge({
+      from: { nodeId: nodeA.id },
+      to: { nodeId: nodeB.id },
+      type: 'editable-polyline',
+    });
+    renderer.addEdge(edge);
+    edge.updateEndpoints({ x: 40, y: 100 }, { x: 200, y: 100 }, 'right', 'left');
+    renderer.render();
+    interaction.selection.select(edge.id);
+
+    // Alt+drag keeps the legacy gesture: insert a bend at the grab point and
+    // pull just that bend off the line (a kink, not a face slide).
     const insert = { x: 80, y: 100 };
     const draggedY = 94;
 
@@ -853,6 +911,7 @@ describe('ConnectionManager', () => {
         button: 0,
         buttons: 1,
         bubbles: true,
+        altKey: true,
       })
     );
     canvas.dispatchEvent(
@@ -868,7 +927,7 @@ describe('ConnectionManager', () => {
     expect(offSegment).toBe(true);
   });
 
-  it('keeps a new bend when the pull is inside the screen magnet but the diagram is zoomed out', () => {
+  it('keeps an alt-drag bend when the pull is inside the screen magnet but the diagram is zoomed out', () => {
     const canvas = createCanvas(400, 240);
     const renderer = new DiagramRenderer(canvas, { width: 400, height: 240, retina: false });
     const interaction = renderer.enableInteractions();
@@ -909,6 +968,7 @@ describe('ConnectionManager', () => {
         button: 0,
         buttons: 1,
         bubbles: true,
+        altKey: true,
       })
     );
     canvas.dispatchEvent(
@@ -956,6 +1016,104 @@ describe('ConnectionManager', () => {
     );
 
     expect(edge.controlPoints?.[0]).toEqual({ x: 40, y: 60 });
+  });
+
+  it('slides the whole face when dragging a bend that sits inside a straight run', () => {
+    const canvas = createCanvas(500, 300);
+    const renderer = new DiagramRenderer(canvas, { width: 500, height: 300, retina: false });
+    renderer.enableInteractions({
+      createEdge: (from, to) => new Edge({ from, to, type: 'editable-polyline' }),
+    });
+
+    const source = new RectangleNode({ x: 40, y: 40, width: 80, height: 40 });
+    const target = new RectangleNode({ x: 300, y: 200, width: 100, height: 40 });
+    renderer.addNode(source);
+    renderer.addNode(target);
+
+    // Horizontal run with a redundant colinear bend between start and the corner.
+    const edge = new Edge({
+      from: { nodeId: source.id },
+      to: { nodeId: target.id },
+      type: 'editable-polyline',
+      controlPoints: [
+        { x: 150, y: 60 },
+        { x: 200, y: 60 },
+        { x: 200, y: 220 },
+      ],
+    });
+    renderer.addEdge(edge);
+    edge.updateEndpoints({ x: 120, y: 60 }, { x: 280, y: 220 });
+    edge.state = 'selected';
+
+    // Drag the colinear bend at (150,60) down: the whole horizontal face slides
+    // with the dot; the corner at x=200 keeps its position.
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', { clientX: 150, clientY: 60, button: 0, bubbles: true })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mousemove', {
+        clientX: 150,
+        clientY: 130,
+        button: 0,
+        buttons: 1,
+        bubbles: true,
+      })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mouseup', { clientX: 150, clientY: 130, button: 0, bubbles: true })
+    );
+
+    expect(edge.controlPoints).toEqual([
+      { x: 120, y: 130 },
+      { x: 200, y: 130 },
+      { x: 200, y: 220 },
+    ]);
+  });
+
+  it('inserts a bend when dragging a diagonal segment body', () => {
+    const canvas = createCanvas(500, 300);
+    const renderer = new DiagramRenderer(canvas, { width: 500, height: 300, retina: false });
+    renderer.enableInteractions({
+      createEdge: (from, to) => new Edge({ from, to, type: 'editable-polyline' }),
+    });
+
+    const source = new RectangleNode({ x: 40, y: 40, width: 60, height: 40 });
+    const target = new RectangleNode({ x: 300, y: 200, width: 60, height: 40 });
+    renderer.addNode(source);
+    renderer.addNode(target);
+
+    const edge = new Edge({
+      from: { nodeId: source.id },
+      to: { nodeId: target.id },
+      type: 'editable-polyline',
+      controlPoints: [{ x: 250, y: 180 }],
+    });
+    renderer.addEdge(edge);
+    edge.updateEndpoints({ x: 100, y: 60 }, { x: 300, y: 220 });
+    edge.state = 'selected';
+
+    // Diagonal body drag keeps the insert gesture: a bend appears at the grab
+    // point and follows the pointer; the existing corner stays untouched.
+    canvas.dispatchEvent(
+      new MouseEvent('mousedown', { clientX: 160, clientY: 108, button: 0, bubbles: true })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mousemove', {
+        clientX: 170,
+        clientY: 118,
+        button: 0,
+        buttons: 1,
+        bubbles: true,
+      })
+    );
+    canvas.dispatchEvent(
+      new MouseEvent('mouseup', { clientX: 170, clientY: 118, button: 0, bubbles: true })
+    );
+
+    expect(edge.controlPoints).toEqual([
+      { x: 170, y: 118 },
+      { x: 250, y: 180 },
+    ]);
   });
 
   it('creates edge when connection completed onto another edge', () => {
